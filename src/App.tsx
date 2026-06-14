@@ -1413,16 +1413,28 @@ export default function App() {
                               {section.highlights && section.highlights.length > 0 && (
                                 <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {section.highlights.map((hl, hlIdx) => (
-                                    <div key={hlIdx} className="p-3 bg-brand-light/50 border border-gray-100 rounded-xl flex flex-col justify-between">
-                                      <div className="font-sans font-bold text-xs">
-                                        {hl.termThai && (
-                                          <span className="text-brand-purple text-sm font-black mr-1">{hl.termThai}</span>
-                                        )}
-                                        <span className="text-brand-green italic">({hl.termPhonetic})</span>
+                                    <div key={hlIdx} className="p-3.5 bg-brand-light/50 border border-gray-200 rounded-xl flex items-center justify-between gap-3.5 hover:border-brand-purple/30 transition-all shadow-3xs">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="font-sans font-bold text-xs flex items-center flex-wrap gap-1">
+                                          {hl.termThai && (
+                                            <span className="text-brand-purple text-base font-black mr-1">{hl.termThai}</span>
+                                          )}
+                                          <span className="text-brand-green italic font-black">({hl.termPhonetic})</span>
+                                        </div>
+                                        <div className="text-[11px] font-sans mt-2 font-bold text-brand-dark leading-snug">
+                                          {hl.meaningEnglish} • <span className="text-brand-muted">{hl.meaningMyanmar}</span>
+                                        </div>
                                       </div>
-                                      <div className="text-[11px] font-sans mt-1.5 font-bold text-brand-dark">
-                                        {hl.meaningEnglish} • <span className="text-brand-muted">{hl.meaningMyanmar}</span>
-                                      </div>
+                                      {hl.termThai && (
+                                        <button
+                                          onClick={() => speakText(hl.termThai)}
+                                          className="p-1 px-2 border-2 border-brand-purple/20 bg-[#fbfaff] hover:bg-brand-purple/10 text-brand-purple hover:text-brand-purple-dark text-[10px] rounded-lg font-black shrink-0 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                          title="Play sound • အသံထွက်ဖွင့်ရန်"
+                                        >
+                                          <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                                          <span>Play</span>
+                                        </button>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
