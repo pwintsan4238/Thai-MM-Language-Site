@@ -4742,7 +4742,7 @@ export default function App() {
                   Join Language Course!
                 </h3>
                 <p className="text-[11px] text-brand-muted font-sans font-semibold mt-1 leading-normal">
-                  ဝင်ရောက်ပြီး သင်ခန်းစာများ စင့်ခ်လုပ်ကာ ဝေါဟာရအသစ်များ ထည့်သွင်းသိမ်းဆည်းပါ။
+                  အကောင့်ဝင်ပြီး သင်ခန်းစာများ လေ့လာပါ။
                 </p>
               </div>
 
