@@ -34,6 +34,7 @@ import {
   Shield,
   Trash2,
   Plus,
+  Archive,
   X,
   Pencil,
   TrendingUp,
@@ -49,6 +50,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { isSingleSentenceEnglish } from './utils/sentenceUtils';
+import { autoFillWord } from './utils/dictionary';
 
 const STORE_ITEMS = [
   {
@@ -320,6 +322,7 @@ export default function App() {
   const [newWordNotes, setNewWordNotes] = useState<string>('');
   const [notebookError, setNotebookError] = useState<string>('');
   const [notebookSuccess, setNotebookSuccess] = useState<string>('');
+  const [showArchived, setShowArchived] = useState<boolean>(false);
 
   // Editing state
   const [editingWordThai, setEditingWordThai] = useState<string | null>(null);
@@ -1777,9 +1780,13 @@ export default function App() {
                         )}
 
                         <div className="space-y-3.5">
+                          <p className="text-[10px] text-brand-purple font-semibold leading-normal font-sans bg-brand-purple-light/40 p-2.5 rounded-lg border border-brand-purple/10">
+                            💡 <strong>Smart Filler Enabled:</strong> Fill only 1-2 fields (e.g. English or Thai) and submit! The app will automatically translate, structure, and create the card for you.
+                          </p>
+
                           <div>
                             <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
-                              Thai Script * (e.g. สวัสดี)
+                              Thai Script (e.g. สวัสดี)
                             </label>
                             <input
                               type="text"
@@ -1792,7 +1799,7 @@ export default function App() {
 
                           <div>
                             <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
-                              Phonetic pronunciation * (e.g. sà-wàt-dii)
+                              Phonetic pronunciation (e.g. sà-wàt-dii)
                             </label>
                             <input
                               type="text"
@@ -1805,7 +1812,7 @@ export default function App() {
 
                           <div>
                             <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
-                              English Translation * (e.g. Hello)
+                              English Translation (e.g. Hello)
                             </label>
                             <input
                               type="text"
@@ -1818,7 +1825,7 @@ export default function App() {
 
                           <div>
                             <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
-                              Myanmar Translation * (e.g. မင်္ဂလာပါ)
+                              Myanmar Translation (e.g. မင်္ဂလာပါ)
                             </label>
                             <input
                               type="text"
@@ -1867,22 +1874,30 @@ export default function App() {
                               const cleanPhonetic = newWordPhonetic.trim();
                               const cleanEnglish = newWordEnglish.trim();
                               const cleanMyanmar = newWordMyanmar.trim();
-                              if (!cleanThai || !cleanPhonetic || !cleanEnglish || !cleanMyanmar) {
-                                setNotebookError("Please fill out all required fields!");
+                              if (!cleanThai && !cleanPhonetic && !cleanEnglish && !cleanMyanmar) {
+                                setNotebookError("Please enter at least one or two options in the form to generate words!");
                                 return;
                               }
-                              if (customWords.some(w => w.thai === cleanThai)) {
-                                setNotebookError("This word already exists in your Notebook!");
+                              
+                              const completedWord = autoFillWord(
+                                cleanThai,
+                                cleanPhonetic,
+                                cleanEnglish,
+                                cleanMyanmar,
+                                newWordPos,
+                                lessons
+                              );
+
+                              if (customWords.some(w => w.thai === completedWord.thai && !w.isArchived)) {
+                                setNotebookError(`"${completedWord.thai}" already exists in active list!`);
                                 return;
                               }
+
                               const wordPayload = {
-                                thai: cleanThai,
-                                phonetic: cleanPhonetic,
-                                english: cleanEnglish,
-                                myanmar: cleanMyanmar,
-                                partOfSpeech: newWordPos,
+                                ...completedWord,
                                 notes: newWordNotes.trim() || undefined,
-                                author: currentUser || 'User'
+                                author: currentUser || 'User',
+                                isArchived: false
                               };
                               const updated = [wordPayload, ...customWords];
                               setCustomWords(updated);
@@ -1893,12 +1908,12 @@ export default function App() {
                               setNewWordMyanmar('');
                               setNewWordNotes('');
                               setNotebookError('');
-                              setNotebookSuccess(`Successfully added "${cleanThai}" to Notebook! (+5 XP gained)`);
+                              setNotebookSuccess(`Successfully added "${completedWord.thai}"! (+5 XP gained)`);
                               saveProgress({
                                 ...progress,
                                 totalXp: progress.totalXp + 5
                               });
-                              addSystemLog(currentUser || 'User', `Contributed new word "${cleanThai}" to Notebook`);
+                              addSystemLog(currentUser || 'User', `Contributed new word "${completedWord.thai}" to Notebook`);
                               setTimeout(() => setNotebookSuccess(''), 4000);
                             }}
                             className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2"
@@ -1913,6 +1928,30 @@ export default function App() {
 
                   {/* Custom Words List Card */}
                   <div className="lg:col-span-2 space-y-4">
+                    {/* Active vs Archived segmented filter */}
+                    <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-150 select-none">
+                      <button
+                        onClick={() => setShowArchived(false)}
+                        className={`py-2 text-center rounded-lg font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider cursor-pointer ${
+                          !showArchived
+                            ? 'bg-white text-brand-purple border-b-2 border-brand-purple/30 shadow-xs'
+                            : 'text-brand-muted hover:text-brand-dark'
+                        }`}
+                      >
+                        📂 Active Words ({customWords.filter(w => !w.isArchived).length})
+                      </button>
+                      <button
+                        onClick={() => setShowArchived(true)}
+                        className={`py-2 text-center rounded-lg font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider cursor-pointer ${
+                          showArchived
+                            ? 'bg-white text-brand-purple border-b-2 border-brand-purple/30 shadow-xs'
+                            : 'text-brand-muted hover:text-brand-dark'
+                        }`}
+                      >
+                        📦 Archived Words ({customWords.filter(w => w.isArchived).length})
+                      </button>
+                    </div>
+
                     {/* Sub card Search */}
                     <div className="bg-white p-4 rounded-xl border-2 border-gray-100 flex items-center gap-2">
                       <Search className="w-4 h-4 text-brand-muted shrink-0" />
@@ -1928,6 +1967,9 @@ export default function App() {
                     {/* custom words iterator */}
                     {(() => {
                       const filteredCustom = customWords.filter(item => {
+                        const isCardArchived = !!item.isArchived;
+                        if (isCardArchived !== showArchived) return false;
+
                         const query = customWordSearch.toLowerCase();
                         return (
                           item.thai.toLowerCase().includes(query) ||
@@ -2057,36 +2099,53 @@ export default function App() {
                                           >
                                             <Star className={`w-4 h-4 ${isMastered ? 'fill-amber-400 text-amber-500' : 'text-gray-300'}`} />
                                           </button>
-                                          {isLoggedIn && (isAdmin || (currentUser && item.author?.toLowerCase() === currentUser.toLowerCase())) && (
-                                            <>
-                                              <button
-                                                onClick={() => {
-                                                  setEditingWordThai(item.thai);
-                                                  setEditWordPhonetic(item.phonetic);
-                                                  setEditWordEnglish(item.english);
-                                                  setEditWordMyanmar(item.myanmar);
-                                                  setEditWordPos(item.partOfSpeech);
-                                                  setEditWordNotes(item.notes || '');
-                                                }}
-                                                className="p-1 hover:bg-gray-150 rounded text-brand-muted hover:text-brand-dark cursor-pointer transition-colors"
-                                                title="Edit Card"
-                                              >
-                                                <Pencil className="w-3.5 h-3.5 shrink-0" />
-                                              </button>
-                                              <button
-                                                onClick={() => {
-                                                  const updated = customWords.filter(w => w.thai !== item.thai);
-                                                  setCustomWords(updated);
-                                                  localStorage.setItem('thai_custom_words_v1', JSON.stringify(updated));
-                                                  addSystemLog(currentUser || 'User', `Removed word "${item.thai}"`);
-                                                }}
-                                                className="p-0.5 hover:bg-red-50 rounded text-red-400 hover:text-red-500 cursor-pointer"
-                                                title="Delete Card"
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                                              </button>
-                                            </>
-                                          )}
+                                          <>
+                                            <button
+                                              onClick={() => {
+                                                setEditingWordThai(item.thai);
+                                                setEditWordPhonetic(item.phonetic);
+                                                setEditWordEnglish(item.english);
+                                                setEditWordMyanmar(item.myanmar);
+                                                setEditWordPos(item.partOfSpeech);
+                                                setEditWordNotes(item.notes || '');
+                                              }}
+                                              className="p-1 hover:bg-gray-150 rounded text-brand-muted hover:text-brand-dark cursor-pointer transition-colors"
+                                              title="Edit Card"
+                                            >
+                                              <Pencil className="w-3.5 h-3.5 shrink-0" />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                const updated = customWords.map(w => {
+                                                  if (w.thai === item.thai) {
+                                                    return { ...w, isArchived: !w.isArchived };
+                                                  }
+                                                  return w;
+                                                });
+                                                setCustomWords(updated);
+                                                localStorage.setItem('thai_custom_words_v1', JSON.stringify(updated));
+                                                addSystemLog(currentUser || 'User', item.isArchived ? `Restored word "${item.thai}" from Archive` : `Archived * ${item.thai}`);
+                                              }}
+                                              className={`p-1 rounded cursor-pointer transition-colors ${
+                                                item.isArchived ? 'bg-brand-purple/10 text-brand-purple' : 'text-brand-muted hover:bg-gray-100 hover:text-brand-dark'
+                                              }`}
+                                              title={item.isArchived ? "Unarchive / Restore word" : "Archive word"}
+                                            >
+                                              <Archive className="w-3.5 h-3.5 shrink-0" />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                const updated = customWords.filter(w => w.thai !== item.thai);
+                                                setCustomWords(updated);
+                                                localStorage.setItem('thai_custom_words_v1', JSON.stringify(updated));
+                                                addSystemLog(currentUser || 'User', `Removed word "${item.thai}" from Notebook`);
+                                              }}
+                                              className="p-1 hover:bg-red-50 rounded text-red-500 hover:text-red-600 cursor-pointer transition-colors"
+                                              title="Delete Card"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                            </button>
+                                          </>
                                         </div>
                                       </div>
 

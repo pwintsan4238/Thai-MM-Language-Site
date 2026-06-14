@@ -11,11 +11,20 @@
   --color-brand-green-hover: #61df02;
   --color-brand-green-shadow: #46a302;
   --color-brand-green-light: #f2fdf1;
-  --color-brand-border: #e5e5e5;
-  --color-brand-border-heavy: #cbd5e1;
+  --color-brand-border: #9ca3af;
+  --color-brand-border-heavy: #6b7280;
   --color-brand-light: #ffffff;
-  --color-brand-dark: #3c3c3c;
-  --color-brand-muted: #afafaf;
+  --color-brand-dark: #222222;
+  --color-brand-muted: #52525b;
+
+  /* Enhanced contrast gray colors for old age accessibility */
+  --color-gray-50: #f1f3f5;
+  --color-gray-100: #d1d5db;
+  --color-gray-150: #b9bec6;
+  --color-gray-200: #9ca3af;
+  --color-gray-300: #6b7280;
+  --color-gray-400: #4b5563;
+  --color-gray-500: #374151;
 }
 
 /* Custom Duolingo-style classes */
