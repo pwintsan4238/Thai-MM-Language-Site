@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { lessonsData } from './data/lessonsData';
 import { grammarChapters } from './data/grammarChapters';
 import { orientationData } from './data/orientation';
-import { ProgressState, Lesson, WordBreakdown } from './types';
+import { pdfVocabulary } from './data/pdfVocabulary';
+import { ProgressState, Lesson, WordBreakdown, DialogueLine, GrammarNote, QuizQuestion, RegisteredUser, PurchaseOrder } from './types';
 import ProgressCard from './components/ProgressCard';
 import DialogueView from './components/DialogueView';
 import VocabularyView from './components/VocabularyView';
@@ -34,16 +35,65 @@ import {
   Trash2,
   Plus,
   X,
+  Pencil,
   TrendingUp,
   Activity,
   Users,
   LogOut,
   RefreshCw,
   LayoutDashboard,
-  CheckSquare
+  CheckSquare,
+  ShoppingBag,
+  CreditCard,
+  GripVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { isSingleSentenceEnglish } from './utils/sentenceUtils';
+
+const STORE_ITEMS = [
+  {
+    id: "premium-book",
+    name: "Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
+    nameMm: "အဆင့်မြင့် ထိုင်း-မြန်မာ သဒ္ဒါလက်စွဲ စာအုပ် (အီးဘုခ်)",
+    type: "e-book" as const,
+    description: "Deep dive into 45 complex Sentence structures, silent consonants rules, and tone system markers with local audio tracks link.",
+    descriptionMm: "ရှုပ်ထွေးသော ဝါကျတည်ဆောက်ပုံ ၄၅ မျိုး၊ အသံထွက် ခြွင်းချက်ပုံစံများနှင့် အသံနိမ့်မြင့်များ အသေးစိတ်ရှင်းလင်းချက်။",
+    price: 25000,
+    currency: "MMK" as const,
+    popular: true
+  },
+  {
+    id: "tutoring-zoom",
+    name: "1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
+    nameMm: "ဆရာမ Kru Jane နှင့် တစ်ဦးချင်း ၁ နာရီ စကားပြောလေ့ကျင့်ခန်း",
+    type: "tutoring" as const,
+    description: "Get real-time feedback on your tone mastery, vocabulary fluency, and everyday conversational pronunciation tips from an experienced Thai speaker native speaker tutor.",
+    descriptionMm: "ထိုင်းစကားပြော လုံးဝကျွမ်းကျင်စေရန် ဇူးမ် (Zoom) ဖြင့် ၁ နာရီကြာ တိုက်ရိုက်တစ်ဦးချင်း အသံထွက်ပြင်ဆင်သင်ကြားပေးခြင်း။",
+    price: 45000,
+    currency: "MMK" as const
+  },
+  {
+    id: "course-cert",
+    name: "Official Certification of Thai Basic Course Mastery",
+    nameMm: "ထိုင်းအခြေခံသင်ရိုး ပြီးဆုံးကြောင်း တရားဝင် အောင်လက်မှတ်",
+    type: "certificate" as const,
+    description: "Redeem your learning performance with a verified downloadable digital certificate. (Requires 1,000 XP minimum to apply!)",
+    descriptionMm: "ရမှတ် XP ၁၀၀၀ ပြည့်ပါက လျှောက်ထားနိုင်သည့် စနစ်တကျလေ့လာအောင်မြင်ကြောင်း QR ပါရှိသော အောင်လက်မှတ်။",
+    price: 1000,
+    currency: "XP" as const
+  },
+  {
+    id: "vip-vip",
+    name: "VIP Lifetime Premium Study Access Card (All Lessons Support)",
+    nameMm: "VIP တစ်သက်တာ ပရီမီယံ အဖွဲ့ဝင်ကတ်",
+    type: "vip-package" as const,
+    description: "Unlock offline access support, all dynamic system dialogue modules, customized direct testing tools, and early-bird textbook additions forever.",
+    descriptionMm: "အော့ဖ်လိုင်းလေ့လာခွင့်များ၊ စကားစမြည်ပြောဆိုမှု အထူးခန်းများ၊ နောက်ဆက်တွဲ သင်ပုန်းများ အားလုံးအား တစ်သက်တာ သုံးစွဲခွင့်။",
+    price: 80000,
+    currency: "MMK" as const,
+    popular: true
+  }
+];
 
 const INITIAL_PROGRESS: ProgressState = {
   completedLessons: [],
@@ -55,6 +105,132 @@ const INITIAL_PROGRESS: ProgressState = {
 };
 
 export default function App() {
+  const [lessons, setLessons] = useState<Lesson[]>(() => {
+    const saved = localStorage.getItem('thai_lessons_curriculum');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing saved lessons:", e);
+      }
+    }
+    return lessonsData;
+  });
+
+  const [adminSelectedLessonId, setAdminSelectedLessonId] = useState<number | null>(null);
+  const [adminEditTab, setAdminEditTab] = useState<'metadata' | 'vocabulary' | 'dialogue' | 'grammar' | 'quiz'>('metadata');
+  const [editingVocabIndex, setEditingVocabIndex] = useState<number | null>(null);
+  const [editingVocabThai, setEditingVocabThai] = useState<string>('');
+  const [editingVocabPhonetic, setEditingVocabPhonetic] = useState<string>('');
+  const [editingVocabEnglish, setEditingVocabEnglish] = useState<string>('');
+  const [editingVocabMyanmar, setEditingVocabMyanmar] = useState<string>('');
+  const [editingVocabPos, setEditingVocabPos] = useState<string>('');
+
+  // Admin New Account Creator State
+  const [adminNewUserUsername, setAdminNewUserUsername] = useState<string>('');
+  const [adminNewUserPassword, setAdminNewUserPassword] = useState<string>('');
+  const [adminNewUserRole, setAdminNewUserRole] = useState<'student' | 'admin'>('student');
+
+  // Checkout and Store purchase form state
+  const [selectedStoreItem, setSelectedStoreItem] = useState<any | null>(null);
+  const [checkoutPhone, setCheckoutPhone] = useState<string>('');
+  const [checkoutName, setCheckoutName] = useState<string>('');
+  const [checkoutNetwork, setCheckoutNetwork] = useState<string>('KBZPay');
+
+  // Drag and drop states for admin sorting
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  const [draggedItemType, setDraggedItemType] = useState<'lessons' | 'vocab' | 'dialogue' | 'grammar' | 'quiz' | null>(null);
+  const [dragOverTargetIndex, setDragOverTargetIndex] = useState<number | null>(null);
+  const [isDragReorderExpanded, setIsDragReorderExpanded] = useState<boolean>(false);
+
+  const handleDragStart = (e: React.DragEvent, index: number, type: 'lessons' | 'vocab' | 'dialogue' | 'grammar' | 'quiz') => {
+    setDraggedItemIndex(index);
+    setDraggedItemType(type);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === index) return;
+    setDragOverTargetIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemIndex(null);
+    setDraggedItemType(null);
+    setDragOverTargetIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number, type: 'lessons' | 'vocab' | 'dialogue' | 'grammar' | 'quiz') => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemType !== type) return;
+    if (draggedItemIndex === targetIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    if (type === 'lessons') {
+      const updated = [...lessons];
+      const [movedItem] = updated.splice(draggedItemIndex, 1);
+      updated.splice(targetIndex, 0, movedItem);
+      setLessons(updated);
+      addSystemLog('admin', 'Reordered lessons list via drag-and-drop');
+    } else if (type === 'vocab') {
+      if (adminSelectedLessonId) {
+        const currentVocab = getCustomVocabList(adminSelectedLessonId);
+        const updated = [...currentVocab];
+        const [movedItem] = updated.splice(draggedItemIndex, 1);
+        updated.splice(targetIndex, 0, movedItem);
+        handleSaveVocabList(adminSelectedLessonId, updated);
+        addSystemLog('admin', `Reordered vocabulary words list in Lesson ${adminSelectedLessonId}`);
+      }
+    } else if (type === 'dialogue') {
+      if (adminSelectedLessonId) {
+        const selectedLesson = lessons.find(l => l.id === adminSelectedLessonId);
+        if (selectedLesson) {
+          const updated = [...(selectedLesson.dialogue || [])];
+          const [movedItem] = updated.splice(draggedItemIndex, 1);
+          updated.splice(targetIndex, 0, movedItem);
+          handleSaveDialogue(adminSelectedLessonId, updated);
+          addSystemLog('admin', `Reordered sentences/dialogue list in Lesson ${adminSelectedLessonId}`);
+        }
+      }
+    } else if (type === 'grammar') {
+      if (adminSelectedLessonId) {
+        const selectedLesson = lessons.find(l => l.id === adminSelectedLessonId);
+        if (selectedLesson) {
+          const updated = [...(selectedLesson.grammarNotes || [])];
+          const [movedItem] = updated.splice(draggedItemIndex, 1);
+          updated.splice(targetIndex, 0, movedItem);
+          handleSaveGrammarNotes(adminSelectedLessonId, updated);
+          addSystemLog('admin', `Reordered grammar notes list in Lesson ${adminSelectedLessonId}`);
+        }
+      }
+    } else if (type === 'quiz') {
+      if (adminSelectedLessonId) {
+        const selectedLesson = lessons.find(l => l.id === adminSelectedLessonId);
+        if (selectedLesson) {
+          const updated = [...(selectedLesson.quiz || [])];
+          const [movedItem] = updated.splice(draggedItemIndex, 1);
+          updated.splice(targetIndex, 0, movedItem);
+          handleSaveQuizzes(adminSelectedLessonId, updated);
+          addSystemLog('admin', `Reordered interactive quizzes list in Lesson ${adminSelectedLessonId}`);
+        }
+      }
+    }
+
+    handleDragEnd();
+  };
+
+  useEffect(() => {
+    localStorage.setItem('thai_lessons_curriculum', JSON.stringify(lessons));
+  }, [lessons]);
+
+  useEffect(() => {
+    setEditingVocabIndex(null);
+  }, [adminSelectedLessonId, adminEditTab]);
+
   const [progress, setProgress] = useState<ProgressState>(INITIAL_PROGRESS);
   const [activeLessonId, setActiveLessonId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'vocabulary' | 'sentence' | 'grammar' | 'quiz'>('vocabulary');
@@ -90,7 +266,7 @@ export default function App() {
     return sessionStorage.getItem('thai_has_dismissed_promo') === 'true';
   });
 
-  const [authTab, setAuthTab] = useState<'user' | 'admin'>('user');
+  const [authTab, setAuthTab] = useState<'student-signup' | 'student-login' | 'admin'>('student-signup');
   const [authUsername, setAuthUsername] = useState<string>('');
   const [authPassword, setAuthPassword] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
@@ -167,8 +343,33 @@ export default function App() {
   const [showBroadcastBanner, setShowBroadcastBanner] = useState<boolean>(true);
 
   // User list table for admin dashboard view
-  const [registeredUsers, setRegisteredUsers] = useState<{username: string; xp: number; dateJoined: string}[]>(() => {
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => {
     const saved = localStorage.getItem('thai_registered_users_list');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((u: any) => ({
+          username: u.username,
+          password: u.password || 'password123',
+          role: u.role || 'student',
+          xp: u.xp || 0,
+          dateJoined: u.dateJoined || new Date().toISOString().split('T')[0]
+        }));
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return [
+      { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12" },
+      { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01" },
+      { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10" },
+      { username: "admin_thura", password: "adminpassword", role: "admin", xp: 5000, dateJoined: "2026-06-05" }
+    ];
+  });
+
+  // Purchase orders list state
+  const [orders, setOrders] = useState<PurchaseOrder[]>(() => {
+    const saved = localStorage.getItem('thai_user_orders_list');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -177,11 +378,32 @@ export default function App() {
       }
     }
     return [
-      { username: "ko_nay_min", xp: 1250, dateJoined: "2026-05-12" },
-      { username: "ma_khine", xp: 820, dateJoined: "2026-06-01" },
-      { username: "phyo_wai", xp: 450, dateJoined: "2026-06-10" }
+      {
+        id: "ORD-99321",
+        username: "ko_nay_min",
+        itemName: "🗣️ 1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
+        itemType: "tutoring",
+        priceAmount: 45000,
+         currency: "MMK",
+        status: "completed",
+        orderDate: "2026-06-10"
+      },
+      {
+         id: "ORD-99322",
+         username: "ma_khine",
+         itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
+         itemType: "e-book",
+         priceAmount: 25000,
+         currency: "MMK",
+         status: "pending",
+         orderDate: "2026-06-13"
+      }
     ];
   });
+
+  useEffect(() => {
+    localStorage.setItem('thai_user_orders_list', JSON.stringify(orders));
+  }, [orders]);
 
   // Dynamic system logs shown on the admin panel
   const [systemLogs, setSystemLogs] = useState<{ id: string; user: string; action: string; time: string }[]>(() => {
@@ -280,8 +502,12 @@ export default function App() {
   };
 
   // User log-in and sign-up handlers
-  const handleAdminLogin = (usernameStr: string, passwordStr: string) => {
-    if (usernameStr.trim() === 'admin' && passwordStr === 'admin@4238') {
+  const handleAdminLogin = (usernameStr: string, passwordStr: string): boolean => {
+    const cleanUser = usernameStr.trim();
+    const cleanPassword = passwordStr.trim();
+
+    // 1. Check hardcoded master admin
+    if (cleanUser.toLowerCase() === 'admin' && cleanPassword === 'admin@4238') {
       setIsLoggedIn(true);
       setCurrentUser('admin');
       setIsAdmin(true);
@@ -290,18 +516,57 @@ export default function App() {
       localStorage.setItem('thai_user_is_admin', 'true');
       setShowAuthModal(false);
       setDashboardTab('admin'); // Navigate to administrator dashboard directly
-      
-      // Log connection
-      addSystemLog('admin', 'Logged into Administrator Console');
+      addSystemLog('admin', 'Logged into Administrator Console (Master)');
       return true;
     }
+
+    // 2. Check registered users database
+    const matchedUser = registeredUsers.find(
+      (u) => u.username.toLowerCase() === cleanUser.toLowerCase() && u.password === cleanPassword
+    );
+
+    if (matchedUser) {
+      setIsLoggedIn(true);
+      setCurrentUser(matchedUser.username);
+      const isAdm = matchedUser.role === 'admin';
+      setIsAdmin(isAdm);
+      localStorage.setItem('thai_user_logged_in', 'true');
+      localStorage.setItem('thai_current_user', matchedUser.username);
+      localStorage.setItem('thai_user_is_admin', isAdm ? 'true' : 'false');
+      setShowAuthModal(false);
+
+      if (isAdm) {
+        setDashboardTab('admin');
+        addSystemLog(matchedUser.username, 'Admin logged into console');
+      } else {
+        setDashboardTab('lessons');
+        // Restore user's XP progress state
+        const nextProgress = {
+          ...progress,
+          totalXp: matchedUser.xp
+        };
+        setProgress(nextProgress);
+        localStorage.setItem('thai_mm_progress_v1', JSON.stringify(nextProgress));
+        addSystemLog(matchedUser.username, `Student logged in (Current XP: ${matchedUser.xp})`);
+      }
+      return true;
+    }
+
     return false;
   };
 
-  const handleStandardSignUp = (usernameStr: string) => {
+  const handleStandardSignUp = (usernameStr: string, passwordStr?: string) => {
     const cleanUser = usernameStr.trim();
-    if (!cleanUser) return;
+    const cleanPassword = (passwordStr || 'password123').trim();
+    if (!cleanUser) return false;
     
+    // Check if taken
+    const alreadyHas = registeredUsers.some((u) => u.username.toLowerCase() === cleanUser.toLowerCase()) || cleanUser.toLowerCase() === 'admin';
+    if (alreadyHas) {
+      alert("Username is already taken! Please choose another username or log in.");
+      return false;
+    }
+
     setIsLoggedIn(true);
     setCurrentUser(cleanUser);
     setIsAdmin(false);
@@ -312,16 +577,19 @@ export default function App() {
 
     // Save registration
     setRegisteredUsers((prev) => {
-      const alreadyHas = prev.some((u) => u.username.toLowerCase() === cleanUser.toLowerCase());
-      if (!alreadyHas) {
-        const nextList = [...prev, { username: cleanUser, xp: progress.totalXp, dateJoined: new Date().toISOString().split('T')[0] }];
-        localStorage.setItem('thai_registered_users_list', JSON.stringify(nextList));
-        return nextList;
-      }
-      return prev;
+      const nextList = [...prev, { 
+        username: cleanUser, 
+        password: cleanPassword, 
+        role: 'student' as const, 
+        xp: progress.totalXp, 
+        dateJoined: new Date().toISOString().split('T')[0] 
+      }];
+      localStorage.setItem('thai_registered_users_list', JSON.stringify(nextList));
+      return nextList;
     });
 
-    addSystemLog(cleanUser, `Newly registered and synchronized progress (+${progress.totalXp} XP)`);
+    addSystemLog(cleanUser, `Newly registered as Student and synchronized progress (+${progress.totalXp} XP)`);
+    return true;
   };
 
   const handleSignOut = () => {
@@ -341,12 +609,74 @@ export default function App() {
 
   const addSystemLog = (user: string, action: string) => {
     const newLog = {
-      id: 'log-' + Date.now(),
+      id: 'log-' + Date.now() + '-' + Math.floor(Math.random() * 1000000),
       user,
       action,
       time: 'Just now'
     };
     setSystemLogs((prev) => [newLog, ...prev.slice(0, 15)]);
+  };
+
+  const getCustomVocabList = (lessonId: number): WordBreakdown[] => {
+    const saved = localStorage.getItem(`thai_custom_vocab_${lessonId}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return pdfVocabulary[lessonId] || [];
+  };
+
+  const handleSaveVocabList = (lessonId: number, updatedVocab: WordBreakdown[]) => {
+    localStorage.setItem(`thai_custom_vocab_${lessonId}`, JSON.stringify(updatedVocab));
+    window.dispatchEvent(new Event('thai_vocab_updated'));
+    addSystemLog('admin', `Updated dynamic Vocabulary database of Lesson ${lessonId}`);
+    alert("Vocabulary list updated successfully!");
+  };
+
+  const updateLessonField = (lessonId: number, field: keyof Lesson, value: any) => {
+    setLessons(prev => prev.map(l => {
+      if (l.id === lessonId) {
+        return { ...l, [field]: value };
+      }
+      return l;
+    }));
+    addSystemLog('admin', `Updated ${field} for Lesson ${lessonId}`);
+  };
+
+  const handleSaveDialogue = (lessonId: number, updatedDialogue: DialogueLine[]) => {
+    setLessons(prev => prev.map(l => {
+      if (l.id === lessonId) {
+        return { ...l, dialogue: updatedDialogue };
+      }
+      return l;
+    }));
+    addSystemLog('admin', `Saved Dialogue context configuration for Lesson ${lessonId}`);
+    alert("Dialogue saved successfully!");
+  };
+
+  const handleSaveGrammarNotes = (lessonId: number, updatedGrammar: GrammarNote[]) => {
+    setLessons(prev => prev.map(l => {
+      if (l.id === lessonId) {
+        return { ...l, grammarNotes: updatedGrammar };
+      }
+      return l;
+    }));
+    addSystemLog('admin', `Saved Grammar context rules for Lesson ${lessonId}`);
+    alert("Grammar notes saved successfully!");
+  };
+
+  const handleSaveQuizzes = (lessonId: number, updatedQuizzes: QuizQuestion[]) => {
+    setLessons(prev => prev.map(l => {
+      if (l.id === lessonId) {
+        return { ...l, quiz: updatedQuizzes };
+      }
+      return l;
+    }));
+    addSystemLog('admin', `Saved interactive Quizzes context for Lesson ${lessonId}`);
+    alert("Quizzes saved successfully!");
   };
 
   // Dismiss auto promotion modal
@@ -356,9 +686,9 @@ export default function App() {
     setShowAuthModal(false);
   };
 
-  // Compile all words from all 20 lessons for the master dictionary grid
+  // Compile all words from all lessons for the master dictionary grid
   const allMasterVocab: WordBreakdown[] = Object.values(
-    lessonsData.reduce((acc: { [key: string]: WordBreakdown }, lesson) => {
+    lessons.reduce((acc: { [key: string]: WordBreakdown }, lesson) => {
       lesson.dialogue.forEach((line) => {
         line.words.forEach((word) => {
           if (!acc[word.thai]) {
@@ -672,14 +1002,18 @@ export default function App() {
   };
 
   const lessonsPerPage = 6;
-  const totalLessons = lessonsData.length;
+  const totalLessons = lessons.length;
   const totalPages = Math.ceil(totalLessons / lessonsPerPage);
-  const paginatedLessons = lessonsData.slice(
+  const paginatedLessons = lessons.slice(
     (currentPage - 1) * lessonsPerPage,
     currentPage * lessonsPerPage
   );
 
-  const activeLesson = lessonsData.find((l) => l.id === activeLessonId);
+  const activeLesson = lessons.find((l) => l.id === activeLessonId);
+
+  const activeLessonIndex = activeLesson ? lessons.findIndex(l => l.id === activeLesson.id) : -1;
+  const prevLesson = activeLessonIndex > 0 ? lessons[activeLessonIndex - 1] : null;
+  const nextLesson = activeLessonIndex >= 0 && activeLessonIndex < lessons.length - 1 ? lessons[activeLessonIndex + 1] : null;
 
   return (
     <div className="min-h-screen bg-brand-light text-brand-dark flex flex-col font-sans">
@@ -703,10 +1037,9 @@ export default function App() {
 
           {/* Offline/Online indicators and Auth/Identity Management Panel */}
           <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 flex-wrap sm:flex-nowrap">
-            <span className="hidden leading-none xs:flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] font-sans font-extrabold text-brand-purple bg-brand-purple-light px-2.5 sm:px-3.5 py-1.5 rounded-full border border-brand-purple/20 shadow-xs select-none">
+            <span className="hidden leading-none xs:flex items-center gap-1 sm:gap-1.5 text-[10px] font-sans font-black text-brand-purple bg-brand-purple-light/50 px-2.5 py-1.5 rounded-full select-none">
               <WifiOff className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden md:inline">OFFLINE READY • အော့ဖ်လိုင်း ဆက်လက်လေ့လာနိုင်သည်</span>
-              <span className="inline md:hidden">OFFLINE READY</span>
+              <span>Offline Ready</span>
             </span>
 
             {/* Authentication controls */}
@@ -756,23 +1089,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Dynamic Admin System Broadcast Marquee Banner */}
-      {showBroadcastBanner && activeBroadcast && (
-        <div className="bg-gradient-to-r from-brand-purple to-brand-purple-shadow text-white py-2 px-4 shadow-xs text-[11px] sm:text-xs font-sans font-bold flex items-center justify-between gap-4 transition-all">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="w-4 h-4 animate-bounce shrink-0 text-amber-300" />
-            <p className="truncate leading-none uppercase tracking-wide">{activeBroadcast}</p>
-          </div>
-          <button 
-            onClick={() => setShowBroadcastBanner(false)}
-            className="text-white/70 hover:text-white p-0.5 hover:bg-white/10 rounded transition-colors shrink-0 cursor-pointer"
-            title="Dismiss Announcement"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       {/* Main Container Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         
@@ -780,70 +1096,80 @@ export default function App() {
         {!activeLessonId ? (
           <div className="space-y-6 sm:space-y-8">
                         {/* Unified Dashboard Tab Selector - Duolingo Elegant Style */}
-            <div className={`grid grid-cols-2 md:grid-cols-3 ${isAdmin ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-1.5 bg-white p-1.5 rounded-2xl border-2 border-gray-100 select-none`}>
+            <div className={`grid grid-cols-2 md:grid-cols-3 ${isAdmin ? 'lg:grid-cols-7' : 'lg:grid-cols-6'} gap-1.5 bg-white p-1.5 rounded-2xl border-2 border-gray-100 select-none`}>
               <button
                 onClick={() => setDashboardTab('lessons')}
-                className={`py-3 px-2 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
                   dashboardTab === 'lessons'
                     ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
                     : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
                 }`}
               >
-                📚 Learning Path • သင်ခန်းစာ
+                📚 Learning Path<span className="hidden md:inline"> • သင်ခန်းစာ</span>
               </button>
               <button
                 onClick={() => setDashboardTab('orientation')}
-                className={`py-3 px-2 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
                   dashboardTab === 'orientation'
                     ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
                     : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
                 }`}
               >
-                🧭 Orientation • လမ်းညွှန်ချက်
+                🧭 Orientation<span className="hidden md:inline"> • လမ်းညွှန်ချက်</span>
               </button>
               <button
                 onClick={() => {
                   setDashboardTab('handbook');
                   setMobileChapterDetailActive(false);
                 }}
-                className={`py-3 px-2 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
                   dashboardTab === 'handbook'
                     ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
                     : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
                 }`}
               >
-                📖 Grammar Handbook • သဒ္ဒါလက်စွဲ
+                📖 Grammar<span className="hidden md:inline"> Handbook • သဒ္ဒါလက်စွဲ</span><span className="inline md:hidden"> Guide</span>
               </button>
               <button
                 onClick={() => setDashboardTab('alphabet')}
-                className={`py-3 px-2 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
                   dashboardTab === 'alphabet'
                     ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
                     : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
                 }`}
               >
-                🔠 Alphabet Guide • အက္ခရာများ
+                🔠 Alphabet<span className="hidden md:inline"> Guide • အက္ခရာများ</span><span className="inline md:hidden"> Guide</span>
               </button>
               <button
                 onClick={() => setDashboardTab('notebook')}
-                className={`py-3 px-2 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
                   dashboardTab === 'notebook'
                     ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
                     : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
                 }`}
               >
-                💡 Notebook • ဝေါဟာရသစ်များ
+                💡 Notebook<span className="hidden md:inline"> • ဝေါဟာရသစ်များ</span>
+              </button>
+              <button
+                onClick={() => setDashboardTab('profile')}
+                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                  dashboardTab === 'profile'
+                    ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
+                    : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
+                }`}
+              >
+                👤 Profile<span className="hidden md:inline"> • ကိုယ်ပိုင်အကောင့်</span><span className="inline md:hidden"> Account</span>
               </button>
               {isAdmin && (
                 <button
                   onClick={() => setDashboardTab('admin')}
-                  className={`py-3 px-2 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                  className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
                     dashboardTab === 'admin'
                       ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
                       : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
                   }`}
                 >
-                  🛡️ Admin Panel • စီမံခန္ခွဲသူ
+                  🛡️ Admin Panel<span className="hidden md:inline"> • စီမံခန္ခွဲသူ</span><span className="inline md:hidden"> Admin</span>
                 </button>
               )}
             </div>
@@ -853,11 +1179,11 @@ export default function App() {
               <div className="max-w-4xl mx-auto space-y-6 min-h-[500px]">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border-2 border-gray-100">
                   <div>
-                    <h3 className="font-sans font-black text-brand-dark text-lg mb-1 uppercase tracking-tight">
-                      Basic Course Curriculum • အခြေခံသင်ရိုးညွှန်းတမ်းများ
+                    <h3 className="font-sans font-black text-brand-dark text-base mb-0.5 uppercase tracking-tight">
+                      Syllabus Lessons • သင်ခန်းစာများ
                     </h3>
-                    <p className="text-sm text-brand-muted font-sans font-semibold">
-                      Structured grammar and vocabulary drills (Lessons {(currentPage - 1) * lessonsPerPage + 1} to {Math.min(currentPage * lessonsPerPage, totalLessons)} of {totalLessons}).
+                    <p className="text-xs text-brand-muted font-sans font-semibold">
+                      Lessons {(currentPage - 1) * lessonsPerPage + 1} to {Math.min(currentPage * lessonsPerPage, totalLessons)} of {totalLessons}
                     </p>
                   </div>
 
@@ -1006,12 +1332,9 @@ export default function App() {
                 {/* Left Sidebar Article Selector */}
                 <div className="space-y-4 lg:col-span-1">
                   <div className="mb-4">
-                    <h3 className="font-sans font-black text-brand-dark text-lg mb-1 uppercase tracking-tight">
-                      Course Orientation
+                    <h3 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wider">
+                      Orientation • လမ်းညွှန်ချက်
                     </h3>
-                    <p className="text-xs text-brand-muted font-sans font-semibold">
-                      Study starting tips, linguistic structures, and pronunciation guidelines.
-                    </p>
                   </div>
 
                   <div className="space-y-2.5">
@@ -1119,12 +1442,9 @@ export default function App() {
                 {/* Left Chapters list sidebar (responsive layout) */}
                 <div className={`space-y-4 lg:col-span-1 ${mobileChapterDetailActive ? 'hidden lg:block' : 'block'}`}>
                   <div className="mb-4">
-                    <h3 className="font-sans font-black text-brand-dark text-lg mb-1 uppercase tracking-tight">
-                      Grammar Index
+                    <h3 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wider">
+                      Grammar Index • သဒ္ဒါမာတိကာ
                     </h3>
-                    <p className="text-xs text-brand-muted font-sans font-semibold">
-                      Access official grammatical chapters comprehensively reconstructed.
-                    </p>
                   </div>
 
                   <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
@@ -1394,12 +1714,9 @@ export default function App() {
               <div className="max-w-7xl mx-auto space-y-6 min-h-[500px]">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <div>
-                    <h3 className="font-sans font-black text-brand-dark text-xl sm:text-2xl mb-1 uppercase tracking-tight">
-                      Thai Alphabet Masterclass • ထိုင်းအက္ခရာသင်ခန်းစာ
+                    <h3 className="font-sans font-black text-brand-dark text-base uppercase tracking-tight">
+                      Alphabet Guide • ထိုင်းအက္ခရာများ
                     </h3>
-                    <p className="text-xs sm:text-sm text-brand-muted font-sans font-semibold">
-                      Learn and vocalize all 44 consonants and 32 vowels with native pronunciations and Burmese sound structures.
-                    </p>
                   </div>
                 </div>
 
@@ -1412,12 +1729,9 @@ export default function App() {
               <div className="max-w-7xl mx-auto space-y-6 min-h-[500px]">
                 <div className="bg-white p-6 rounded-2xl border-2 border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-sans font-black text-brand-dark text-xl sm:text-2xl mb-1 uppercase tracking-tight">
-                      💡 Vocabulary Notebook • ဝေါဟာရအသစ်စုစည်းမှု
+                    <h3 className="font-sans font-black text-brand-dark text-base uppercase tracking-tight">
+                      Vocabulary Notebook • ဝေါဟာရစုစည်းမှု
                     </h3>
-                    <p className="text-xs sm:text-sm text-brand-muted font-sans font-semibold">
-                      Contribute, save, and listen to custom Thai vocabulary words and phrases. Admin or users can add vocabulary cards.
-                    </p>
                   </div>
                   {!isLoggedIn && (
                     <button
@@ -1754,10 +2068,10 @@ export default function App() {
                                                   setEditWordPos(item.partOfSpeech);
                                                   setEditWordNotes(item.notes || '');
                                                 }}
-                                                className="p-0.5 hover:bg-gray-100 rounded text-brand-muted hover:text-brand-dark cursor-pointer"
+                                                className="p-1 hover:bg-gray-150 rounded text-brand-muted hover:text-brand-dark cursor-pointer transition-colors"
                                                 title="Edit Card"
                                               >
-                                                <Plus className="w-4 h-4 rotate-45 shrink-0" />
+                                                <Pencil className="w-3.5 h-3.5 shrink-0" />
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -1821,6 +2135,459 @@ export default function App() {
                       );
                     })()}
                   </div>
+                </div>
+              </div>
+            )}
+ 
+            {/* TAB CONTENT: My Account / Student Profile Page */}
+            {dashboardTab === 'profile' && (
+              <div className="max-w-7xl mx-auto space-y-6 min-h-[500px] text-left">
+                {/* 1. Account Identity & Metrics Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Profile Card */}
+                  <div className="bg-white p-6 rounded-2xl border-2 border-gray-100 flex flex-col justify-between space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-brand-purple/10 border-2 border-brand-purple flex items-center justify-center font-sans font-black text-2xl text-brand-purple shrink-0">
+                          {currentUser ? currentUser.substring(0, 2).toUpperCase() : 'ST'}
+                        </div>
+                        <div>
+                          <h3 className="font-sans font-black text-brand-dark text-lg capitalize tracking-tight leading-tight">
+                            {currentUser || 'Guest Student (ဧည့်သည်တော်)'}
+                          </h3>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {isAdmin ? (
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                <Shield className="w-2.5 h-2.5" /> Staff Admin
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase bg-brand-purple/10 text-brand-purple border border-brand-purple/20">
+                                Student Scholar
+                              </span>
+                            )}
+                            <span className="text-[10px] text-brand-muted font-bold font-sans">
+                              Joined {isLoggedIn ? 'Recently' : 'Now'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-100 pt-4 space-y-3 font-sans text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-brand-muted font-semibold">Account Status:</span>
+                          <span className="text-brand-dark font-black uppercase tracking-wider flex items-center gap-1">
+                            {isLoggedIn ? (
+                              <>
+                                <span className="w-2 h-2 rounded-full bg-green-500 inline-block animate-ping"></span>
+                                Logged In (အကောင့်ဝင်ပြီး)
+                              </>
+                            ) : (
+                              'Not Registered (ဧည့်သည်)'
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-brand-muted font-semibold">Total XP Reward:</span>
+                          <span className="text-brand-purple font-black font-mono text-sm">{progress.totalXp} XP</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-brand-muted font-semibold">Current Title:</span>
+                          <span className="text-brand-green font-extrabold uppercase">
+                            Level {Math.floor(progress.totalXp / 1000) + 1} Thai Scholar
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!isLoggedIn ? (
+                      <div className="bg-brand-purple-light p-4 rounded-xl border border-brand-purple/20 space-y-3 text-left">
+                        <p className="text-[11px] font-semibold text-brand-purple leading-normal">
+                          ⚠️ You are viewing as a guest. Please sign up or log in to track your XP, earn dynamic certificates, and order study manuals securely!
+                        </p>
+                        <button
+                          onClick={() => {
+                            setAuthTab('student-signup');
+                            setShowAuthModal(true);
+                          }}
+                          className="w-full py-2 bg-brand-purple text-white text-[10px] font-black uppercase tracking-wider rounded-lg border-b-4 border-brand-purple-shadow hover:brightness-105 active:translate-y-0.5 cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <User className="w-3.5 h-3.5" /> Complete Registration Now
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50/70 p-3 rounded-xl border border-gray-100 text-[10px] font-sans font-bold text-brand-muted leading-relaxed">
+                        ✨ Local Session State has been synchronized. All orders and metrics are logged dynamically in local storage.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Columns: User Metrics Dashboard Display */}
+                  <div className="bg-white p-6 rounded-2xl border-2 border-gray-100 lg:col-span-2 space-y-6">
+                    <div className="flex items-center justify-between border-b border-gray-150 pb-3">
+                      <h4 className="font-sans font-black text-brand-dark text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 text-brand-purple shrink-0" />
+                        My Progress • သင်ယူမှုမှတ်တမ်း
+                      </h4>
+                    </div>
+
+                    {/* Metrics Cards Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100/85 text-center">
+                        <span className="text-[10px] font-sans text-brand-muted block uppercase font-bold">Lessons Passed</span>
+                        <span className="text-2xl font-sans font-black text-brand-dark min-h-8 flex items-center justify-center">
+                          {progress.completedLessons.length} / {lessons.length}
+                        </span>
+                        <div className="w-full bg-gray-200 rounded-full h-1 mt-1.5 overflow-hidden">
+                          <div 
+                            className="bg-brand-purple h-full rounded-full transition-all duration-500" 
+                            style={{ width: `${Math.min(100, lessons.length > 0 ? (progress.completedLessons.length / lessons.length) * 100 : 0)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100/85 text-center">
+                        <span className="text-[10px] font-sans text-brand-muted block uppercase font-bold">Saved Words</span>
+                        <span className="text-2xl font-sans font-black text-brand-purple min-h-8 flex items-center justify-center">
+                          {progress.masteredWords.length}
+                        </span>
+                        <span className="text-[9px] text-brand-muted block leading-none mt-1 font-bold">marked mastered</span>
+                      </div>
+
+                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100/85 text-center">
+                        <span className="text-[10px] font-sans text-brand-muted block uppercase font-bold">Active Streak</span>
+                        <span className="text-2xl font-sans font-black text-amber-500 min-h-8 flex items-center justify-center gap-0.5">
+                          🔥 {progress.streak} <span className="text-[10px] text-brand-muted">days</span>
+                        </span>
+                        <span className="text-[9px] text-brand-muted block leading-none mt-1 font-bold">keep practicing!</span>
+                      </div>
+
+                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100/85 text-center">
+                        <span className="text-[10px] font-sans text-brand-muted block uppercase font-bold">Current Level</span>
+                        <span className="text-2xl font-sans font-black text-brand-green min-h-8 flex items-center justify-center">
+                          LVL {Math.floor(progress.totalXp / 1000) + 1}
+                        </span>
+                        <span className="text-[9px] text-brand-muted block leading-none mt-1 font-bold">
+                          {1000 - (progress.totalXp % 1000)} XP to next
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Achievements */}
+                    <div className="space-y-3">
+                      <h5 className="text-[11px] font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1 text-left">
+                        <Award className="w-3.5 h-3.5 text-brand-purple shrink-0" />
+                        🏆 Earned Accolades & Milestones (အောင်မြင်မှုဆုတံဆိပ်များ)
+                      </h5>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${progress.completedLessons.length > 0 ? 'bg-amber-50/50 border-amber-200' : 'bg-gray-50/40 border-gray-100 opacity-60'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-base shrink-0 ${progress.completedLessons.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                            🎬
+                          </div>
+                          <div className="min-w-0">
+                            <h6 className="text-[11px] font-sans font-black text-brand-dark truncate">First Breakthrough</h6>
+                            <p className="text-[9px] text-brand-muted leading-tight font-bold">Completed 1+ lessons.</p>
+                          </div>
+                        </div>
+
+                        <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${progress.masteredWords.length >= 5 ? 'bg-amber-50/50 border-amber-200' : 'bg-gray-50/40 border-gray-100 opacity-60'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-base shrink-0 ${progress.masteredWords.length >= 5 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                            👑
+                          </div>
+                          <div className="min-w-0">
+                            <h6 className="text-[11px] font-sans font-black text-brand-dark truncate">Vocab Titan</h6>
+                            <p className="text-[9px] text-brand-muted leading-tight font-bold">Mastered 5+ words.</p>
+                          </div>
+                        </div>
+
+                        <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all text-left ${progress.totalXp >= 1000 ? 'bg-amber-50/50 border-amber-200' : 'bg-gray-50/40 border-gray-100 opacity-60'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-base shrink-0 ${progress.totalXp >= 1000 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                            🎖️
+                          </div>
+                          <div className="min-w-0">
+                            <h6 className="text-[11px] font-sans font-black text-brand-dark truncate">Scholar Grade</h6>
+                            <p className="text-[9px] text-brand-muted leading-tight font-bold">Earned 1000+ points.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. PREMIUM RESOURCE STUDY STORE (WHERE USERS PURCHASE ORDERS) */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3 text-left">
+                    <div>
+                      <h4 className="font-sans font-black text-brand-dark text-xs uppercase tracking-wider flex items-center gap-1.5 text-brand-purple">
+                        <ShoppingBag className="w-4 h-4 shrink-0" />
+                        Study Resources Store • အပိုဆောင်းလေ့လာရန်
+                      </h4>
+                    </div>
+                  </div>
+
+                  {/* Grid of Store Items */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {STORE_ITEMS.map((item) => {
+                      return (
+                        <div key={item.id} className="bg-gray-50/40 hover:bg-gray-50/80 p-4 rounded-xl border border-gray-200/90 flex flex-col justify-between space-y-4 transition-all relative">
+                          {item.popular && (
+                            <span className="absolute top-2.5 right-2 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-brand-purple text-white">
+                              POPULAR • အရောင်းရဆုံး
+                            </span>
+                          )}
+                          <div className="space-y-2 text-left">
+                            <div className="flex gap-1.5 text-xs font-sans font-black uppercase text-brand-purple text-left items-center">
+                              <span>
+                                {item.type === 'e-book' && '📕'}
+                                {item.type === 'tutoring' && '🗣️'}
+                                {item.type === 'certificate' && '🎖️'}
+                                {item.type === 'vip-package' && '⭐'}
+                              </span>
+                              <span>{item.type}</span>
+                            </div>
+                            <h5 className="font-sans font-black text-brand-dark text-[13px] leading-snug">
+                              {item.name}
+                            </h5>
+                            <p className="font-sans font-extrabold text-[12px] text-brand-purple/90 leading-tight">
+                              {item.nameMm}
+                            </p>
+                            <p className="text-[10.5px] text-brand-muted leading-relaxed">
+                              {item.description}
+                            </p>
+                            <p className="text-[10.5px] italic text-brand-dark/80 leading-relaxed font-semibold">
+                              {item.descriptionMm}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between border-t border-gray-150 pt-3 flex-wrap gap-2 text-left">
+                            <div>
+                              <span className="text-[10px] font-mono text-brand-muted block leading-none font-bold">TOTAL VALUE PRICE</span>
+                              <span className="text-base font-sans font-black text-brand-purple font-mono">
+                                {item.price.toLocaleString()} {item.currency}
+                              </span>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                if (!isLoggedIn) {
+                                  alert("You must be registered and logged in as a student to purchase resources!");
+                                  setAuthTab('student-signup');
+                                  setShowAuthModal(true);
+                                  return;
+                                }
+                                if (item.currency === 'XP' && progress.totalXp < item.price) {
+                                  alert(`Error: You need at least ${item.price} XP points to redeem this certificate! (You current have ${progress.totalXp} XP)`);
+                                  return;
+                                }
+                                setSelectedStoreItem(item);
+                                setCheckoutPhone('');
+                                setCheckoutName(currentUser || '');
+                                setCheckoutNetwork(item.currency === 'XP' ? 'XP' : 'KBZPay');
+                              }}
+                              className="px-4 py-2 bg-brand-purple text-white border-b-4 border-brand-purple-shadow rounded-lg text-[10px] font-black uppercase tracking-wider hover:brightness-105 cursor-pointer active:translate-y-0.5"
+                            >
+                              {item.currency === 'XP' ? 'Redeem with XP' : 'Purchase Order'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Inline Checkout Form Modal/Card */}
+                {selectedStoreItem && (
+                  <div className="bg-amber-50/40 border-2 border-amber-200 p-5 rounded-2xl space-y-4" id="store-checkout-block">
+                    <div className="flex items-start justify-between border-b border-amber-200 pb-2 text-left">
+                      <div>
+                        <h4 className="font-sans font-black text-brand-dark text-[13px] uppercase tracking-wide flex items-center gap-1 text-amber-800">
+                          <CreditCard className="w-4 h-4 text-amber-600 shrink-0" /> Secure Order Checkout Terminal
+                        </h4>
+                        <p className="text-[10px] text-amber-700/80 font-semibold font-sans">
+                          Complete details below to submit your study course order logic.
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedStoreItem(null)} 
+                        className="p-1 hover:bg-amber-100 text-amber-800 rounded-full cursor-pointer"
+                        title="Cancel Checkout"
+                      >
+                        <X className="w-4 h-4 shrink-0" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+                      <div className="md:col-span-1 bg-white p-3 rounded-xl border border-amber-200 space-y-2 text-left">
+                        <span className="text-[9px] font-black text-brand-purple uppercase tracking-wider block">Selected Package</span>
+                        <h5 className="font-sans font-black text-brand-dark text-xs">{selectedStoreItem.name}</h5>
+                        <p className="text-[11px] font-sans font-mono font-black text-brand-purple mt-1 text-base">
+                          {selectedStoreItem.price.toLocaleString()} {selectedStoreItem.currency}
+                        </p>
+                        <div className="text-[10px] text-brand-muted leading-relaxed font-semibold">
+                          Once confirmed, a "Pending Approval" state will appear in your Order Ledger. Logged administrators will instantly review the transaction.
+                        </div>
+                      </div>
+
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const id = "ORD-" + Math.floor(10000 + Math.random() * 90000);
+                        
+                        // If payment currency is XP
+                        if (selectedStoreItem.currency === 'XP') {
+                          if (progress.totalXp < selectedStoreItem.price) {
+                            alert("Insufficient XP balance!");
+                            return;
+                          }
+                          // Deduct XP
+                          const nextXp = progress.totalXp - selectedStoreItem.price;
+                          saveProgress({ ...progress, totalXp: nextXp });
+                        }
+
+                        const newOrder: PurchaseOrder = {
+                          id,
+                          username: currentUser || 'Anonymous',
+                          itemName: selectedStoreItem.name,
+                          itemType: selectedStoreItem.type,
+                          priceAmount: selectedStoreItem.price,
+                          currency: selectedStoreItem.currency,
+                          status: 'pending',
+                          orderDate: new Date().toISOString().split('T')[0]
+                        };
+
+                        const nextOrders = [newOrder, ...orders];
+                        setOrders(nextOrders);
+                        addSystemLog(currentUser || 'User', `Ordered package "${selectedStoreItem.name}" (ID: ${id})`);
+                        setSelectedStoreItem(null);
+                        alert(`Your order ${id} has been submitted successfully!\nAdmin is checking the transaction details.`);
+                      }} className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                            Student Name / Contact
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={checkoutName}
+                            onChange={(e) => setCheckoutName(e.target.value)}
+                            className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                            placeholder="e.g. ko_nay_min"
+                          />
+                        </div>
+
+                        {selectedStoreItem.currency !== 'XP' ? (
+                          <>
+                            <div>
+                              <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                                Mobile Wallet Phone Number (Myanmar)
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={checkoutPhone}
+                                onChange={(e) => setCheckoutPhone(e.target.value)}
+                                className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-mono font-bold text-brand-dark focus:border-brand-purple focus:outline-none"
+                                placeholder="e.g. 09-987654321 / 09-791234567"
+                              />
+                            </div>
+
+                            <div className="sm:col-span-2">
+                              <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                                Myanmar Mobile Payment System
+                              </label>
+                              <select
+                                value={checkoutNetwork}
+                                onChange={(e) => setCheckoutNetwork(e.target.value)}
+                                className="w-full px-2.5 py-2 bg-white border border-amber-200 rounded-lg text-[10px] font-black font-sans text-brand-purple focus:border-brand-purple focus:outline-none"
+                              >
+                                <option value="KBZPay">KBZPay Wallet Merchant (09987654321)</option>
+                                <option value="WavePay">WavePay Mobile Wallet (09791234567)</option>
+                                <option value="CBPay">CBPay Fast App Transfer</option>
+                                <option value="AYAPay">AYA Pay Secure Pay</option>
+                              </select>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="sm:col-span-1 bg-amber-100/20 p-2.5 rounded-lg border border-amber-200 text-[10px] text-amber-800 font-bold leading-normal">
+                            Redeeming with XP! This purchase will deduct {selectedStoreItem.price} XP directly from your registered progress balance!
+                          </div>
+                        )}
+
+                        <div className="sm:col-span-2 flex justify-end pt-2">
+                          <button
+                            type="submit"
+                            className="w-full py-2.5 bg-brand-purple text-white border-b-4 border-brand-purple-shadow rounded-lg text-[10.5px] font-black uppercase tracking-wider hover:brightness-105 active:translate-y-0.5 cursor-pointer"
+                          >
+                            Submit Order Purchase • ဝယ်ယူမှုအတည်ပြုမည်
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. STUDENT LEDGER/ORDERS HISTORY PREVIEW */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4">
+                  <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 pb-2 border-b border-gray-100">
+                    <ShoppingBag className="w-4 h-4 text-brand-purple shrink-0" />
+                    📜 Personal Purchase Ledger & Order Compliance ({currentUser ? orders.filter(o => o.username.toLowerCase() === currentUser.toLowerCase()).length : 0})
+                  </h4>
+
+                  {!isLoggedIn ? (
+                    <div className="text-center py-6 text-xs text-brand-muted font-sans font-bold">
+                      Please register an account above to track your transaction logs.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-gray-100">
+                      <table className="w-full text-left font-sans text-xs">
+                        <thead className="bg-gray-50/70">
+                          <tr className="border-b border-gray-100 text-brand-muted text-[10px] font-black uppercase tracking-wider">
+                            <th className="py-2.5 px-3">ORDER ID</th>
+                            <th className="py-2.5 px-3">ITEM DESCRIPTION</th>
+                            <th className="py-2.5 px-3">DATE PLACED</th>
+                            <th className="py-2.5 px-3">METHOD VALUE</th>
+                            <th className="py-2.5 px-3 text-right">STATUS BADGE</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {orders.filter(o => o.username.toLowerCase() === currentUser.toLowerCase()).length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-brand-muted font-bold">
+                                No previous orders exist on your student account. Click "Purchase Order" above to purchase!
+                              </td>
+                            </tr>
+                          ) : (
+                            orders
+                              .filter(o => o.username.toLowerCase() === currentUser.toLowerCase())
+                              .map((ord) => (
+                                <tr key={ord.id} className="hover:bg-gray-50/50">
+                                  <td className="py-3 px-3 font-mono font-black text-brand-purple">{ord.id}</td>
+                                  <td className="py-3 px-3 font-bold text-brand-dark text-[11px]">{ord.itemName}</td>
+                                  <td className="py-3 px-3 text-brand-muted font-bold">{ord.orderDate}</td>
+                                  <td className="py-3 px-3 font-mono font-black text-brand-dark">
+                                    {ord.priceAmount.toLocaleString()} {ord.currency}
+                                  </td>
+                                  <td className="py-3 px-3 text-right">
+                                    {ord.status === 'pending' ? (
+                                      <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                        Pending Admin
+                                      </span>
+                                    ) : ord.status === 'completed' ? (
+                                      <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-green-50 text-green-700 border border-green-200">
+                                        Approved / Sent
+                                      </span>
+                                    ) : (
+                                      <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-red-50 text-red-700 border border-red-200">
+                                        Cancelled
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1890,52 +2657,132 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Registered Users Audit Table */}
-                  <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4 flex flex-col justify-between">
+                  {/* Registered Users Audit Card Directory */}
+                  <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4 flex flex-col justify-between lg:col-span-1">
                     <div className="space-y-4">
-                      <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 pb-2 border-b border-gray-100">
-                        <Users className="w-4 h-4 text-brand-purple shrink-0" />
-                        Registered Student Registry ({registeredUsers.length})
-                      </h4>
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-brand-purple shrink-0" />
+                          Registered Accounts Directory ({registeredUsers.length})
+                        </h4>
+                      </div>
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left font-sans text-xs">
-                          <thead>
-                            <tr className="border-b border-gray-100 text-brand-muted text-[9px] font-black uppercase tracking-wider">
-                              <th className="py-2">USERNAME</th>
-                              <th className="py-2">XP POINTS</th>
-                              <th className="py-2">LEVEL</th>
-                              <th className="py-2">DATE JOINED</th>
-                              <th className="py-2 text-right">ACTION</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {registeredUsers.map((usr, i) => (
-                              <tr key={i} className="hover:bg-gray-50/50">
-                                <td className="py-2.5 font-bold text-brand-dark">{usr.username}</td>
-                                <td className="py-2.5 font-mono text-brand-purple font-black">{usr.xp} XP</td>
-                                <td className="py-2.5 font-sans font-extrabold text-[10px] text-brand-green">LVL {Math.floor(usr.xp / 1000) + 1}</td>
-                                <td className="py-2.5 text-brand-muted font-bold">{usr.dateJoined}</td>
-                                <td className="py-2.5 text-right">
-                                  <button
-                                    onClick={() => {
-                                      setRegisteredUsers((prev) => {
-                                        const updated = prev.filter(u => u.username !== usr.username);
-                                        localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
-                                        return updated;
-                                      });
-                                      addSystemLog('admin', `Deregistered user database record of "${usr.username}"`);
-                                    }}
-                                    className="p-1 hover:bg-red-50 text-red-500 rounded cursor-pointer animate-pulse"
-                                    title="Deregister User"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5 inline-block shrink-0" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      {/* Admin Form to Create Accounts */}
+                      <div className="bg-gray-50/50 p-3 sm:p-4 rounded-xl border border-gray-200/85 space-y-2.5">
+                        <h5 className="text-[10px] sm:text-xs font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                          Create New Account (Admin Quick-Add Credentials)
+                        </h5>
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          const cleanUser = adminNewUserUsername.trim();
+                          const cleanPassword = adminNewUserPassword.trim();
+                          if (!cleanUser || !cleanPassword) {
+                            alert("Username and password are required.");
+                            return;
+                          }
+                          const alreadyHas = registeredUsers.some(u => u.username.toLowerCase() === cleanUser.toLowerCase()) || cleanUser.toLowerCase() === 'admin';
+                          if (alreadyHas) {
+                            alert("This username is already taken!");
+                            return;
+                          }
+                          const newUser: RegisteredUser = {
+                            username: cleanUser,
+                            password: cleanPassword,
+                            role: adminNewUserRole,
+                            xp: adminNewUserRole === 'student' ? 0 : 5000,
+                            dateJoined: new Date().toISOString().split('T')[0]
+                          };
+                          const updated = [...registeredUsers, newUser];
+                          setRegisteredUsers(updated);
+                          localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
+                          addSystemLog('admin', `Created a new ${adminNewUserRole.toUpperCase()} account for "${cleanUser}"`);
+                          setAdminNewUserUsername('');
+                          setAdminNewUserPassword('');
+                          alert(`Account successfully created!\nUsername: ${cleanUser}\nRole: ${adminNewUserRole.toUpperCase()}`);
+                        }} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="Username"
+                              value={adminNewUserUsername}
+                              onChange={(e) => setAdminNewUserUsername(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="Password"
+                              value={adminNewUserPassword}
+                              onChange={(e) => setAdminNewUserPassword(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <select
+                              value={adminNewUserRole}
+                              onChange={(e) => setAdminNewUserRole(e.target.value as 'student' | 'admin')}
+                              className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-black font-sans text-brand-purple focus:border-brand-purple focus:outline-none"
+                            >
+                              <option value="student">STUDENT (ကျောင်းသား)</option>
+                              <option value="admin">ADMIN (စီမံသူ)</option>
+                            </select>
+                          </div>
+                          <button
+                            type="submit"
+                            className="sm:col-span-3 w-full py-2 bg-brand-purple text-white rounded-lg border-b-4 border-brand-purple-shadow text-[10px] font-black uppercase tracking-wider hover:brightness-105 active:translate-y-0.5 cursor-pointer"
+                          >
+                            Add New Credentials Securely
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Scrollable list of user cards - HIGH POLISH CARDS */}
+                      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                        {registeredUsers.map((usr, i) => (
+                          <div key={i} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between gap-3 shadow-xs hover:border-gray-200 transition-all text-left">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-sans font-black text-brand-dark text-xs">{usr.username}</span>
+                                {usr.role === 'admin' ? (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                    <Shield className="w-2 h-2" /> Admin
+                                  </span>
+                                ) : (
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-green-50 text-green-700 border border-green-200">
+                                    Student
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-brand-muted font-sans space-y-0.5 font-semibold">
+                                <p>Password: <code className="bg-gray-50 text-brand-dark px-1 py-0.5 rounded font-mono font-bold">{usr.password || 'password123'}</code></p>
+                                <p>Progress: <span className="text-brand-purple font-black font-mono">{usr.role === 'admin' ? '—' : `${usr.xp} XP (LVL ${Math.floor(usr.xp / 1000) + 1})`}</span></p>
+                                <p>Joined: <span>{usr.dateJoined}</span></p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                const confirmed = window.confirm(`Are you sure you want to delete the user account "${usr.username}"? This cannot be undone.`);
+                                if (confirmed) {
+                                  setRegisteredUsers((prev) => {
+                                    const updated = prev.filter(u => u.username !== usr.username);
+                                    localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
+                                    return updated;
+                                  });
+                                  addSystemLog('admin', `Deregistered account of "${usr.username}"`);
+                                }
+                              }}
+                              className="p-2 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-red-100"
+                              title="Delete Account"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -1943,10 +2790,11 @@ export default function App() {
                       onClick={() => {
                         const confirmReset = window.confirm("Are you sure you want to reset user table? (Will reset standard entries)");
                         if (confirmReset) {
-                          const initialUsers = [
-                            { username: "ko_nay_min", xp: 1250, dateJoined: "2026-05-12" },
-                            { username: "ma_khine", xp: 820, dateJoined: "2026-06-01" },
-                            { username: "phyo_wai", xp: 450, dateJoined: "2026-06-10" }
+                          const initialUsers: RegisteredUser[] = [
+                            { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12" },
+                            { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01" },
+                            { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10" },
+                            { username: "admin_thura", password: "adminpassword", role: "admin", xp: 5000, dateJoined: "2026-06-05" }
                           ];
                           setRegisteredUsers(initialUsers);
                           localStorage.setItem('thai_registered_users_list', JSON.stringify(initialUsers));
@@ -1958,6 +2806,1340 @@ export default function App() {
                       FACTORY RESET USER DIRECTORY
                     </button>
                   </div>
+                </div>
+
+                {/* Brand New Section: student Purchase Orders Manager */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-3">
+                    <div>
+                      <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 text-brand-purple">
+                        <ShoppingBag className="w-4 h-4 shrink-0 text-brand-purple" />
+                        📋 student Purchase Orders Manager (ကျောင်းသားများ ဝယ်ယူမှုအော်ဒါများ ပန်နယ်)
+                      </h4>
+                      <p className="text-[10px] font-sans font-bold text-brand-muted mt-1">
+                        Review, audit, Approve or cancel client transactions submitted from study resource store checkout.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Restore demo mock transactions?")) {
+                          const initialOrders: PurchaseOrder[] = [
+                            {
+                              id: "ORD-99321",
+                              username: "ko_nay_min",
+                              itemName: "🗣️ 1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
+                              itemType: "tutoring",
+                              priceAmount: 45000,
+                              currency: "MMK",
+                              status: "completed",
+                              orderDate: "2026-06-10"
+                            },
+                            {
+                              id: "ORD-99322",
+                              username: "ma_khine",
+                              itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
+                              itemType: "e-book",
+                              priceAmount: 25000,
+                              currency: "MMK",
+                              status: "pending",
+                              orderDate: "2026-06-13"
+                            }
+                          ];
+                          setOrders(initialOrders);
+                          addSystemLog('admin', 'Seeded demo simulated purchase orders ledger');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-sans font-black text-brand-dark rounded-lg cursor-pointer"
+                    >
+                      SEED DEFAULT ORDERS
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                    <table className="w-full text-left font-sans text-xs">
+                      <thead className="bg-gray-50/70">
+                        <tr className="border-b border-gray-100 text-brand-muted text-[9px] font-black uppercase tracking-wider">
+                          <th className="py-2.5 px-3">ORDER ID</th>
+                          <th className="py-2.5 px-3">USERNAME</th>
+                          <th className="py-2.5 px-3">PACKAGE DESCRIPTION</th>
+                          <th className="py-2.5 px-3">DATE PLACED</th>
+                          <th className="py-2.5 px-3">METHOD TOTAL</th>
+                          <th className="py-2.5 px-3">STATUS</th>
+                          <th className="py-2.5 px-3 text-right">ADMIN ACTIONS</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 font-sans">
+                        {orders.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-brand-muted font-bold">
+                              No purchase orders currently submitted in system memory.
+                            </td>
+                          </tr>
+                        ) : (
+                          orders.map((ord) => (
+                            <tr key={ord.id} className="hover:bg-gray-50/50">
+                              <td className="py-3 px-3 font-mono font-black text-brand-purple">{ord.id}</td>
+                              <td className="py-3 px-3 font-bold text-brand-dark">{ord.username}</td>
+                              <td className="py-3 px-3 font-semibold text-brand-dark text-[11px]">{ord.itemName}</td>
+                              <td className="py-3 px-3 text-brand-muted font-bold">{ord.orderDate}</td>
+                              <td className="py-3 px-3 font-mono font-black text-brand-dark">
+                                {ord.priceAmount.toLocaleString()} {ord.currency}
+                              </td>
+                              <td className="py-3 px-3">
+                                {ord.status === 'pending' ? (
+                                  <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                    Pending Review
+                                  </span>
+                                ) : ord.status === 'completed' ? (
+                                  <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-green-50 text-green-700 border border-green-200">
+                                    Completed
+                                  </span>
+                                ) : (
+                                  <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-red-50 text-red-700 border border-red-200">
+                                    Cancelled
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                {ord.status === 'pending' && (
+                                  <div className="flex gap-1 justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'completed' } : o));
+                                        addSystemLog('admin', `Approved purchase of "${ord.itemName}" by "${ord.username}"`);
+                                      }}
+                                      className="px-2 py-1 bg-brand-green text-white text-[9px] font-black uppercase rounded hover:opacity-90 cursor-pointer"
+                                      title="Mark order as Completed"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'cancelled' } : o));
+                                        addSystemLog('admin', `Denied and Cancelled order "${ord.id}"`);
+                                      }}
+                                      className="px-2 py-1 bg-red-500 text-white text-[9px] font-black uppercase rounded hover:opacity-90 cursor-pointer"
+                                      title="Reject order"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                )}
+                                {ord.status !== 'pending' && (
+                                  <span className="text-[10px] text-brand-muted italic font-bold">Processed</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Curriculum & Lesson Database Manager */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-6" id="admin-curriculum-manager">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                    <div>
+                      <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 text-brand-purple">
+                        <BookOpen className="w-4 h-4 shrink-0 text-brand-purple" />
+                        📚 Curriculum & Lesson Database Manager • သင်ရိုးညွှန်းတမ်း တည်းဖြတ်ခြင်း
+                      </h4>
+                      <p className="text-[10px] font-sans font-bold text-brand-muted mt-1">
+                        Add, delete or modify metadata, vocabularies, sentences, grammars, and quizzes for all lessons. All edits persist instantly.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          const nextId = lessons.length > 0 ? Math.max(...lessons.map(l => l.id)) + 1 : 1;
+                          const newLesson: Lesson = {
+                            id: nextId,
+                            titleThai: "บทเรียนใหม่",
+                            titlePhonetic: "Bot-riian mai",
+                            titleEnglish: "New Custom Lesson " + nextId,
+                            titleMyanmar: "သင်ခန်းစာသစ် " + nextId,
+                            descriptionEnglish: "This is an interactive custom-created lesson from the Admin console.",
+                            descriptionMyanmar: "ဤသင်ခန်းစာကို စီမံခန့်ခွဲသူမှ တိုက်ရိုက်ဖန်တီးထားပါသည်။",
+                            dialogue: [
+                              {
+                                speaker: "A",
+                                thai: "สวัสดีครับ",
+                                phonetic: "sa-wat-dee khráp",
+                                english: "Hello (male)",
+                                myanmar: "မင်္ဂလာပါခင်ဗျာ",
+                                words: [{ thai: "สวัสดี", phonetic: "sa-wat-dee", english: "Hello", myanmar: "မင်္ဂလာပါ", partOfSpeech: "interjection" }]
+                              }
+                            ],
+                            grammarNotes: [
+                              {
+                                title: "Polite Particles",
+                                titleMyanmar: "ယဉ်ကျေးမှုဆိုင်ရာ အဆုံးသတ်စကားလုံးများ",
+                                explanation: "Use khráp for male speakers.",
+                                explanationMyanmar: "အမျိုးသားများအတွက် ယဉ်ကျေးစွာ ပြောဆိုရာတွင် khráp ကို ထည့်သွင်းသုံးစွဲရမည်ဖြစ်ပါသည်။",
+                                examples: [
+                                  { thai: "สวัสดีครับ", phonetic: "sa-wat-dee khráp", english: "Hello (male)", myanmar: "မင်္ဂလာပါခင်ဗျာ" },
+                                  { thai: "สบายดีครับ", phonetic: "sa-baai-dee khráp", english: "I am fine (male)", myanmar: "နေကောင်းပါတယ်ခင်ဗျာ" },
+                                  { thai: "ขอบคุณครับ", phonetic: "khòop-khun khráp", english: "Thank you (male)", myanmar: "ကျေးဇူးတင်ပါတယ်ခင်ဗျာ" },
+                                  { thai: "ขอโทษครับ", phonetic: "khǎaw-thôot khráp", english: "Excuse me (male)", myanmar: "တောင်းပန်ပါတယ်ခင်ဗျာ" },
+                                  { thai: "ยินดีครับ", phonetic: "yin-dee khráp", english: "My pleasure", myanmar: "ဝမ်းသာပါတယ်ခင်ဗျာ" },
+                                  { thai: "ဟုတ်ကဲ့ပါခင်ဗျာ", phonetic: "khrap", english: "Yes", myanmar: "ဟုတ်ကဲ့ပါခင်ဗျာ" }
+                                ]
+                              }
+                            ],
+                            quiz: [
+                              {
+                                id: "quiz-" + Date.now() + "-1",
+                                type: "translate-thai-to-mm",
+                                prompt: "What does สวัสดี mean?",
+                                promptThai: "สวัสดี",
+                                options: ["နေကောင်းလား", "မင်္ဂလာပါ", "ကျေးဇူးတင်ပါတယ်", "သွားတော့မယ်"],
+                                correctAnswer: "မင်္ဂလာပါ",
+                                explanation: "Sawatdee is the common Thai greeting meaning 'Hello'",
+                                explanationMyanmar: "Sawatdee သည် ထိုင်းနှုတ်ဆက်စကား 'မင်္ဂလာပါ' ဖြစ်သည်။"
+                              }
+                            ]
+                          };
+                          setLessons([...lessons, newLesson]);
+                          setAdminSelectedLessonId(newLesson.id);
+                          addSystemLog('admin', `Created a brand-new customized Lesson ${newLesson.id}`);
+                        }}
+                        className="px-3 py-1.5 bg-brand-purple hover:bg-brand-purple/90 text-white rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        CREATE LESSON
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          const ok = window.confirm("Are you absolutely sure you want to reset all curriculum contents back to factory defaults? Custom lessons and word edits will be permanently wiped.");
+                          if (ok) {
+                            localStorage.removeItem('thai_lessons_curriculum');
+                            lessons.forEach(l => {
+                              localStorage.removeItem(`thai_custom_vocab_${l.id}`);
+                            });
+                            setLessons(lessonsData);
+                            setAdminSelectedLessonId(lessonsData[0]?.id || null);
+                            window.dispatchEvent(new Event('thai_vocab_updated'));
+                            addSystemLog('admin', "Perform full factory reset of curriculum database");
+                            alert("System curriculum reset to factory baseline!");
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-colors border border-red-200"
+                        title="Reset back to factory template curriculum"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        RESET ALL TO FACTORY
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Drag and Drop Lesson Ordering Deck */}
+                  <div className="bg-amber-50/25 border border-amber-200/60 rounded-xl overflow-hidden transition-all duration-200 select-none">
+                    {/* Clickable Header for Collapse/Expand toggle */}
+                    <button
+                      onClick={() => setIsDragReorderExpanded(!isDragReorderExpanded)}
+                      className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-amber-100/30 transition-colors text-left"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <h5 className="text-[11px] font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1.5 text-brand-purple">
+                          🔀 DRAG & REORDER SYLLABUS LESSONS • သင်ခန်းစာများ အစီအစဉ် ပြောင်းလဲရန်
+                        </h5>
+                        <p className="text-[9.5px] font-sans font-medium text-brand-muted sm:ml-2">
+                          {!isDragReorderExpanded ? '(Click to expand drag panel • တည်းဖြတ်ရန် နှိပ်ပါ)' : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[9px] font-mono font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200/50">
+                          {lessons.length} LESSONS
+                        </span>
+                        {isDragReorderExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-brand-purple" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-brand-purple" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Expandable Section Body */}
+                    {isDragReorderExpanded && (
+                      <div className="p-4 pt-0 border-t border-gray-150/50 space-y-3.5 bg-white/40">
+                        <div className="pt-3.5">
+                          <p className="text-[9.5px] font-sans font-medium text-brand-muted">
+                            Drag and drop any lesson box below to change the syllabus sequence for students. Click a box to select it for edits.
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2.5">
+                          {lessons.map((l, index) => {
+                            const isSelected = l.id === adminSelectedLessonId;
+                            const isOver = draggedItemType === 'lessons' && dragOverTargetIndex === index;
+                            const isDragging = draggedItemType === 'lessons' && draggedItemIndex === index;
+                            return (
+                              <div
+                                key={l.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, index, 'lessons')}
+                                onDragOver={(e) => handleDragOver(e, index)}
+                                onDragEnd={handleDragEnd}
+                                onDrop={(e) => handleDrop(e, index, 'lessons')}
+                                onClick={() => setAdminSelectedLessonId(l.id)}
+                                className={`p-2 rounded-xl border-2 flex items-center gap-2 select-none cursor-grab active:cursor-grabbing transition-all text-xs font-semibold ${
+                                  isSelected
+                                    ? 'bg-brand-purple/10 border-brand-purple text-brand-purple shadow-sm ring-1 ring-brand-purple/20'
+                                    : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-xs text-brand-dark'
+                                } ${isOver ? 'border-brand-purple border-dashed scale-95 bg-brand-purple/5' : ''} ${
+                                  isDragging ? 'opacity-45 scale-95' : ''
+                                }`}
+                              >
+                                <GripVertical className="w-3.5 h-3.5 text-gray-400 shrink-0 pointer-events-none" />
+                                <span className="pointer-events-none">
+                                  L-{l.id}: <span className="font-extrabold">{l.titleEnglish}</span>
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lesson selection query dropdown */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-150">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                      <label className="text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider shrink-0">
+                        SELECT LESSON TO EDIT:
+                      </label>
+                      <select
+                        value={adminSelectedLessonId || ""}
+                        onChange={(e) => {
+                          const id = Number(e.target.value);
+                          setAdminSelectedLessonId(id || null);
+                        }}
+                        className="bg-white border-2 border-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer"
+                      >
+                        <option value="">-- Choose a Lesson --</option>
+                        {lessons.map(l => (
+                          <option key={l.id} value={l.id}>
+                            Lesson {l.id}: {l.titleEnglish} ({l.titleThai})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {adminSelectedLessonId && (
+                      <button
+                        onClick={() => {
+                          const confirmed = window.confirm(`Are you absolutely sure you want to delete Lesson ${adminSelectedLessonId} and all its structural contexts?`);
+                          if (confirmed) {
+                            const updated = lessons.filter(l => l.id !== adminSelectedLessonId);
+                            setLessons(updated);
+                            addSystemLog('admin', `Permanently deleted Lesson ${adminSelectedLessonId} from curriculums`);
+                            setAdminSelectedLessonId(updated[0]?.id || null);
+                          }
+                        }}
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[10px] font-sans font-black flex items-center gap-1 sm:ml-auto cursor-pointer border border-red-200"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        DELETE LESSON [{adminSelectedLessonId}]
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Selected lesson edits section */}
+                  {adminSelectedLessonId && (() => {
+                    const selectedLesson = lessons.find(l => l.id === adminSelectedLessonId);
+                    if (!selectedLesson) return <p className="text-xs text-brand-muted font-bold font-sans">Selected lesson metadata corrupt.</p>;
+
+                    return (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-xs bg-white">
+                        {/* Sub-tab navigation bar */}
+                        <div className="flex flex-wrap bg-gray-50 border-b border-gray-200">
+                          {([
+                            { id: 'metadata', label: '📝 METADATA' },
+                            { id: 'vocabulary', label: '📖 VOCABULARY ({wordsCount})' },
+                            { id: 'dialogue', label: '💬 DIALOGUE' },
+                            { id: 'grammar', label: '🧠 GRAMMAR ({grammarCount})' },
+                            { id: 'quiz', label: '⚡ QUIZZES ({quizCount})' }
+                          ] as const).map((tab) => {
+                            let labelText: string = tab.label;
+                            if (tab.id === 'vocabulary') {
+                              const wordsList = getCustomVocabList(selectedLesson.id);
+                              labelText = tab.label.replace('{wordsCount}', String(wordsList.length));
+                            } else if (tab.id === 'grammar') {
+                              labelText = tab.label.replace('{grammarCount}', String((selectedLesson.grammarNotes || []).length));
+                            } else if (tab.id === 'quiz') {
+                              labelText = tab.label.replace('{quizCount}', String((selectedLesson.quiz || []).length));
+                            }
+                            const isActive = adminEditTab === tab.id;
+                            return (
+                              <button
+                                key={tab.id}
+                                onClick={() => setAdminEditTab(tab.id)}
+                                className={`px-4 py-2.5 text-[10px] font-sans font-black tracking-wider transition-all border-r border-gray-200 cursor-pointer ${
+                                  isActive
+                                    ? 'bg-white text-brand-purple border-t-2 border-t-brand-purple font-extrabold focus:outline-none'
+                                    : 'text-brand-muted hover:bg-gray-100 hover:text-brand-dark'
+                                }`}
+                              >
+                                {labelText}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="p-4 sm:p-5 space-y-4">
+                          
+                          {/* SUB-TAB 1: METADATA */}
+                          {adminEditTab === 'metadata' && (
+                            <div className="space-y-4 animate-fade-in">
+                              <h5 className="text-xs font-sans font-black text-brand-dark uppercase tracking-wider border-b pb-1.5 text-brand-purple">
+                                Basic Metadata Configuration • အခြေခံအချက်အလက်များ ပြင်ဆင်ရန်
+                              </h5>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">English Title</label>
+                                  <input
+                                    type="text"
+                                    value={selectedLesson.titleEnglish}
+                                    onChange={(e) => updateLessonField(selectedLesson.id, 'titleEnglish', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">Thai Title</label>
+                                  <input
+                                    type="text"
+                                    value={selectedLesson.titleThai}
+                                    onChange={(e) => updateLessonField(selectedLesson.id, 'titleThai', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">Phonetic Title (Pronunciation)</label>
+                                  <input
+                                    type="text"
+                                    value={selectedLesson.titlePhonetic}
+                                    onChange={(e) => updateLessonField(selectedLesson.id, 'titlePhonetic', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">Myanmar Title</label>
+                                  <input
+                                    type="text"
+                                    value={selectedLesson.titleMyanmar}
+                                    onChange={(e) => updateLessonField(selectedLesson.id, 'titleMyanmar', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">English Short Description</label>
+                                <textarea
+                                  value={selectedLesson.descriptionEnglish}
+                                  onChange={(e) => updateLessonField(selectedLesson.id, 'descriptionEnglish', e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">Myanmar Short Description</label>
+                                <textarea
+                                  value={selectedLesson.descriptionMyanmar}
+                                  onChange={(e) => updateLessonField(selectedLesson.id, 'descriptionMyanmar', e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* SUB-TAB 2: VOCABULARY */}
+                          {adminEditTab === 'vocabulary' && (() => {
+                            const currentVocab = getCustomVocabList(selectedLesson.id);
+                            return (
+                              <div className="space-y-6 animate-fade-in">
+                                <div className="flex items-center justify-between gap-4">
+                                  <h5 className="text-xs font-sans font-black text-brand-dark uppercase tracking-wider border-b pb-1.5 text-brand-purple">
+                                    Vocabulary Drills Database • ဝေါဟာရပြင်ဆင်ရန်
+                                  </h5>
+                                  <span className="text-[10px] font-mono text-brand-muted font-bold">
+                                    {currentVocab.length} words registered
+                                  </span>
+                                </div>
+
+                                {/* Add vocabulary word helper inline card */}
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const form = e.currentTarget;
+                                    const thai = (form.elements.namedItem('th') as HTMLInputElement).value.trim();
+                                    const phonetic = (form.elements.namedItem('ph') as HTMLInputElement).value.trim();
+                                    const english = (form.elements.namedItem('en') as HTMLInputElement).value.trim();
+                                    const myanmar = (form.elements.namedItem('mm') as HTMLInputElement).value.trim();
+                                    const pos = (form.elements.namedItem('pos') as HTMLSelectElement).value;
+
+                                    if (!thai || !myanmar) {
+                                      alert("Please specify at least Thai Characters and Myanmar translation!");
+                                      return;
+                                    }
+
+                                    const newWord: WordBreakdown = { thai, phonetic, english, myanmar, partOfSpeech: pos };
+                                    const updated = [...currentVocab, newWord];
+                                    handleSaveVocabList(selectedLesson.id, updated);
+                                    form.reset();
+                                  }}
+                                  className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-5 gap-3"
+                                >
+                                  <div className="sm:col-span-5 border-b border-gray-200 pb-1.5 mb-1 flex items-center justify-between">
+                                    <span className="text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      ➕ Add Word to Lesson Vocabulary List
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Thai Word</label>
+                                    <input
+                                      name="th"
+                                      type="text"
+                                      placeholder="สวัสดี"
+                                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none"
+                                      required
+                                    />
+                                  </div>
+                                  
+                                  <div className="space-y-1">
+                                    <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Phonetic</label>
+                                    <input
+                                      name="ph"
+                                      type="text"
+                                      placeholder="sa-wat-dee"
+                                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none"
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">English</label>
+                                    <input
+                                      name="en"
+                                      type="text"
+                                      placeholder="Hello"
+                                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none"
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Myanmar</label>
+                                    <input
+                                      name="mm"
+                                      type="text"
+                                      placeholder="မင်္ဂလာပါ"
+                                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none"
+                                      required
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Part of Speech</label>
+                                    <select name="pos" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold bg-white cursor-pointer focus:border-brand-purple focus:outline-none">
+                                      <option value="noun">noun (နာမ်)</option>
+                                      <option value="verb">verb (ကြိယာ)</option>
+                                      <option value="adjective">adjective (နာမဝိသေသန)</option>
+                                      <option value="pronoun">pronoun (နာမ်စား)</option>
+                                      <option value="particle">particle (စကားလုံးနောက်ဆက်)</option>
+                                      <option value="phrase">phrase (စကားစု)</option>
+                                      <option value="interjection">interjection (အာမေဍိတ်)</option>
+                                    </select>
+                                  </div>
+
+                                  <button
+                                    type="submit"
+                                    className="sm:col-span-5 w-full bg-brand-purple text-white text-[11px] font-sans font-black py-2 rounded-lg mt-2 cursor-pointer hover:bg-brand-purple/90 transition-colors uppercase tracking-wider"
+                                  >
+                                    ➕ ADD WORD TO LESSON {selectedLesson.id}
+                                  </button>
+                                </form>
+
+                                 {/* List of current word database */}
+                                 <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-2.5 bg-gray-50/20">
+                                   {currentVocab.length === 0 ? (
+                                     <p className="text-center py-6 text-xs text-brand-muted font-bold font-sans">No vocabulary entries. Add some above!</p>
+                                   ) : (
+                                     currentVocab.map((w, index) => {
+                                       const isEditing = editingVocabIndex === index;
+                                       return (
+                                         <div
+                                           key={index}
+                                           draggable={!isEditing}
+                                           onDragStart={(e) => handleDragStart(e, index, 'vocab')}
+                                           onDragOver={(e) => handleDragOver(e, index)}
+                                           onDragEnd={handleDragEnd}
+                                           onDrop={(e) => handleDrop(e, index, 'vocab')}
+                                           className={`p-2.5 rounded-lg border-2 flex items-center justify-between gap-4 text-xs font-sans transition-all ${
+                                             isEditing
+                                               ? 'bg-amber-50/40 border-amber-200 shadow-md'
+                                               : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-xs cursor-grab active:cursor-grabbing'
+                                           } ${
+                                             draggedItemType === 'vocab' && dragOverTargetIndex === index
+                                               ? 'border-brand-purple border-dashed bg-brand-purple-light/10 scale-[0.98]'
+                                               : ''
+                                           } ${
+                                             draggedItemType === 'vocab' && draggedItemIndex === index ? 'opacity-40 scale-[0.98]' : ''
+                                           }`}
+                                         >
+                                           {!isEditing && (
+                                             <GripVertical className="w-3.5 h-3.5 text-gray-400 shrink-0 select-none cursor-grab active:cursor-grabbing hover:text-brand-purple" />
+                                           )}
+                                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 flex-1">
+                                             {isEditing ? (
+                                               <>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-amber-600 uppercase block mb-0.5">Thai *</span>
+                                                   <input
+                                                     type="text"
+                                                     value={editingVocabThai}
+                                                     onChange={(e) => setEditingVocabThai(e.target.value)}
+                                                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none bg-white"
+                                                   />
+                                                 </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-amber-600 uppercase block mb-0.5">Phonetic</span>
+                                                   <input
+                                                     type="text"
+                                                     value={editingVocabPhonetic}
+                                                     onChange={(e) => setEditingVocabPhonetic(e.target.value)}
+                                                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-sans text-brand-dark focus:border-brand-purple focus:outline-none bg-white font-semibold"
+                                                   />
+                                                 </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-amber-600 uppercase block mb-0.5">English</span>
+                                                   <input
+                                                     type="text"
+                                                     value={editingVocabEnglish}
+                                                     onChange={(e) => setEditingVocabEnglish(e.target.value)}
+                                                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-sans text-brand-dark focus:border-brand-purple focus:outline-none bg-white"
+                                                   />
+                                                 </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-amber-600 uppercase block mb-0.5">Myanmar // POS *</span>
+                                                   <input
+                                                     type="text"
+                                                     value={editingVocabMyanmar}
+                                                     onChange={(e) => setEditingVocabMyanmar(e.target.value)}
+                                                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none bg-white mb-1.5"
+                                                   />
+                                                   <select
+                                                     value={editingVocabPos}
+                                                     onChange={(e) => setEditingVocabPos(e.target.value)}
+                                                     className="w-full px-1.5 py-1 border border-gray-300 rounded text-[9px] uppercase font-bold font-sans text-brand-purple focus:border-brand-purple focus:outline-none bg-white"
+                                                   >
+                                                     <option value="noun">noun (နာမ်)</option>
+                                                     <option value="verb">verb (ကြိယာ)</option>
+                                                     <option value="adjective">adjective (နာမဝိသေသန)</option>
+                                                     <option value="pronoun">pronoun (နာမ်စား)</option>
+                                                     <option value="particle">particle (စကားလုံးနောက်ဆက်)</option>
+                                                     <option value="phrase">phrase (စကားစု)</option>
+                                                     <option value="interjection">interjection (အာမေဍိတ်)</option>
+                                                   </select>
+                                                 </div>
+                                               </>
+                                             ) : (
+                                               <>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-brand-muted uppercase block">Thai</span>
+                                                   <strong className="text-brand-dark text-sm">{w.thai}</strong>
+                                                 </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-brand-muted uppercase block">Phonetic</span>
+                                                   <span className="text-brand-dark italic">{w.phonetic || "-"}</span>
+                                                 </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-brand-muted uppercase block">English Meaning</span>
+                                                   <span className="text-brand-dark">{w.english || "-"}</span>
+                                                 </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-brand-muted uppercase block">Myanmar // POS</span>
+                                                   <span className="text-brand-dark block font-bold">{w.myanmar}</span>
+                                                   <span className="text-[9px] uppercase font-bold text-brand-purple bg-brand-purple-light/40 px-1 py-0.5 rounded w-fit block mt-0.5">{w.partOfSpeech}</span>
+                                                 </div>
+                                               </>
+                                             )}
+                                           </div>
+
+                                           <div className="flex flex-col sm:flex-row gap-1 shrink-0">
+                                             {isEditing ? (
+                                               <>
+                                                 <button
+                                                   onClick={() => {
+                                                     if (!editingVocabThai.trim() || !editingVocabMyanmar.trim()) {
+                                                       alert("Please specify at least Thai characters and Myanmar translation!");
+                                                       return;
+                                                     }
+                                                     const updated = [...currentVocab];
+                                                     updated[index] = {
+                                                       thai: editingVocabThai.trim(),
+                                                       phonetic: editingVocabPhonetic.trim(),
+                                                       english: editingVocabEnglish.trim(),
+                                                       myanmar: editingVocabMyanmar.trim(),
+                                                       partOfSpeech: editingVocabPos as any
+                                                     };
+                                                     handleSaveVocabList(selectedLesson.id, updated);
+                                                     setEditingVocabIndex(null);
+                                                   }}
+                                                   className="p-1.5 bg-brand-green hover:bg-brand-green/90 text-white rounded cursor-pointer transition-colors"
+                                                   title="Keep Edits"
+                                                 >
+                                                   <Check className="w-3.5 h-3.5" />
+                                                 </button>
+                                                 <button
+                                                   onClick={() => setEditingVocabIndex(null)}
+                                                   className="p-1.5 bg-gray-150 hover:bg-gray-200 text-gray-600 rounded cursor-pointer transition-colors"
+                                                   title="Discard Edits"
+                                                 >
+                                                   <X className="w-3.5 h-3.5" />
+                                                 </button>
+                                               </>
+                                             ) : (
+                                               <>
+                                                 <button
+                                                   onClick={() => {
+                                                     setEditingVocabIndex(index);
+                                                     setEditingVocabThai(w.thai);
+                                                     setEditingVocabPhonetic(w.phonetic || '');
+                                                     setEditingVocabEnglish(w.english || '');
+                                                     setEditingVocabMyanmar(w.myanmar);
+                                                     setEditingVocabPos(w.partOfSpeech || 'noun');
+                                                   }}
+                                                   className="p-1.5 hover:bg-gray-100 text-brand-purple rounded cursor-pointer transition-colors"
+                                                   title="Edit word entry"
+                                                 >
+                                                   <Pencil className="w-3.5 h-3.5" />
+                                                 </button>
+                                                 <button
+                                                   onClick={() => {
+                                                     const confirmed = window.confirm(`Are you sure you want to delete the word "${w.thai}"?`);
+                                                     if (confirmed) {
+                                                       const updated = currentVocab.filter((_, i) => i !== index);
+                                                       handleSaveVocabList(selectedLesson.id, updated);
+                                                     }
+                                                   }}
+                                                   className="p-1.5 hover:bg-red-50 text-red-500 rounded cursor-pointer transition-colors"
+                                                   title="Delete Word"
+                                                 >
+                                                   <Trash2 className="w-3.5 h-3.5" />
+                                                 </button>
+                                               </>
+                                             )}
+                                           </div>
+                                         </div>
+                                       );
+                                     })
+                                   )}
+                                 </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* SUB-TAB 3: DIALOGUE */}
+                          {adminEditTab === 'dialogue' && (() => {
+                            const currentDialogue = [...(selectedLesson.dialogue || [])];
+                            return (
+                              <div className="space-y-6 animate-fade-in">
+                                <div className="flex items-center justify-between gap-4">
+                                  <h5 className="text-xs font-sans font-black text-brand-dark uppercase tracking-wider border-b pb-1.5 text-brand-purple">
+                                    Dialogue Configuration Builder • စကားပြောခန်းများ ပြင်ဆင်ရန်
+                                  </h5>
+                                  <button
+                                    onClick={() => {
+                                      const newLine: DialogueLine = {
+                                        speaker: "A",
+                                        thai: "สบายดีครับ",
+                                        phonetic: "sa-baai-dee khráp",
+                                        english: "I am fine.",
+                                        myanmar: "နေကောင်းပါတယ်ခင်ဗျာ",
+                                        words: []
+                                      };
+                                      handleSaveDialogue(selectedLesson.id, [...currentDialogue, newLine]);
+                                    }}
+                                    className="px-3 py-1 bg-brand-purple text-white text-[10px] font-sans font-black rounded-lg flex items-center gap-1 cursor-pointer hover:bg-brand-purple/90"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    ADD LINE
+                                  </button>
+                                </div>
+
+                                <div className="space-y-4 max-h-[500px] overflow-y-auto p-1 bg-gray-50/50 rounded-xl border p-2">
+                                  {currentDialogue.length === 0 ? (
+                                    <p className="text-center py-6 text-xs text-brand-muted font-bold font-sans">No dialogue lines configured. Click Add above!</p>
+                                  ) : (
+                                    currentDialogue.map((dl, index) => (
+                                      <div
+                                        key={index}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, index, 'dialogue')}
+                                        onDragOver={(e) => handleDragOver(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        onDrop={(e) => handleDrop(e, index, 'dialogue')}
+                                        className={`bg-white border-2 rounded-xl p-4 space-y-3 relative shadow-xs cursor-grab active:cursor-grabbing transition-all ${
+                                          draggedItemType === 'dialogue' && dragOverTargetIndex === index
+                                            ? 'border-brand-purple border-dashed bg-brand-purple-light/10 scale-[0.98]'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                        } ${
+                                          draggedItemType === 'dialogue' && draggedItemIndex === index ? 'opacity-40 scale-[0.98]' : ''
+                                        }`}
+                                      >
+                                        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                                          <div className="text-[9px] font-sans font-black text-brand-muted uppercase bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg flex items-center gap-1 select-none pointer-events-none">
+                                            <GripVertical className="w-3 h-3 text-gray-400" />
+                                            LINE {index + 1}
+                                          </div>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const updated = currentDialogue.filter((_, i) => i !== index);
+                                              handleSaveDialogue(selectedLesson.id, updated);
+                                            }}
+                                            className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                                            title="Delete line"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                                          <div className="space-y-1">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Speaker</label>
+                                            <input
+                                              type="text"
+                                              value={dl.speaker}
+                                              onChange={(e) => {
+                                                const updated = [...currentDialogue];
+                                                updated[index].speaker = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, dialogue: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-2">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Thai text</label>
+                                            <input
+                                              type="text"
+                                              value={dl.thai}
+                                              onChange={(e) => {
+                                                const updated = [...currentDialogue];
+                                                updated[index].thai = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, dialogue: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-2">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Phonetic</label>
+                                            <input
+                                              type="text"
+                                              value={dl.phonetic}
+                                              onChange={(e) => {
+                                                const updated = [...currentDialogue];
+                                                updated[index].phonetic = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, dialogue: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-2">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">English Meaning</label>
+                                            <input
+                                              type="text"
+                                              value={dl.english}
+                                              onChange={(e) => {
+                                                const updated = [...currentDialogue];
+                                                updated[index].english = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, dialogue: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-3">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Myanmar Translation</label>
+                                            <input
+                                              type="text"
+                                              value={dl.myanmar}
+                                              onChange={(e) => {
+                                                const updated = [...currentDialogue];
+                                                updated[index].myanmar = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, dialogue: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+
+                                <button
+                                  onClick={() => handleSaveDialogue(selectedLesson.id, currentDialogue)}
+                                  className="w-full bg-brand-green text-white text-[11px] font-sans font-black py-2.5 rounded-xl uppercase tracking-wider cursor-pointer hover:bg-brand-green/90 transition-colors"
+                                >
+                                  💾 SAVE DIALOGUE CONFIGURATION
+                                </button>
+                              </div>
+                            );
+                          })()}
+
+                          {/* SUB-TAB 4: GRAMMAR */}
+                          {adminEditTab === 'grammar' && (() => {
+                            const currentGrammar = [...(selectedLesson.grammarNotes || [])];
+                            return (
+                              <div className="space-y-6 animate-fade-in">
+                                <div className="flex items-center justify-between gap-4">
+                                  <h5 className="text-xs font-sans font-black text-brand-dark uppercase tracking-wider border-b pb-1.5 text-brand-purple">
+                                    Grammar Notes Rules Engine • သဒ္ဒါစည်းမျဉ်းများ ပြင်ဆင်ရန်
+                                  </h5>
+                                  <button
+                                    onClick={() => {
+                                      const newGrammar: GrammarNote = {
+                                        title: "New Grammar Point",
+                                        titleMyanmar: "သဒ္ဒါအချက်အလတ်သစ်",
+                                        explanation: "Explanation in English context.",
+                                        explanationMyanmar: "မြန်မာလိုရှင်းလင်းချက် အကျဉ်းချုပ်။",
+                                        examples: []
+                                      };
+                                      handleSaveGrammarNotes(selectedLesson.id, [...currentGrammar, newGrammar]);
+                                    }}
+                                    className="px-3 py-1 bg-brand-purple text-white text-[10px] font-sans font-black rounded-lg flex items-center gap-1 cursor-pointer hover:bg-brand-purple/90"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    ADD GRAMMAR POINT
+                                  </button>
+                                </div>
+
+                                <div className="space-y-6 max-h-[500px] overflow-y-auto p-1 bg-gray-50/50 border rounded-xl p-2">
+                                  {currentGrammar.length === 0 ? (
+                                    <p className="text-center py-6 text-xs text-brand-muted font-bold font-sans">No grammar notes configured. Click Add above!</p>
+                                  ) : (
+                                    currentGrammar.map((gn, index) => (
+                                      <div
+                                        key={index}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, index, 'grammar')}
+                                        onDragOver={(e) => handleDragOver(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        onDrop={(e) => handleDrop(e, index, 'grammar')}
+                                        className={`bg-white border-2 rounded-xl p-4 space-y-4 relative shadow-sm cursor-grab active:cursor-grabbing transition-all ${
+                                          draggedItemType === 'grammar' && dragOverTargetIndex === index
+                                            ? 'border-brand-purple border-dashed bg-brand-purple-light/10 scale-[0.98]'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                        } ${
+                                          draggedItemType === 'grammar' && draggedItemIndex === index ? 'opacity-40 scale-[0.98]' : ''
+                                        }`}
+                                      >
+                                        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                                          <div className="text-[9px] font-sans font-black text-brand-muted uppercase bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg flex items-center gap-1 select-none pointer-events-none">
+                                            <GripVertical className="w-3 h-3 text-gray-400" />
+                                            RULE {index + 1}
+                                          </div>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const updated = currentGrammar.filter((_, i) => i !== index);
+                                              handleSaveGrammarNotes(selectedLesson.id, updated);
+                                            }}
+                                            className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                                            title="Delete Grammar Notes"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          <div className="space-y-1">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Grammar Title (English)</label>
+                                            <input
+                                              type="text"
+                                              value={gn.title}
+                                              onChange={(e) => {
+                                                const updated = [...currentGrammar];
+                                                updated[index].title = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Grammar Title (Myanmar)</label>
+                                            <input
+                                              type="text"
+                                              value={gn.titleMyanmar}
+                                              onChange={(e) => {
+                                                const updated = [...currentGrammar];
+                                                updated[index].titleMyanmar = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-2">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">English Explanation</label>
+                                            <textarea
+                                              value={gn.explanation}
+                                              onChange={(e) => {
+                                                const updated = [...currentGrammar];
+                                                updated[index].explanation = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                              }}
+                                              rows={2}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-2">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Myanmar Explanation</label>
+                                            <textarea
+                                              value={gn.explanationMyanmar}
+                                              onChange={(e) => {
+                                                const updated = [...currentGrammar];
+                                                updated[index].explanationMyanmar = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                              }}
+                                              rows={2}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* Examples for this Grammar Note */}
+                                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
+                                          <div className="flex items-center justify-between gap-2 border-b border-gray-250 pb-1.5">
+                                            <span className="text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1">
+                                              <CheckCircle className="w-3.5 h-3.5 text-brand-green" />
+                                              Grammar Examples ({gn.examples?.length || 0}) (Must include exactly 6 for best performance!)
+                                            </span>
+                                            <button
+                                              onClick={() => {
+                                                const updated = [...currentGrammar];
+                                                if (!updated[index].examples) updated[index].examples = [];
+                                                updated[index].examples.push({
+                                                  thai: "ไทย",
+                                                  phonetic: "thai",
+                                                  english: "Thai language",
+                                                  myanmar: "ထိုင်းစကား"
+                                                });
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                              }}
+                                              className="px-2 py-1 bg-brand-purple-light text-brand-purple text-[9px] font-sans font-black rounded cursor-pointer hover:bg-brand-purple/10"
+                                            >
+                                              ➕ ADD EXAMPLE ROW
+                                            </button>
+                                          </div>
+
+                                          <div className="space-y-2">
+                                            {(!gn.examples || gn.examples.length === 0) ? (
+                                              <p className="text-[10px] text-brand-muted font-bold block text-center">No grammatical examples defined.</p>
+                                            ) : (
+                                              gn.examples.map((ex, exIdx) => (
+                                                <div key={exIdx} className="bg-white p-2 rounded border border-gray-200 grid grid-cols-1 sm:grid-cols-4 gap-2 relative">
+                                                  <button
+                                                    onClick={() => {
+                                                      const updated = [...currentGrammar];
+                                                      updated[index].examples = updated[index].examples.filter((_, i) => i !== exIdx);
+                                                      setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                                    }}
+                                                    className="absolute -top-1 -right-1 bg-red-100 text-red-500 rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black cursor-pointer shadow-xs hover:bg-red-200"
+                                                    title="Delete Example"
+                                                  >
+                                                    ×
+                                                  </button>
+
+                                                  <div>
+                                                    <span className="text-[7.5px] font-black text-brand-muted uppercase block">Thai</span>
+                                                    <input
+                                                      type="text"
+                                                      placeholder="Thai"
+                                                      value={ex.thai}
+                                                      onChange={(e) => {
+                                                        const updated = [...currentGrammar];
+                                                        updated[index].examples[exIdx].thai = e.target.value;
+                                                        setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                                      }}
+                                                      className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-xs text-brand-dark font-semibold mt-0.5"
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-[7.5px] font-black text-brand-muted uppercase block">Phonetic</span>
+                                                    <input
+                                                      type="text"
+                                                      placeholder="Phonetic"
+                                                      value={ex.phonetic}
+                                                      onChange={(e) => {
+                                                        const updated = [...currentGrammar];
+                                                        updated[index].examples[exIdx].phonetic = e.target.value;
+                                                        setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                                      }}
+                                                      className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-xs text-brand-dark font-semibold mt-0.5"
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-[7.5px] font-black text-brand-muted uppercase block">English</span>
+                                                    <input
+                                                      type="text"
+                                                      placeholder="English"
+                                                      value={ex.english}
+                                                      onChange={(e) => {
+                                                        const updated = [...currentGrammar];
+                                                        updated[index].examples[exIdx].english = e.target.value;
+                                                        setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                                      }}
+                                                      className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-xs text-brand-dark font-semibold mt-0.5"
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-[7.5px] font-black text-brand-muted uppercase block">Myanmar</span>
+                                                    <input
+                                                      type="text"
+                                                      placeholder="Myanmar"
+                                                      value={ex.myanmar}
+                                                      onChange={(e) => {
+                                                        const updated = [...currentGrammar];
+                                                        updated[index].examples[exIdx].myanmar = e.target.value;
+                                                        setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, grammarNotes: updated } : l));
+                                                      }}
+                                                      className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-xs text-brand-dark font-semibold mt-0.5"
+                                                    />
+                                                  </div>
+                                                </div>
+                                              ))
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+
+                                <button
+                                  onClick={() => handleSaveGrammarNotes(selectedLesson.id, currentGrammar)}
+                                  className="w-full bg-brand-green text-white text-[11px] font-sans font-black py-2.5 rounded-xl uppercase tracking-wider cursor-pointer hover:bg-brand-green/90 transition-colors"
+                                >
+                                  💾 SAVE GRAMMAR RULES
+                                </button>
+                              </div>
+                            );
+                          })()}
+
+                          {/* SUB-TAB 5: QUIZZES */}
+                          {adminEditTab === 'quiz' && (() => {
+                            const currentQuiz = [...(selectedLesson.quiz || [])];
+                            return (
+                              <div className="space-y-6 animate-fade-in">
+                                <div className="flex items-center justify-between gap-4">
+                                  <h5 className="text-xs font-sans font-black text-brand-dark uppercase tracking-wider border-b pb-1.5 text-brand-purple">
+                                    Interactive Quizzes Database • ပဟေဠိမေးခွန်းများ ပြင်ဆင်ရန်
+                                  </h5>
+                                  <button
+                                    onClick={() => {
+                                      const newQuiz: QuizQuestion = {
+                                        id: "quiz-" + Date.now() + "-" + (currentQuiz.length + 1),
+                                        type: "translate-thai-to-mm",
+                                        prompt: "What is the correct translation?",
+                                        options: ["Choice A", "Choice B", "Choice C", "Choice D"],
+                                        correctAnswer: "Choice A",
+                                        explanation: "Explanation",
+                                        explanationMyanmar: "ရှင်းလင်းချက်"
+                                      };
+                                      handleSaveQuizzes(selectedLesson.id, [...currentQuiz, newQuiz]);
+                                    }}
+                                    className="px-3 py-1 bg-brand-purple text-white text-[10px] font-sans font-black rounded-lg flex items-center gap-1 cursor-pointer hover:bg-brand-purple/90"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    ADD QUIZ QUESTION
+                                  </button>
+                                </div>
+
+                                <div className="space-y-6 max-h-[500px] overflow-y-auto p-1 bg-gray-50/50 border rounded-xl p-2">
+                                  {currentQuiz.length === 0 ? (
+                                    <p className="text-center py-6 text-xs text-brand-muted font-bold font-sans">No quizzes configured. Click Add above!</p>
+                                  ) : (
+                                    currentQuiz.map((qz, index) => (
+                                      <div
+                                        key={qz.id}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, index, 'quiz')}
+                                        onDragOver={(e) => handleDragOver(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        onDrop={(e) => handleDrop(e, index, 'quiz')}
+                                        className={`bg-white border-2 rounded-xl p-4 space-y-3 relative shadow-xs cursor-grab active:cursor-grabbing transition-all ${
+                                          draggedItemType === 'quiz' && dragOverTargetIndex === index
+                                            ? 'border-brand-purple border-dashed bg-brand-purple-light/10 scale-[0.98]'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                        } ${
+                                          draggedItemType === 'quiz' && draggedItemIndex === index ? 'opacity-40 scale-[0.98]' : ''
+                                        }`}
+                                      >
+                                        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                                          <div className="text-[9px] font-sans font-black text-brand-muted uppercase bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg flex items-center gap-1 select-none pointer-events-none">
+                                            <GripVertical className="w-3 h-3 text-gray-400" />
+                                            QUIZ {index + 1}
+                                          </div>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const updated = currentQuiz.filter((_, i) => i !== index);
+                                              handleSaveQuizzes(selectedLesson.id, updated);
+                                            }}
+                                            className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                                            title="Delete Quiz"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                          <div className="space-y-1">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Question Type</label>
+                                            <select
+                                              value={qz.type}
+                                              onChange={(e) => {
+                                                const updated = [...currentQuiz];
+                                                updated[index].type = e.target.value as any;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, quiz: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-semibold bg-white cursor-pointer focus:border-brand-purple focus:outline-none"
+                                            >
+                                              <option value="translate-thai-to-mm">Thai to Myanmar</option>
+                                              <option value="translate-mm-to-thai">Myanmar to Thai</option>
+                                              <option value="listening-match">Listening audio match</option>
+                                              <option value="fill-gap">Fill in the missing gap</option>
+                                            </select>
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-2">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Prompt (The Question Text)</label>
+                                            <input
+                                              type="text"
+                                              value={qz.prompt}
+                                              onChange={(e) => {
+                                                const updated = [...currentQuiz];
+                                                updated[index].prompt = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, quiz: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Prompt Thai segment (audio query)</label>
+                                            <input
+                                              type="text"
+                                              value={qz.promptThai || ""}
+                                              onChange={(e) => {
+                                                const updated = [...currentQuiz];
+                                                updated[index].promptThai = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, quiz: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-2">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Correct Answer Value (MUST MATCH EXACT OPTION STRING)</label>
+                                            <input
+                                              type="text"
+                                              value={qz.correctAnswer}
+                                              onChange={(e) => {
+                                                const updated = [...currentQuiz];
+                                                updated[index].correctAnswer = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, quiz: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-brand-green/30 rounded text-xs font-bold bg-brand-green-light/20 text-brand-green focus:outline-none"
+                                              placeholder="Must match one of the options exactly"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-3">
+                                            <span className="block text-[9px] font-sans font-black text-brand-muted uppercase mb-1">
+                                              Multiple Choice Options (Exactly 4 Choices)
+                                            </span>
+                                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                              {[0, 1, 2, 3].map((optIdx) => (
+                                                <input
+                                                  key={optIdx}
+                                                  type="text"
+                                                  placeholder={`Choice ${optIdx + 1}`}
+                                                  value={qz.options[optIdx] || ""}
+                                                  onChange={(e) => {
+                                                    const updated = [...currentQuiz];
+                                                    const opts = [...(updated[index].options || [])];
+                                                    opts[optIdx] = e.target.value;
+                                                    updated[index].options = opts;
+                                                    setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, quiz: updated } : l));
+                                                  }}
+                                                  className="px-2 py-1.5 border border-gray-300 rounded text-xs font-bold focus:border-brand-purple"
+                                                />
+                                              ))}
+                                            </div>
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-1.5">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">English Explanation</label>
+                                            <input
+                                              type="text"
+                                              value={qz.explanation || ""}
+                                              onChange={(e) => {
+                                                const updated = [...currentQuiz];
+                                                updated[index].explanation = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, quiz: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold focus:border-brand-purple"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-1.5">
+                                            <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Myanmar Explanation</label>
+                                            <input
+                                              type="text"
+                                              value={qz.explanationMyanmar || ""}
+                                              onChange={(e) => {
+                                                const updated = [...currentQuiz];
+                                                updated[index].explanationMyanmar = e.target.value;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, quiz: updated } : l));
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold focus:border-brand-purple"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+
+                                <button
+                                  onClick={() => handleSaveQuizzes(selectedLesson.id, currentQuiz)}
+                                  className="w-full bg-brand-green text-white text-[11px] font-sans font-black py-2.5 rounded-xl uppercase tracking-wider cursor-pointer hover:bg-brand-green/90 transition-colors"
+                                >
+                                  💾 SAVE QUIZ DATABASE
+                                </button>
+                              </div>
+                            );
+                          })()}
+
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Audit Logs feed */}
@@ -2043,7 +4225,7 @@ export default function App() {
                 id="tab-vocabulary"
               >
                 <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Vocab • ဝေါဟာရ</span>
+                <span className="truncate">Vocab<span className="hidden xs:inline"> • ဝေါဟာရ</span></span>
               </button>
 
               <button
@@ -2056,7 +4238,7 @@ export default function App() {
                 id="tab-sentence"
               >
                 <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Sentence • ဝါကျ</span>
+                <span className="truncate">Sentence<span className="hidden xs:inline"> • ဝါကျ</span></span>
               </button>
 
               <button
@@ -2069,7 +4251,7 @@ export default function App() {
                 id="tab-grammar"
               >
                 <FileText className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Grammar • သဒ္ဒါ</span>
+                <span className="truncate">Grammar<span className="hidden xs:inline"> • သဒ္ဒါ</span></span>
               </button>
 
               <button
@@ -2082,7 +4264,7 @@ export default function App() {
                 id="tab-quiz"
               >
                 <Award className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Quiz • စစ်ဆေးခြင်း</span>
+                <span className="truncate">Quiz<span className="hidden xs:inline"> • စစ်ဆေးခြင်း</span></span>
               </button>
             </div>
 
@@ -2320,10 +4502,10 @@ export default function App() {
             </div>
 
             {/* Unified Bottom Lesson Control Deck */}
-            <div className="mt-8 pt-6 border-t border-gray-100 space-y-6 animate-fade-in" id="bottom-lesson-ctrl-deck">
+            <div className="mt-6 pt-4 border-t border-gray-100 space-y-4 animate-fade-in" id="bottom-lesson-ctrl-deck">
               
               {/* Part 1: Page-to-Page Navigation for active lesson */}
-              <div className="bg-white rounded-2xl border-2 border-gray-100 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="bg-white rounded-xl border border-gray-150 p-3 flex items-center justify-between gap-4">
                 {/* Back Button */}
                 <button
                   onClick={() => {
@@ -2334,56 +4516,29 @@ export default function App() {
                     } else if (activeTab === 'sentence') {
                       setActiveTab('vocabulary');
                     } else if (activeTab === 'vocabulary') {
-                      if (activeLesson.id > 1) {
-                        const prevId = activeLesson.id - 1;
-                        setActiveLessonId(prevId);
+                      if (prevLesson) {
+                        setActiveLessonId(prevLesson.id);
                         setActiveTab('quiz');
                       } else {
                         setActiveLessonId(null);
                       }
                     }
                   }}
-                  className="duo-btn duo-btn-white text-xs px-5 py-3 font-black flex items-center justify-center gap-1.5 min-w-[150px] transition-all cursor-pointer"
+                  className="duo-btn duo-btn-white text-xs px-4 py-2 font-black flex items-center justify-center gap-1.5 min-w-[120px] transition-all cursor-pointer"
                   id="nav-btn-back"
                 >
-                  <ChevronLeft className="w-4 h-4 shrink-0" />
+                  <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
                   {activeTab === 'vocabulary' ? (
-                    activeLesson.id > 1 ? `LESSON ${activeLesson.id - 1}` : 'DASHBOARD'
+                    prevLesson ? `LESSON ${prevLesson.id}` : 'DASHBOARD'
                   ) : (
                     'BACK • ရှေ့သို့'
                   )}
                 </button>
 
-                {/* Page Pagination Segments / Tabs list */}
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {[
-                    { id: 'vocabulary', label: '1. Vocab • ဝေါဟာရ' },
-                    { id: 'sentence', label: '2. Sentence • ဝါကျ' },
-                    { id: 'grammar', label: '3. Grammar • သဒ္ဒါ' },
-                    { id: 'quiz', label: '4. Quiz • စစ်ဆေးခြင်း' }
-                  ].map((p) => {
-                    const isPageActive = activeTab === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        id={`page-bttn-${p.id}`}
-                        onClick={() => {
-                          setActiveTab(p.id as any);
-                          if (p.id === 'grammar') {
-                            setCurrentGrammarPageIndex(0);
-                          }
-                        }}
-                        className={`px-3.5 py-1.5 rounded-full text-[11px] font-sans font-black transition-all cursor-pointer ${
-                          isPageActive
-                            ? 'bg-brand-purple text-white shadow-sm ring-2 ring-brand-purple-shadow'
-                            : 'bg-gray-50 border border-gray-200 text-brand-muted hover:bg-gray-100 hover:text-brand-dark'
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Compact Current Page Indicator */}
+                <span className="text-[10px] font-sans text-brand-purple bg-brand-purple-light px-3 py-1 rounded-full font-black select-none uppercase tracking-wider">
+                  Page {activeTab === 'vocabulary' ? '1' : activeTab === 'sentence' ? '2' : activeTab === 'grammar' ? '3' : '4'} of 4
+                </span>
 
                 {/* Next Button */}
                 <button
@@ -2396,58 +4551,52 @@ export default function App() {
                     } else if (activeTab === 'grammar') {
                       setActiveTab('quiz');
                     } else if (activeTab === 'quiz') {
-                      if (activeLesson.id < lessonsData.length) {
-                        const nextId = activeLesson.id + 1;
-                        setActiveLessonId(nextId);
+                      if (nextLesson) {
+                        setActiveLessonId(nextLesson.id);
                         setActiveTab('vocabulary');
                       } else {
                         setActiveLessonId(null);
                       }
                     }
                   }}
-                  className="duo-btn duo-btn-purple text-xs px-5 py-3 font-black flex items-center justify-center gap-1.5 min-w-[150px] transition-all cursor-pointer"
+                  className="duo-btn duo-btn-purple text-xs px-4 py-2 font-black flex items-center justify-center gap-1.5 min-w-[120px] transition-all cursor-pointer"
                   id="nav-btn-next"
                 >
                   {activeTab === 'quiz' ? (
-                    activeLesson.id < lessonsData.length ? (
+                    nextLesson ? (
                       <>
-                        LESSON {activeLesson.id + 1}
-                        <ChevronRight className="w-4 h-4 shrink-0" />
+                        LESSON {nextLesson.id}
+                        <ChevronRight className="w-3.5 h-3.5 shrink-0" />
                       </>
                     ) : (
                       <>
                         FINISH • ပြီးဆုံးပါပြီ
-                        <Check className="w-4 h-4 shrink-0" />
+                        <Check className="w-3.5 h-3.5 shrink-0" />
                       </>
                     )
                   ) : (
                     <>
                       NEXT • နောက်သို့
-                      <ChevronRight className="w-4 h-4 shrink-0" />
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0" />
                     </>
                   )}
                 </button>
               </div>
 
               {/* Part 2: Lesson Switcher / All Lessons Pagination */}
-              <div className="bg-white rounded-2xl border-2 border-gray-100 p-5 shadow-xs" id="lessons-nav-pager">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-gray-100 pb-3">
-                  <div>
-                    <h4 className="text-xs font-sans text-brand-dark font-black uppercase tracking-wider">
-                      All Lessons Navigation • သင်ခန်းစာများအားလုံး
-                    </h4>
-                    <p className="text-[10px] font-sans font-bold text-brand-muted">
-                      Quickly hop to any lesson index directly from below.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-1 rounded-full font-black select-none">
-                    LESSON {activeLesson.id} OF {lessonsData.length}
+              <div className="bg-gray-50/50 rounded-xl border border-gray-150 p-3" id="lessons-nav-pager">
+                <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-gray-100">
+                  <span className="text-[10px] font-sans text-brand-dark font-black uppercase tracking-wider">
+                    Hop to Lesson • သင်ခန်းစာများ
+                  </span>
+                  <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light/50 px-2 py-0.5 rounded-full font-black select-none">
+                    LESSON {activeLesson.id} OF {lessons.length}
                   </span>
                 </div>
 
                 {/* Grid of All available Lesson Numbers */}
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {lessonsData.map((lesson) => {
+                <div className="flex flex-wrap gap-1.5 justify-center">
+                  {lessons.map((lesson) => {
                     const isLessonActive = lesson.id === activeLesson.id;
                     const isCompleted = (progress.quizHighScores[lesson.id] || 0) >= 80;
                     return (
@@ -2458,18 +4607,18 @@ export default function App() {
                           setActiveLessonId(lesson.id);
                           setActiveTab('vocabulary');
                         }}
-                        className={`w-9.5 h-9.5 rounded-xl text-xs font-sans font-black transition-all border-2 flex items-center justify-center cursor-pointer relative ${
+                        className={`w-7 h-7 rounded-lg text-[10px] font-sans font-black transition-all border flex items-center justify-center cursor-pointer relative ${
                           isLessonActive
-                            ? 'bg-brand-purple text-white border-brand-purple border-b-4 border-brand-purple-shadow scale-110 z-10'
+                            ? 'bg-brand-purple text-white border-brand-purple border-b-2 border-brand-purple-shadow scale-105 z-10'
                             : isCompleted
-                            ? 'bg-brand-green-light border-brand-green/20 text-brand-green hover:bg-brand-green-light/80'
-                            : 'bg-white border-gray-200 text-brand-dark hover:bg-gray-50 border-b-4'
+                            ? 'bg-brand-green-light border-brand-green/25 text-brand-green hover:bg-brand-green-light/80'
+                            : 'bg-white border-gray-200 text-brand-dark hover:bg-gray-50 border-b-2'
                         }`}
                         title={lesson.titleEnglish}
                       >
                         {lesson.id}
                         {isCompleted && !isLessonActive && (
-                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#3b82f6] rounded-full border border-white" />
+                          <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" />
                         )}
                       </button>
                     );
@@ -2483,6 +4632,25 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Dynamic Admin System Broadcast Marquee Banner (Low Priority Footer Banner) */}
+      {showBroadcastBanner && activeBroadcast && (
+        <div className="max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 mt-6">
+          <div className="bg-gradient-to-r from-brand-purple/90 to-brand-purple-shadow/90 text-white py-2.5 px-4 rounded-2xl shadow-xs text-[11px] sm:text-xs font-sans font-bold flex items-center justify-between gap-4 transition-all">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="w-4 h-4 animate-bounce shrink-0 text-amber-300" />
+              <p className="truncate leading-none uppercase tracking-wide">{activeBroadcast}</p>
+            </div>
+            <button 
+              onClick={() => setShowBroadcastBanner(false)}
+              className="text-white/70 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors shrink-0 cursor-pointer"
+              title="Dismiss Announcement"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer credits */}
       <footer className="border-t border-gray-100 bg-white mt-16 py-8 text-center text-[11px] text-brand-muted font-sans font-semibold leading-relaxed">
@@ -2520,38 +4688,51 @@ export default function App() {
               </div>
 
               {/* Modal Tabs inside Auth Form */}
-              <div className="flex gap-1.5 p-1 bg-gray-50 rounded-xl border border-gray-100/80 mb-5 font-sans text-[10px] sm:text-xs font-black">
+              <div className="flex gap-1 p-1 bg-gray-50 rounded-xl border border-gray-100/80 mb-5 font-sans text-[10px] sm:text-xs font-black">
                 <button 
                   onClick={() => {
-                    setAuthTab('user');
+                    setAuthTab('student-signup');
                     setAuthError('');
                   }}
-                  className={`flex-1 py-1.5 text-center rounded-lg transition-all uppercase tracking-wide cursor-pointer ${authTab === 'user' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                  className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-signup' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
                 >
-                  Student Sign Up
+                  Sign Up
+                </button>
+                <button 
+                  onClick={() => {
+                    setAuthTab('student-login');
+                    setAuthError('');
+                  }}
+                  className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-login' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                >
+                  Log In
                 </button>
                 <button 
                   onClick={() => {
                     setAuthTab('admin');
                     setAuthError('');
                   }}
-                  className={`flex-1 py-1.5 text-center rounded-lg transition-all uppercase tracking-wide cursor-pointer ${authTab === 'admin' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                  className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'admin' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
                 >
-                  Admin Console
+                  Admin Box
                 </button>
               </div>
 
-              {authTab === 'user' ? (
+              {authTab === 'student-signup' && (
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   if (authUsername.trim()) {
-                    handleStandardSignUp(authUsername);
-                    setAuthUsername('');
+                    const success = handleStandardSignUp(authUsername, authPassword);
+                    if (success) {
+                      setAuthUsername('');
+                      setAuthPassword('');
+                      setAuthError('');
+                    }
                   }
                 }} className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
-                      Enter Username • သင့်အမည်ပေးပါ
+                      Choose Username • အမည်အသစ်ပေးပါ
                     </label>
                     <input 
                       type="text" 
@@ -2562,15 +4743,30 @@ export default function App() {
                       className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
                     />
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                      Choose Password • စကားဝှက်အသစ်
+                    </label>
+                    <input 
+                      type="password" 
+                      placeholder="e.g. secret123"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      required
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                    />
+                  </div>
                   <button 
                     type="submit"
                     className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2"
                   >
                     <CheckSquare className="w-4 h-4" />
-                    ENTER COURSE • သင်ခန်းစာလေ့လာမည်
+                    CREATE STUDENT USER • အကောင့်သစ်ဖွင့်မည်
                   </button>
                 </form>
-              ) : (
+              )}
+
+              {authTab === 'student-login' && (
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   if (authUsername.trim() && authPassword) {
@@ -2580,7 +4776,62 @@ export default function App() {
                       setAuthPassword('');
                       setAuthError('');
                     } else {
-                      setAuthError('Invalid admin credentials! (use admin & admin@4238)');
+                      setAuthError('Error: Incorrect credentials or not found. (Note: standard demo password is password123)');
+                    }
+                  }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                      Student Username • အသုံးပြုသူအမည်
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. ko_nay_min"
+                      value={authUsername}
+                      onChange={(e) => setAuthUsername(e.target.value)}
+                      required
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                      Password • စကားဝှက်
+                    </label>
+                    <input 
+                      type="password" 
+                      placeholder="••••••••"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      required
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                    />
+                  </div>
+
+                  {authError && (
+                    <p className="text-red-500 text-[10px] font-semibold leading-tight">{authError}</p>
+                  )}
+
+                  <button 
+                    type="submit"
+                    className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2"
+                  >
+                    <Lock className="w-4 h-4" />
+                    LOG IN STUDENT • အကောင့်ဝင်မည်
+                  </button>
+                </form>
+              )}
+
+              {authTab === 'admin' && (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (authUsername.trim() && authPassword) {
+                    const success = handleAdminLogin(authUsername, authPassword);
+                    if (success) {
+                      setAuthUsername('');
+                      setAuthPassword('');
+                      setAuthError('');
+                    } else {
+                      setAuthError('Invalid admin credentials! (Master admin: use admin & admin@4238)');
                     }
                   }
                 }} className="space-y-4">
@@ -2620,7 +4871,7 @@ export default function App() {
                     className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2 mb-2"
                   >
                     <Shield className="w-4 h-4" />
-                    ADMIN LOG IN • အကောင့်ဝင်မည်
+                    ADMIN LOG IN • စီမံသူဖြင့် ဝင်မည်
                   </button>
                 </form>
               )}

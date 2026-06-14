@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WordBreakdown } from '../types';
 import { pdfVocabulary } from '../data/pdfVocabulary';
 import { Volume2, Volume1, Volume, HelpCircle, CheckCircle, Award, RefreshCw, Smile, AlertCircle } from 'lucide-react';
@@ -19,8 +19,35 @@ export default function VocabularyView({
   audioSpeedIndex,
   setAudioSpeedIndex
 }: VocabularyViewProps) {
-  const words = pdfVocabulary[lessonId] || [];
-  const [selectedWord, setSelectedWord] = useState<WordBreakdown | null>(words[0] || null);
+  const [words, setWords] = useState<WordBreakdown[]>([]);
+  const [selectedWord, setSelectedWord] = useState<WordBreakdown | null>(null);
+
+  const loadWords = () => {
+    const saved = localStorage.getItem(`thai_custom_vocab_${lessonId}`);
+    let loadedWords = pdfVocabulary[lessonId] || [];
+    if (saved) {
+      try {
+        loadedWords = JSON.parse(saved);
+      } catch (e) {
+        console.error("Error loading custom vocabulary:", e);
+      }
+    }
+    setWords(loadedWords);
+    setSelectedWord(loadedWords[0] || null);
+  };
+
+  useEffect(() => {
+    loadWords();
+
+    const handleUpdate = () => {
+      loadWords();
+    };
+
+    window.addEventListener('thai_vocab_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('thai_vocab_updated', handleUpdate);
+    };
+  }, [lessonId]);
   
   // Trainer state
   const [studyMode, setStudyMode] = useState<'study' | 'quiz'>('study');

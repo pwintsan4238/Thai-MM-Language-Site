@@ -62,3 +62,25 @@ export interface ProgressState {
   lastActiveDate: string; // YYYY-MM-DD
   quizHighScores: { [lessonId: number]: number }; // Lesson ID -> highest score percentage
 }
+
+export interface RegisteredUser {
+  username: string;
+  password?: string;
+  role: 'admin' | 'student';
+  xp: number;
+  dateJoined: string;
+  lessonsDone?: number; // total completed lessons count
+  streakCount?: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  username: string;
+  itemName: string;
+  itemType: 'e-book' | 'tutoring' | 'vip-package' | 'certificate';
+  priceAmount: number;
+  currency: 'MMK' | 'XP';
+  status: 'pending' | 'completed' | 'cancelled';
+  orderDate: string;
+}
+

@@ -376,7 +376,10 @@ export function expandLessonQuizzes(allLessons: Lesson[]): Lesson[] {
 
     // Truncate or cap the list to exactly 20 premium questions, or minimum 20 questions
     // This perfectly satisfies "must have at least 20 questions for each lesson"
-    lesson.quiz = unifiedQuiz.slice(0, Math.max(20, existingQuiz.length));
+    lesson.quiz = unifiedQuiz.slice(0, Math.max(20, existingQuiz.length)).map((q, idx) => ({
+      ...q,
+      id: q.id ? `${q.id}_idx_${idx}` : `quiz_${lesson.id}_${idx}`
+    }));
     return lesson;
   });
 }
