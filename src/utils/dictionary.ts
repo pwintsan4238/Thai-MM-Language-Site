@@ -2,6 +2,10 @@ import { Lesson, WordBreakdown } from '../types';
 
 export const OFFLINE_DICT: (WordBreakdown & { author?: string })[] = [
   { thai: "สวัสดี", phonetic: "sa-wat-dee", english: "Hello", myanmar: "မင်္ဂလာပါ", partOfSpeech: "Phrase" },
+  { thai: "อรุณสวัสดิ์", phonetic: "a-run-sa-wat", english: "Good morning", myanmar: "မင်္ဂလာနံနက်ခင်းပါ", partOfSpeech: "Phrase" },
+  { thai: "สวัสดีตอนบ่าย", phonetic: "sa-wat-dee-ton-baai", english: "Good afternoon", myanmar: "မင်္ဂလာနေ့လယ်ခင်းပါ", partOfSpeech: "Phrase" },
+  { thai: "สวัสดีตอนเย็น", phonetic: "sa-wat-dee-ton-yen", english: "Good evening", myanmar: "မင်္ဂလာညနေခင်းပါ", partOfSpeech: "Phrase" },
+  { thai: "ราตรีสวัสดิ์", phonetic: "ra-tree-sa-wat", english: "Good night", myanmar: "ကောင်းသောညလေးဖြစ်ပါစေ", partOfSpeech: "Phrase" },
   { thai: "ขอบคุณ", phonetic: "khob-khun", english: "Thank you", myanmar: "ကျေးဇူးတင်ပါတယ်", partOfSpeech: "Phrase" },
   { thai: "สบายดี", phonetic: "sa-bai-dee", english: "Fine", myanmar: "နေကောင်းတယ်", partOfSpeech: "Adjective" },
   { thai: "รัก", phonetic: "rak", english: "Love", myanmar: "ချစ်တယ်", partOfSpeech: "Verb" },
@@ -104,7 +108,23 @@ export function autoFillWord(
     }
     // Sub-segment search
     if (cleanEnglish) {
-      const match = list.find(w => normalize(w.english).includes(normalize(cleanEnglish)) || normalize(cleanEnglish).includes(normalize(w.english)));
+      const targetNorm = normalize(cleanEnglish);
+      const match = list.find(w => {
+        const entryNorm = normalize(w.english);
+        if (entryNorm === targetNorm) return true;
+
+        const entryWords = w.english.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+        const targetWords = cleanEnglish.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+        return entryWords.some(ew =>
+          targetWords.some(tw => {
+            if (ew === tw) return true;
+            if (ew.startsWith(tw) && tw.length >= 4) return true;
+            if (tw.startsWith(ew) && ew.length >= 4) return true;
+            return false;
+          })
+        );
+      });
       if (match) return match;
     }
     if (cleanThai) {
