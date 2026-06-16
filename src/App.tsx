@@ -9,6 +9,7 @@ import DialogueView from './components/DialogueView';
 import VocabularyView from './components/VocabularyView';
 import QuizView from './components/QuizView';
 import AlphabetGuide from './components/AlphabetGuide';
+import { GrammarVocabDropdown } from './components/GrammarVocabDropdown';
 import { 
   BookOpen, 
   Award, 
@@ -43,10 +44,13 @@ import {
   LogOut,
   RefreshCw,
   LayoutDashboard,
+  Upload,
+  Download,
   CheckSquare,
   ShoppingBag,
   CreditCard,
-  GripVertical
+  GripVertical,
+  Megaphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { isSingleSentenceEnglish } from './utils/sentenceUtils';
@@ -121,6 +125,7 @@ export default function App() {
 
   const [adminSelectedLessonId, setAdminSelectedLessonId] = useState<number | null>(null);
   const [adminEditTab, setAdminEditTab] = useState<'metadata' | 'vocabulary' | 'dialogue' | 'grammar' | 'quiz'>('metadata');
+  const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts'>('orders');
   const [editingVocabIndex, setEditingVocabIndex] = useState<number | null>(null);
   const [editingVocabThai, setEditingVocabThai] = useState<string>('');
   const [editingVocabPhonetic, setEditingVocabPhonetic] = useState<string>('');
@@ -132,6 +137,24 @@ export default function App() {
   const [adminNewUserUsername, setAdminNewUserUsername] = useState<string>('');
   const [adminNewUserPassword, setAdminNewUserPassword] = useState<string>('');
   const [adminNewUserRole, setAdminNewUserRole] = useState<'student' | 'admin'>('student');
+
+  // CSV Import Hub State
+  const [csvImportType, setCsvImportType] = useState<'vocabulary' | 'dialogue' | 'grammar' | 'quiz' | 'lessons'>('vocabulary');
+  const [csvImportTargetLesson, setCsvImportTargetLesson] = useState<number | 'all'>('all');
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvParsedData, setCsvParsedData] = useState<any[]>([]);
+  const [csvErrors, setCsvErrors] = useState<string[]>([]);
+  const [csvFileName, setCsvFileName] = useState<string>('');
+  const [isCsvImportExpanded, setIsCsvImportExpanded] = useState<boolean>(false);
+  const [isCsvDragOver, setIsCsvDragOver] = useState<boolean>(false);
+
+  // Dedicated syllabus-level bulk lesson import state
+  const [syllabusCsvFile, setSyllabusCsvFile] = useState<File | null>(null);
+  const [syllabusCsvFileName, setSyllabusCsvFileName] = useState<string>('');
+  const [syllabusCsvParsedData, setSyllabusCsvParsedData] = useState<any[]>([]);
+  const [syllabusCsvErrors, setSyllabusCsvErrors] = useState<string[]>([]);
+  const [isSyllabusCsvDragOver, setIsSyllabusCsvDragOver] = useState<boolean>(false);
+  const [isSyllabusImportExpanded, setIsSyllabusImportExpanded] = useState<boolean>(false);
 
   // Checkout and Store purchase form state
   const [selectedStoreItem, setSelectedStoreItem] = useState<any | null>(null);
@@ -240,7 +263,7 @@ export default function App() {
   const [onlyShowUnmastered, setOnlyShowUnmastered] = useState<boolean>(false);
   const [isOnline, setIsRecordingOnline] = useState<boolean>(navigator.onLine);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [dashboardTab, setDashboardTab] = useState<'lessons' | 'orientation' | 'handbook' | 'alphabet' | 'admin'>('lessons');
+  const [dashboardTab, setDashboardTab] = useState<'lessons' | 'orientation' | 'handbook' | 'alphabet' | 'notebook' | 'profile' | 'admin'>('lessons');
   const [activeChapterId, setActiveChapterId] = useState<number>(1);
   const [activeOrientationId, setActiveOrientationId] = useState<string>('better-thai');
   const [mobileChapterDetailActive, setMobileChapterDetailActive] = useState<boolean>(false);
@@ -682,6 +705,517 @@ export default function App() {
     alert("Quizzes saved successfully!");
   };
 
+  // --- CSV Import Engine & Utilities ---
+  const parseCSV = (text: string): string[][] => {
+    const result: string[][] = [];
+    let row: string[] = [];
+    let inQuotes = false;
+    let currentVal = '';
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentVal += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        row.push(currentVal.trim());
+        currentVal = '';
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') {
+          i++;
+        }
+        row.push(currentVal.trim());
+        result.push(row);
+        row = [];
+        currentVal = '';
+      } else {
+        currentVal += char;
+      }
+    }
+    if (currentVal || row.length > 0) {
+      row.push(currentVal.trim());
+      result.push(row);
+    }
+    return result.filter(r => r.length > 0 && r.some(cell => cell !== ''));
+  };
+
+  const downloadCsvTemplate = (type: string) => {
+    let headers = '';
+    let sample = '';
+    let filename = '';
+
+    if (type === 'vocabulary') {
+      headers = 'thai,phonetic,english,myanmar,partOfSpeech,notes\n';
+      sample = 'ข้าว,khaaw,rice,ထမင်း,noun,basic food item\nน้ำ,naam,water,ရေ,noun,essential fluid\n';
+      filename = 'thai_vocabulary_template.csv';
+    } else if (type === 'dialogue') {
+      headers = 'speaker,thai,phonetic,english,myanmar,words\n';
+      sample = 'A,สบายดีไหม,sa-baai-dee mai,How are you?,နေကောင်းလား,"สบายดี|sa-baai-dee|fine|နေကောင်းတယ်|verb ; ไหม|mai|question marker|လား|particle"\nB,สบายดีครับ,sa-baai-dee khráp,I am fine thank you.,နေကောင်းပါတယ်ခင်ဗျာ,"สบายดี|sa-baai-dee|fine|နေကောင်းတယ်|verb ; ครับ|khráp|polite male|ခင်ဗျာ|particle"\n';
+      filename = 'thai_dialogue_template.csv';
+    } else if (type === 'grammar') {
+      headers = 'title,titleMyanmar,explanation,explanationMyanmar,examples\n';
+      sample = 'Using polite particle "khrap",အမျိုးသားယဉ်ကျေးမှုစကား,Add "khrap" at the end of statements for polite male speech,အမျိုးသားများအတွက် ယဉ်ကျေးစွာပြောဆိုရန် ဝါကျအဆုံးတွင် "khrap" ထည့်ပါ,"สวัสดีครับ|sa-wat-dee khráp|Hello (male)|မင်္ဂလာပါခင်ဗျာ ; ขอบคุณครับ|khòop-khun khráp|Thank you (male)|ကျေးဇူးတင်ပါတယ်ခင်ဗျာ"\n';
+      filename = 'thai_grammar_template.csv';
+    } else if (type === 'quiz') {
+      headers = 'type,prompt,promptThai,options,correctAnswer,explanation,explanationMyanmar\n';
+      sample = 'translate-thai-to-mm,What does "สวัสดี" mean?,สวัสดี,နေကောင်းလား|မင်္ဂလာပါ|ကျေးဇူးတင်ပါတယ်|သွားတော့မယ်,မင်္ဂလာပါ,Standard greeting context,Sawatdee သည် ထိုင်းနှုတ်ဆက်စကား မင်္ဂလာပါ ဖြစ်သည်။\n';
+      filename = 'thai_quiz_template.csv';
+    } else if (type === 'lessons') {
+      headers = 'id,titleThai,titlePhonetic,titleEnglish,titleMyanmar,descriptionEnglish,descriptionMyanmar\n';
+      sample = '51,บทเรียนทดสอบ,Bot-riian thot-sɔɔp,Advanced Testing Lesson,စမ်းသပ်သင်ခန်းစာ,An advanced lesson imported via Excel/CSV system,Excel/CSV စနစ်မှ တစ်ဆင့် ထည့်သွင်းထားသော သင်ခန်းစာဖြစ်သည်။\n';
+      filename = 'thai_lessons_metadata_template.csv';
+    }
+
+    const blob = new Blob([headers + sample], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSyllabusCsvFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processSyllabusCsvFile(file);
+    }
+  };
+
+  const processSyllabusCsvFile = (file: File) => {
+    setSyllabusCsvFile(file);
+    setSyllabusCsvFileName(file.name);
+    setSyllabusCsvErrors([]);
+    setSyllabusCsvParsedData([]);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) {
+        setSyllabusCsvErrors(['Empty file or unable to read file contents.']);
+        return;
+      }
+      parseAndValidateSyllabusCsv(text);
+    };
+    reader.onerror = () => {
+      setSyllabusCsvErrors(['Error reading file.']);
+    };
+    reader.readAsText(file);
+  };
+
+  const parseAndValidateSyllabusCsv = (text: string) => {
+    const rows = parseCSV(text);
+    if (rows.length < 2) {
+      setSyllabusCsvErrors(['Invalid CSV format. File must contain at least a header row and one data row.']);
+      return;
+    }
+
+    const headers = rows[0].map(h => h.toLowerCase().trim());
+    const dataRows = rows.slice(1);
+    const parsed: any[] = [];
+    const errors: string[] = [];
+
+    dataRows.forEach((row, idx) => {
+      const rowNum = idx + 2;
+      const getVal = (headerName: string): string => {
+        const colIdx = headers.indexOf(headerName.toLowerCase().trim());
+        return colIdx !== -1 && row[colIdx] !== undefined ? row[colIdx].trim() : '';
+      };
+
+      const idVal = getVal('id');
+      const titleThai = getVal('titleThai');
+      const titlePhonetic = getVal('titlePhonetic');
+      const titleEnglish = getVal('titleEnglish');
+      const titleMyanmar = getVal('titleMyanmar');
+      const descriptionEnglish = getVal('descriptionEnglish');
+      const descriptionMyanmar = getVal('descriptionMyanmar');
+
+      if (!idVal) errors.push(`Row ${rowNum}: Lesson 'id' (number) is required.`);
+      if (!titleEnglish) errors.push(`Row ${rowNum}: Lesson 'titleEnglish' is required.`);
+
+      const parsedId = Number(idVal);
+      if (isNaN(parsedId)) {
+        errors.push(`Row ${rowNum}: Lesson ID must be a valid number.`);
+      }
+
+      parsed.push({
+        id: parsedId,
+        titleThai: titleThai || "บทเรียนใหม่",
+        titlePhonetic: titlePhonetic || "Bot-riian mai",
+        titleEnglish,
+        titleMyanmar: titleMyanmar || titleEnglish,
+        descriptionEnglish: descriptionEnglish || "",
+        descriptionMyanmar: descriptionMyanmar || "",
+        dialogue: [],
+        grammarNotes: [],
+        quiz: []
+      });
+    });
+
+    setSyllabusCsvParsedData(parsed);
+    setSyllabusCsvErrors(errors);
+  };
+
+  const submitSyllabusCsvImport = () => {
+    if (syllabusCsvParsedData.length === 0) {
+      alert("No valid lesson rows found to import. Please check columns and formatting.");
+      return;
+    }
+    if (syllabusCsvErrors.length > 0) {
+      const proceed = window.confirm(`There are ${syllabusCsvErrors.length} errors/warnings found in your CSV data. Would you like to proceed anyway, skipping corrupted records?`);
+      if (!proceed) return;
+    }
+
+    const updatedLessons = [...lessons];
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    syllabusCsvParsedData.forEach((importedLesson: Lesson) => {
+      const existingIdx = updatedLessons.findIndex(l => l.id === importedLesson.id);
+      if (existingIdx !== -1) {
+        updatedLessons[existingIdx] = {
+          ...updatedLessons[existingIdx],
+          titleThai: importedLesson.titleThai,
+          titlePhonetic: importedLesson.titlePhonetic,
+          titleEnglish: importedLesson.titleEnglish,
+          titleMyanmar: importedLesson.titleMyanmar,
+          descriptionEnglish: importedLesson.descriptionEnglish,
+          descriptionMyanmar: importedLesson.descriptionMyanmar
+        };
+        updatedCount++;
+      } else {
+        updatedLessons.push(importedLesson);
+        addedCount++;
+      }
+    });
+
+    updatedLessons.sort((a, b) => a.id - b.id);
+    setLessons(updatedLessons);
+    localStorage.setItem('thai_lessons_curriculum', JSON.stringify(updatedLessons));
+    addSystemLog('admin', `Syllabus upload: Imported ${addedCount} new lessons and updated ${updatedCount} existing lessons.`);
+    alert(`Curriculum syllabus imported/updated successfully!\n- Added: ${addedCount} lesson(s)\n- Updated: ${updatedCount} lesson(s)`);
+
+    setSyllabusCsvFile(null);
+    setSyllabusCsvParsedData([]);
+    setSyllabusCsvErrors([]);
+    setSyllabusCsvFileName('');
+    setIsSyllabusImportExpanded(false);
+  };
+
+  const handleCsvFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processCsvFile(file);
+    }
+  };
+
+  const processCsvFile = (file: File) => {
+    setCsvFile(file);
+    setCsvFileName(file.name);
+    setCsvErrors([]);
+    setCsvParsedData([]);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) {
+        setCsvErrors(['Empty file or unable to read file contents.']);
+        return;
+      }
+      parseAndValidateCsv(text, csvImportType);
+    };
+    reader.onerror = () => {
+      setCsvErrors(['Error reading file.']);
+    };
+    reader.readAsText(file);
+  };
+
+  const parseAndValidateCsv = (text: string, type: 'vocabulary' | 'dialogue' | 'grammar' | 'quiz' | 'lessons') => {
+    const rows = parseCSV(text);
+    if (rows.length < 2) {
+      setCsvErrors(['Invalid CSV format. File must contain at least a header row and one data row.']);
+      return;
+    }
+
+    const headers = rows[0].map(h => h.toLowerCase().trim());
+    const dataRows = rows.slice(1);
+    const parsed: any[] = [];
+    const errors: string[] = [];
+
+    dataRows.forEach((row, idx) => {
+      const rowNum = idx + 2;
+      const getVal = (headerName: string): string => {
+        const colIdx = headers.indexOf(headerName.toLowerCase().trim());
+        return colIdx !== -1 && row[colIdx] !== undefined ? row[colIdx].trim() : '';
+      };
+
+      if (type === 'vocabulary') {
+        const thai = getVal('thai');
+        const phonetic = getVal('phonetic');
+        const english = getVal('english');
+        const myanmar = getVal('myanmar');
+        const partOfSpeech = getVal('partOfSpeech') || 'noun';
+        const notes = getVal('notes');
+
+        if (!thai) errors.push(`Row ${rowNum}: 'thai' column value is required.`);
+        if (!english) errors.push(`Row ${rowNum}: 'english' meaning column is required.`);
+        if (!myanmar) errors.push(`Row ${rowNum}: 'myanmar' translation is required.`);
+
+        parsed.push({
+          thai,
+          phonetic: phonetic || thai,
+          english,
+          myanmar,
+          partOfSpeech,
+          notes: notes || undefined
+        });
+      } else if (type === 'dialogue') {
+        const speaker = getVal('speaker') || 'A';
+        const thai = getVal('thai');
+        const phonetic = getVal('phonetic');
+        const english = getVal('english');
+        const myanmar = getVal('myanmar');
+        const wordsStr = getVal('words');
+
+        if (!thai) errors.push(`Row ${rowNum}: 'thai' transcription is required.`);
+        if (!english) errors.push(`Row ${rowNum}: 'english' meaning is required.`);
+        if (!myanmar) errors.push(`Row ${rowNum}: 'myanmar' translation is required.`);
+
+        const words: WordBreakdown[] = [];
+        if (wordsStr) {
+          const parts = wordsStr.split(';').map(p => p.trim()).filter(Boolean);
+          parts.forEach(part => {
+            const fields = part.split('|').map(f => f.trim());
+            if (fields.length >= 4) {
+              words.push({
+                thai: fields[0],
+                phonetic: fields[1] || fields[0],
+                english: fields[2],
+                myanmar: fields[3],
+                partOfSpeech: fields[4] || 'noun'
+              });
+            }
+          });
+        }
+
+        if (words.length === 0) {
+          words.push({
+            thai: thai,
+            phonetic: phonetic || thai,
+            english: english,
+            myanmar: myanmar,
+            partOfSpeech: 'phrase'
+          });
+        }
+
+        parsed.push({
+          speaker,
+          thai,
+          phonetic: phonetic || thai,
+          english,
+          myanmar,
+          words
+        });
+      } else if (type === 'grammar') {
+        const title = getVal('title');
+        const titleMyanmar = getVal('titleMyanmar') || title;
+        const explanation = getVal('explanation');
+        const explanationMyanmar = getVal('explanationMyanmar') || explanation;
+        const examplesStr = getVal('examples');
+
+        if (!title) errors.push(`Row ${rowNum}: Grammar 'title' column is required.`);
+        if (!explanation) errors.push(`Row ${rowNum}: Grammar 'explanation' is required.`);
+
+        const examples: any[] = [];
+        if (examplesStr) {
+          const parts = examplesStr.split(';').map(p => p.trim()).filter(Boolean);
+          parts.forEach(part => {
+            const fields = part.split('|').map(f => f.trim());
+            if (fields.length >= 4) {
+              examples.push({
+                thai: fields[0],
+                phonetic: fields[1] || fields[0],
+                english: fields[2],
+                myanmar: fields[3]
+              });
+            }
+          });
+        }
+
+        parsed.push({
+          title,
+          titleMyanmar,
+          explanation,
+          explanationMyanmar,
+          examples
+        });
+      } else if (type === 'quiz') {
+        const quizType = getVal('type') || 'translate-thai-to-mm';
+        const prompt = getVal('prompt');
+        const promptThai = getVal('promptThai');
+        const optionsStr = getVal('options');
+        const correctAnswer = getVal('correctAnswer');
+        const explanation = getVal('explanation');
+        const explanationMyanmar = getVal('explanationMyanmar');
+
+        if (!prompt) errors.push(`Row ${rowNum}: Quiz 'prompt' is required.`);
+        if (!optionsStr) errors.push(`Row ${rowNum}: Quiz 'options' options separated by "|" are required.`);
+        if (!correctAnswer) errors.push(`Row ${rowNum}: Quiz 'correctAnswer' option is required.`);
+
+        const options = optionsStr.split('|').map(o => o.trim()).filter(Boolean);
+        if (options.length < 2) {
+          errors.push(`Row ${rowNum}: Options must contain at least 2 distinct options separated by "|".`);
+        }
+        if (options.length > 0 && !options.includes(correctAnswer)) {
+          errors.push(`Row ${rowNum}: Correct answer ("${correctAnswer}") is missing from the options list (${options.join(', ')}).`);
+        }
+
+        parsed.push({
+          id: `quiz-imported-${Date.now()}-${idx}`,
+          type: quizType,
+          prompt,
+          promptThai: promptThai || undefined,
+          options,
+          correctAnswer,
+          explanation: explanation || undefined,
+          explanationMyanmar: explanationMyanmar || undefined
+        });
+      } else if (type === 'lessons') {
+        const idVal = getVal('id');
+        const titleThai = getVal('titleThai');
+        const titlePhonetic = getVal('titlePhonetic');
+        const titleEnglish = getVal('titleEnglish');
+        const titleMyanmar = getVal('titleMyanmar');
+        const descriptionEnglish = getVal('descriptionEnglish');
+        const descriptionMyanmar = getVal('descriptionMyanmar');
+
+        if (!idVal) errors.push(`Row ${rowNum}: Lesson 'id' (number) is required.`);
+        if (!titleEnglish) errors.push(`Row ${rowNum}: Lesson 'titleEnglish' is required.`);
+
+        const parsedId = Number(idVal);
+        if (isNaN(parsedId)) {
+          errors.push(`Row ${rowNum}: Lesson ID must be a valid number.`);
+        }
+
+        parsed.push({
+          id: parsedId,
+          titleThai: titleThai || "บทเรียนใหม่",
+          titlePhonetic: titlePhonetic || "Bot-riian mai",
+          titleEnglish,
+          titleMyanmar: titleMyanmar || titleEnglish,
+          descriptionEnglish: descriptionEnglish || "",
+          descriptionMyanmar: descriptionMyanmar || "",
+          dialogue: [],
+          grammarNotes: [],
+          quiz: []
+        });
+      }
+    });
+
+    setCsvParsedData(parsed);
+    setCsvErrors(errors);
+  };
+
+  const submitCsvImport = () => {
+    if (csvParsedData.length === 0) {
+      alert("No valid data rows found to import. Please check columns and formatting.");
+      return;
+    }
+    if (csvErrors.length > 0) {
+      const proceed = window.confirm(`There are ${csvErrors.length} errors/warnings found in your CSV data. Would you like to proceed anyway, skipping corrupted records?`);
+      if (!proceed) return;
+    }
+
+    const updatedLessons = [...lessons];
+
+    if (csvImportType === 'lessons') {
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      csvParsedData.forEach((importedLesson: Lesson) => {
+        const existingIdx = updatedLessons.findIndex(l => l.id === importedLesson.id);
+        if (existingIdx !== -1) {
+          updatedLessons[existingIdx] = {
+            ...updatedLessons[existingIdx],
+            titleThai: importedLesson.titleThai,
+            titlePhonetic: importedLesson.titlePhonetic,
+            titleEnglish: importedLesson.titleEnglish,
+            titleMyanmar: importedLesson.titleMyanmar,
+            descriptionEnglish: importedLesson.descriptionEnglish,
+            descriptionMyanmar: importedLesson.descriptionMyanmar
+          };
+          updatedCount++;
+        } else {
+          updatedLessons.push(importedLesson);
+          addedCount++;
+        }
+      });
+
+      updatedLessons.sort((a, b) => a.id - b.id);
+      setLessons(updatedLessons);
+      addSystemLog('admin', `Imported ${addedCount} new lessons and updated ${updatedCount} lessons from CSV file.`);
+      alert(`Lesson Curriculum sync successful!\n- New Lessons Added: ${addedCount}\n- Lessons Metadata Updated: ${updatedCount}`);
+    } else {
+      const activeLessonTarget = csvImportTargetLesson === 'all' 
+        ? adminSelectedLessonId 
+        : Number(csvImportTargetLesson);
+
+      if (!activeLessonTarget) {
+        alert("Please select a target Lesson in the database first.");
+        return;
+      }
+
+      const lessonIdx = updatedLessons.findIndex(l => l.id === activeLessonTarget);
+      if (lessonIdx === -1) {
+        alert(`Target Lesson ID ${activeLessonTarget} does not exist.`);
+        return;
+      }
+
+      const targetLesson = updatedLessons[lessonIdx];
+
+      if (csvImportType === 'vocabulary') {
+        const currentVocab = getCustomVocabList(activeLessonTarget) || [];
+        const mergedVocab = [...currentVocab, ...csvParsedData];
+        handleSaveVocabList(activeLessonTarget, mergedVocab);
+        addSystemLog('admin', `Imported ${csvParsedData.length} vocabulary terms to Lesson ${activeLessonTarget} via CSV upload.`);
+        alert(`Success! Imported ${csvParsedData.length} vocabulary items into Lesson ${activeLessonTarget}.`);
+      } else if (csvImportType === 'dialogue') {
+        const currentDialogue = targetLesson.dialogue || [];
+        const updatedDialogue = [...currentDialogue, ...csvParsedData];
+        handleSaveDialogue(activeLessonTarget, updatedDialogue);
+        addSystemLog('admin', `Imported ${csvParsedData.length} dialogue lines to Lesson ${activeLessonTarget} via CSV upload.`);
+        alert(`Success! Imported ${csvParsedData.length} sentence entries into Lesson ${activeLessonTarget}.`);
+      } else if (csvImportType === 'grammar') {
+        const currentNotes = targetLesson.grammarNotes || [];
+        const updatedNotes = [...currentNotes, ...csvParsedData];
+        handleSaveGrammarNotes(activeLessonTarget, updatedNotes);
+        addSystemLog('admin', `Imported ${csvParsedData.length} grammar points to Lesson ${activeLessonTarget} via CSV upload.`);
+        alert(`Success! Imported ${csvParsedData.length} grammar nodes into Lesson ${activeLessonTarget}.`);
+      } else if (csvImportType === 'quiz') {
+        const currentQuizzes = targetLesson.quiz || [];
+        const updatedQuizzes = [...currentQuizzes, ...csvParsedData];
+        handleSaveQuizzes(activeLessonTarget, updatedQuizzes);
+        addSystemLog('admin', `Imported ${csvParsedData.length} interactive quizzes to Lesson ${activeLessonTarget} via CSV upload.`);
+        alert(`Success! Imported ${csvParsedData.length} quiz questions into Lesson ${activeLessonTarget}.`);
+      }
+    }
+
+    setCsvFile(null);
+    setCsvParsedData([]);
+    setCsvErrors([]);
+    setCsvFileName('');
+    setIsCsvImportExpanded(false);
+    window.dispatchEvent(new Event('thai_vocab_updated'));
+  };
+
   // Dismiss auto promotion modal
   const handleDismissPromo = () => {
     setHasDismissedPromo(true);
@@ -1004,6 +1538,36 @@ export default function App() {
     localStorage.removeItem('thai_mm_progress_v1');
   };
 
+  const handleTabClick = (tab: 'lessons' | 'notebook' | 'courses' | 'profile' | 'admin') => {
+    if (tab === 'lessons') {
+      if (dashboardTab === 'lessons' && activeLessonId !== null) {
+        setActiveLessonId(null);
+      } else {
+        setDashboardTab('lessons');
+      }
+    } else if (tab === 'notebook') {
+      setDashboardTab('notebook');
+      setActiveLessonId(null);
+    } else if (tab === 'profile') {
+      setDashboardTab('profile');
+      setActiveLessonId(null);
+    } else if (tab === 'admin') {
+      setDashboardTab('admin');
+      setActiveLessonId(null);
+    } else if (tab === 'courses') {
+      setActiveLessonId(null);
+      if (!['orientation', 'handbook', 'alphabet'].includes(dashboardTab)) {
+        setDashboardTab('orientation');
+      }
+    }
+  };
+
+  const isLessonsActive = dashboardTab === 'lessons';
+  const isNotebookActive = dashboardTab === 'notebook';
+  const isProfileActive = dashboardTab === 'profile';
+  const isAdminActive = dashboardTab === 'admin';
+  const isCoursesActive = ['orientation', 'handbook', 'alphabet'].includes(dashboardTab);
+
   const lessonsPerPage = 6;
   const totalLessons = lessons.length;
   const totalPages = Math.ceil(totalLessons / lessonsPerPage);
@@ -1093,89 +1657,49 @@ export default function App() {
       </header>
 
       {/* Main Container Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[88px] sm:pb-32">
         
         {/* If no lesson is currently active: Display main student Dashboard */}
         {!activeLessonId ? (
           <div className="space-y-6 sm:space-y-8">
-                        {/* Unified Dashboard Tab Selector - Duolingo Elegant Style */}
-            <div className={`grid grid-cols-2 md:grid-cols-3 ${isAdmin ? 'lg:grid-cols-7' : 'lg:grid-cols-6'} gap-1.5 bg-white p-1.5 rounded-2xl border-2 border-gray-100 select-none`}>
-              <button
-                onClick={() => setDashboardTab('lessons')}
-                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
-                  dashboardTab === 'lessons'
-                    ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
-                    : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
-                }`}
-              >
-                📚 Learning Path<span className="hidden md:inline"> • သင်ခန်းစာ</span>
-              </button>
-              <button
-                onClick={() => setDashboardTab('orientation')}
-                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
-                  dashboardTab === 'orientation'
-                    ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
-                    : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
-                }`}
-              >
-                🧭 Orientation<span className="hidden md:inline"> • လမ်းညွှန်ချက်</span>
-              </button>
-              <button
-                onClick={() => {
-                  setDashboardTab('handbook');
-                  setMobileChapterDetailActive(false);
-                }}
-                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
-                  dashboardTab === 'handbook'
-                    ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
-                    : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
-                }`}
-              >
-                📖 Grammar<span className="hidden md:inline"> Handbook • သဒ္ဒါလက်စွဲ</span><span className="inline md:hidden"> Guide</span>
-              </button>
-              <button
-                onClick={() => setDashboardTab('alphabet')}
-                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
-                  dashboardTab === 'alphabet'
-                    ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
-                    : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
-                }`}
-              >
-                🔠 Alphabet<span className="hidden md:inline"> Guide • အက္ခရာများ</span><span className="inline md:hidden"> Guide</span>
-              </button>
-              <button
-                onClick={() => setDashboardTab('notebook')}
-                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
-                  dashboardTab === 'notebook'
-                    ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
-                    : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
-                }`}
-              >
-                💡 Notebook<span className="hidden md:inline"> • ဝေါဟာရသစ်များ</span>
-              </button>
-              <button
-                onClick={() => setDashboardTab('profile')}
-                className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
-                  dashboardTab === 'profile'
-                    ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
-                    : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
-                }`}
-              >
-                👤 Profile<span className="hidden md:inline"> • ကိုယ်ပိုင်အကောင့်</span><span className="inline md:hidden"> Account</span>
-              </button>
-              {isAdmin && (
+            {/* Courses Segmented Top Sub-Selector - Only visible under Courses Bottom Tab */}
+            {['orientation', 'handbook', 'alphabet'].includes(dashboardTab) && (
+              <div className="grid grid-cols-3 gap-1.5 bg-white p-1.5 rounded-2xl border-2 border-gray-100 select-none max-w-2xl mx-auto shadow-xs">
                 <button
-                  onClick={() => setDashboardTab('admin')}
+                  onClick={() => setDashboardTab('orientation')}
                   className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
-                    dashboardTab === 'admin'
+                    dashboardTab === 'orientation'
                       ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
                       : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
                   }`}
                 >
-                  🛡️ Admin Panel<span className="hidden md:inline"> • စီမံခန္ခွဲသူ</span><span className="inline md:hidden"> Admin</span>
+                  🧭 Orientation<span className="hidden md:inline"> • လမ်းညွှန်ချက်</span>
                 </button>
-              )}
-            </div>
+                <button
+                  onClick={() => {
+                    setDashboardTab('handbook');
+                    setMobileChapterDetailActive(false);
+                  }}
+                  className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                    dashboardTab === 'handbook'
+                      ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
+                      : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
+                  }`}
+                >
+                  📖 Grammar<span className="hidden md:inline"> Handbook • သဒ္ဒါလက်စွဲ</span><span className="inline md:hidden"> Guide</span>
+                </button>
+                <button
+                  onClick={() => setDashboardTab('alphabet')}
+                  className={`py-3 px-1.5 text-center rounded-xl font-sans font-black text-[10px] sm:text-xs transition-all uppercase tracking-wider ${
+                    dashboardTab === 'alphabet'
+                      ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow'
+                      : 'text-brand-muted hover:text-brand-dark hover:bg-gray-50'
+                  }`}
+                >
+                  🔠 Alphabet<span className="hidden md:inline"> Guide • အက္ခရာများ</span><span className="inline md:hidden"> Guide</span>
+                </button>
+              </div>
+            )}
 
             {/* TAB CONTENT: 1. Lessons pathways */}
             {dashboardTab === 'lessons' && (
@@ -1653,28 +2177,31 @@ export default function App() {
                                                 </div>
                                               </div>
 
-                                              <button
-                                                onClick={() => speakText(ex.thai)}
-                                                className="px-2 h-8 rounded-xl bg-white border-2 border-b-4 border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-1 shrink-0 transition-all active:translate-y-0.5"
-                                                title={`Listen (${audioSpeedIndex === 0 ? "Normal" : audioSpeedIndex === 1 ? "Slow 0.7x" : "Slower 0.5x"})`}
-                                              >
-                                                {audioSpeedIndex === 0 ? (
-                                                  <>
-                                                    <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
-                                                    <span className="text-[8px] font-sans font-black text-brand-purple bg-brand-purple-light px-1 py-0.5 rounded-md select-none leading-none">1.0x</span>
-                                                  </>
-                                                ) : audioSpeedIndex === 1 ? (
-                                                  <>
-                                                    <Volume1 className="w-3.5 h-3.5 text-indigo-500" />
-                                                    <span className="text-[8px] font-sans font-black text-indigo-500 bg-indigo-50 px-1 py-0.5 rounded-md select-none leading-none">0.7x</span>
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <Volume className="w-3.5 h-3.5 text-orange-500" />
-                                                    <span className="text-[8px] font-sans font-black text-orange-500 bg-orange-50 px-1 py-0.5 rounded-md select-none leading-none">0.5x</span>
-                                                  </>
-                                                )}
-                                              </button>
+                                              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 shrink-0 self-start">
+                                                <GrammarVocabDropdown sentence={ex.thai} allLessons={lessons} />
+                                                <button
+                                                  onClick={() => speakText(ex.thai)}
+                                                  className="px-2 h-8 rounded-xl bg-white border-2 border-b-4 border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-1 shrink-0 transition-all active:translate-y-0.5"
+                                                  title={`Listen (${audioSpeedIndex === 0 ? "Normal" : audioSpeedIndex === 1 ? "Slow 0.7x" : "Slower 0.5x"})`}
+                                                >
+                                                  {audioSpeedIndex === 0 ? (
+                                                    <>
+                                                      <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
+                                                      <span className="text-[8px] font-sans font-black text-brand-purple bg-brand-purple-light px-1 py-0.5 rounded-md select-none leading-none">1.0x</span>
+                                                    </>
+                                                  ) : audioSpeedIndex === 1 ? (
+                                                    <>
+                                                      <Volume1 className="w-3.5 h-3.5 text-indigo-500" />
+                                                      <span className="text-[8px] font-sans font-black text-indigo-500 bg-indigo-50 px-1 py-0.5 rounded-md select-none leading-none">0.7x</span>
+                                                    </>
+                                                  ) : (
+                                                    <>
+                                                      <Volume className="w-3.5 h-3.5 text-orange-500" />
+                                                      <span className="text-[8px] font-sans font-black text-orange-500 bg-orange-50 px-1 py-0.5 rounded-md select-none leading-none">0.5x</span>
+                                                    </>
+                                                  )}
+                                                </button>
+                                              </div>
                                             </div>
                                           ))}
                                         </div>
@@ -2681,36 +3208,446 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Announcement Manager */}
-                  <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4">
-                    <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 pb-2 border-b border-gray-100">
-                      <Sparkles className="w-4 h-4 text-brand-purple shrink-0" />
-                      System Announcement Banner
-                    </h4>
+                {/* COMBINED: Core Student Register & Purchase Ledger Hub */}
+                <div id="student-commerce-ledger-hub" className="bg-white rounded-2xl border-2 border-gray-100 overflow-hidden text-left shadow-xs">
+                  {/* Tab/Indicator Selector bar */}
+                  <div className="bg-gradient-to-r from-brand-dark to-[#1d232a] text-white p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100">
+                    <div>
+                      <h4 className="font-sans font-black text-sm sm:text-base uppercase tracking-tight flex items-center gap-2">
+                        <Users className="w-5 h-5 text-brand-purple shrink-0" />
+                        👥 Students & Commerce Hub • ကျောင်းသားရေးရာနှင့် အော်ဒါစီမံမှု
+                      </h4>
+                      <p className="text-[11px] text-gray-400 font-sans font-semibold mt-1">
+                        Unified directory for student accounts management, progress level checks, and checkout transaction auditing.
+                      </p>
+                    </div>
 
-                    <div className="space-y-3">
-                      <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
-                        Dynamic Marquee Notification Text
-                      </label>
-                      <textarea
-                        placeholder="Welcome message..."
-                        value={activeBroadcastInput}
-                        onChange={(e) => setActiveBroadcastInput(e.target.value)}
-                        rows={4}
-                        className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-xs sm:text-sm font-semibold font-sans focus:border-brand-purple focus:outline-none transition-colors text-brand-dark"
-                      />
+                    {/* Segmented controls button */}
+                    <div className="bg-white/10 p-1.5 rounded-xl border border-white/10 flex items-center gap-1.5 w-full md:w-auto self-start md:self-auto select-none">
+                      <button
+                        onClick={() => setAdminHubTab('orders')}
+                        className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          adminHubTab === 'orders'
+                            ? 'bg-brand-purple text-white shadow-sm shadow-brand-purple-shadow'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        Purchase Orders ({orders.length})
+                      </button>
+                      <button
+                        onClick={() => setAdminHubTab('accounts')}
+                        className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          adminHubTab === 'accounts'
+                            ? 'bg-brand-purple text-white shadow-sm shadow-brand-purple-shadow'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        Student Directory ({registeredUsers.length})
+                      </button>
+                    </div>
+                  </div>
 
-                      <div className="flex gap-2">
+                  <div className="p-5 sm:p-6 space-y-6">
+                    {/* SUB-SECTION 1: PURCHASE ORDERS */}
+                    {adminHubTab === 'orders' && (
+                      <div className="space-y-4 animate-fade-in text-left">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-3">
+                          <div>
+                            <h5 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5">
+                              📋 Student Purchase Orders Manager (ကျောင်းသားများ ဝယ်ယူမှုအော်ဒါများ)
+                            </h5>
+                            <p className="text-[10px] text-brand-muted font-sans font-semibold mt-1">
+                              Review, audit, Approve or cancel client transactions submitted from study resource store checkout.
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              if (window.confirm("Restore demo mock transactions?")) {
+                                const initialOrders: PurchaseOrder[] = [
+                                  {
+                                    id: "ORD-99321",
+                                    username: "ko_nay_min",
+                                    itemName: "🗣️ 1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
+                                    itemType: "tutoring",
+                                    priceAmount: 45000,
+                                    currency: "MMK",
+                                    status: "completed",
+                                    orderDate: "2026-06-10"
+                                  },
+                                  {
+                                    id: "ORD-99322",
+                                    username: "ma_khine",
+                                    itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
+                                    itemType: "e-book",
+                                    priceAmount: 25000,
+                                    currency: "MMK",
+                                    status: "pending",
+                                    orderDate: "2026-06-13"
+                                  }
+                                ];
+                                setOrders(initialOrders);
+                                addSystemLog('admin', 'Seeded demo simulated purchase orders ledger');
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-sans font-black text-brand-dark rounded-lg cursor-pointer flex items-center gap-1 hover:brightness-95 transition-all text-[10px]"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5 mr-0.5 text-brand-muted" />
+                            SEED DEFAULT ORDERS
+                          </button>
+                        </div>
+
+                        <div className="overflow-x-auto border border-gray-100 rounded-xl bg-gray-50/25">
+                          <table className="w-full text-left font-sans text-xs">
+                            <thead className="bg-gray-50/75 border-b border-gray-100">
+                              <tr className="text-brand-muted text-[9px] font-black uppercase tracking-wider">
+                                <th className="py-2.5 px-3">ORDER ID</th>
+                                <th className="py-2.5 px-3">USERNAME</th>
+                                <th className="py-2.5 px-3">PACKAGE DESCRIPTION</th>
+                                <th className="py-2.5 px-3">DATE PLACED</th>
+                                <th className="py-2.5 px-3">METHOD TOTAL</th>
+                                <th className="py-2.5 px-3">STATUS</th>
+                                <th className="py-2.5 px-3 text-right">ADMIN ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 font-sans">
+                              {orders.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="py-12 text-center text-brand-muted font-bold text-sm">
+                                    No purchase orders currently submitted in system memory.
+                                  </td>
+                                </tr>
+                              ) : (
+                                orders.map((ord) => (
+                                  <tr key={ord.id} className="hover:bg-amber-50/10 transition-all">
+                                    <td className="py-3 px-3 font-mono font-black text-brand-purple">{ord.id}</td>
+                                    <td className="py-3 px-3 font-bold text-brand-dark">{ord.username}</td>
+                                    <td className="py-3 px-3 font-semibold text-brand-dark text-[11px]">{ord.itemName}</td>
+                                    <td className="py-3 px-3 text-brand-muted font-bold">{ord.orderDate}</td>
+                                    <td className="py-3 px-3 font-mono font-black text-brand-dark">
+                                      {ord.priceAmount.toLocaleString()} {ord.currency}
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      {ord.status === 'pending' ? (
+                                        <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-205">
+                                          Pending Review
+                                        </span>
+                                      ) : ord.status === 'completed' ? (
+                                        <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-green-50 text-green-700 border border-green-205">
+                                          Completed
+                                        </span>
+                                      ) : (
+                                        <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-red-50 text-red-700 border border-red-205">
+                                          Cancelled
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-3 text-right">
+                                      {ord.status === 'pending' && (
+                                        <div className="flex gap-1 justify-end">
+                                          <button
+                                            onClick={() => {
+                                              setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'completed' } : o));
+                                              addSystemLog('admin', `Approved purchase of "${ord.itemName}" by "${ord.username}"`);
+                                            }}
+                                            className="px-2.5 py-1 bg-brand-green text-white text-[9.5px] font-black uppercase rounded-lg hover:opacity-90 cursor-pointer shadow-3xs"
+                                            title="Mark order as Completed"
+                                          >
+                                            Approve
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'cancelled' } : o));
+                                              addSystemLog('admin', `Denied and Cancelled order "${ord.id}"`);
+                                            }}
+                                            className="px-2.5 py-1 bg-red-500 text-white text-[9.5px] font-black uppercase rounded-lg hover:opacity-90 cursor-pointer shadow-3xs"
+                                            title="Reject order"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      )}
+                                      {ord.status !== 'pending' && (
+                                        <span className="text-[10px] text-brand-muted italic font-bold">Processed</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-SECTION 2: REGISTERED ACCOUNTS */}
+                    {adminHubTab === 'accounts' && (
+                      <div className="space-y-6 animate-fade-in" id="admin-accounts-tab-view">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                          {/* Create account form block */}
+                          <div className="lg:col-span-5 bg-gray-50/70 p-4 sm:p-5 rounded-2xl border border-gray-150 space-y-4">
+                            <h5 className="text-xs font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4 shrink-0 text-amber-500 animate-pulse" />
+                              Create Student / Admin Account
+                            </h5>
+                            <p className="text-[10px] text-brand-muted font-sans font-semibold leading-relaxed">
+                              Manually add pre-configured login credentials for custom testing or manual student profile onboarding.
+                            </p>
+
+                            <form onSubmit={(e) => {
+                              e.preventDefault();
+                              const cleanUser = adminNewUserUsername.trim();
+                              const cleanPassword = adminNewUserPassword.trim();
+                              if (!cleanUser || !cleanPassword) {
+                                alert("Username and password are required.");
+                                return;
+                              }
+                              const alreadyHas = registeredUsers.some(u => u.username.toLowerCase() === cleanUser.toLowerCase()) || cleanUser.toLowerCase() === 'admin';
+                              if (alreadyHas) {
+                                alert("This username is already taken!");
+                                return;
+                              }
+                              const newUser: RegisteredUser = {
+                                username: cleanUser,
+                                password: cleanPassword,
+                                role: adminNewUserRole,
+                                xp: adminNewUserRole === 'student' ? 0 : 5000,
+                                dateJoined: new Date().toISOString().split('T')[0]
+                              };
+                              const updated = [...registeredUsers, newUser];
+                              setRegisteredUsers(updated);
+                              localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
+                              addSystemLog('admin', `Created a new ${adminNewUserRole.toUpperCase()} account for "${cleanUser}"`);
+                              setAdminNewUserUsername('');
+                              setAdminNewUserPassword('');
+                              alert(`Account successfully created!\nUsername: ${cleanUser}\nRole: ${adminNewUserRole.toUpperCase()}`);
+                            }} className="space-y-3 pt-1 text-left">
+                              <div>
+                                <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">Username</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. ko_phyo"
+                                  value={adminNewUserUsername}
+                                  onChange={(e) => setAdminNewUserUsername(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border-2 border-gray-200 rounded-xl text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">Password</label>
+                                <input
+                                  type="text"
+                                  placeholder="Enter clean password"
+                                  value={adminNewUserPassword}
+                                  onChange={(e) => setAdminNewUserPassword(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border-2 border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">Assigned Role</label>
+                                <select
+                                  value={adminNewUserRole}
+                                  onChange={(e) => setAdminNewUserRole(e.target.value as 'student' | 'admin')}
+                                  className="w-full px-3 py-2 bg-white border-2 border-gray-200 rounded-xl text-xs font-black font-sans text-brand-purple focus:border-brand-purple focus:outline-none cursor-pointer"
+                                >
+                                  <option value="student">STUDENT (ကျောင်းသားရှုထောင့်)</option>
+                                  <option value="admin">ADMIN CONTROL (စီမံသူရှုထောင့်)</option>
+                                </select>
+                              </div>
+                              <button
+                                type="submit"
+                                className="w-full py-3 bg-brand-purple hover:bg-brand-purple/95 text-white rounded-xl border-b-4 border-brand-purple-shadow text-[11px] font-sans font-black hover:brightness-105 active:translate-y-0.5 cursor-pointer uppercase tracking-wider transition-all pt-3 flex items-center justify-center gap-1.5"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Add Account Securely
+                              </button>
+                            </form>
+                          </div>
+
+                          {/* List of registered users directory cards */}
+                          <div className="lg:col-span-7 space-y-3.5 flex flex-col justify-between text-left">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h6 className="text-[11px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Current Register List ({registeredUsers.length} Users)
+                                </h6>
+                                <button
+                                  onClick={() => {
+                                    const confirmReset = window.confirm("Are you sure you want to reset user table? (Will reset to standard entries)");
+                                    if (confirmReset) {
+                                      const initialUsers: RegisteredUser[] = [
+                                        { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12" },
+                                        { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01" },
+                                        { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10" },
+                                        { username: "admin_thura", password: "adminpassword", role: "admin", xp: 5000, dateJoined: "2026-06-05" }
+                                      ];
+                                      setRegisteredUsers(initialUsers);
+                                      localStorage.setItem('thai_registered_users_list', JSON.stringify(initialUsers));
+                                      addSystemLog('admin', 'Reset student user directory catalog to factory seed');
+                                    }
+                                  }}
+                                  className="text-[9.5px] font-sans font-black text-brand-purple hover:underline flex items-center gap-1 cursor-pointer select-none"
+                                >
+                                  <RefreshCw className="w-3 text-brand-purple" />
+                                  RESET TO DEFAULT USERS
+                                </button>
+                              </div>
+
+                              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 bg-gray-50/30 p-2 border border-gray-100 rounded-xl">
+                                {registeredUsers.map((usr, i) => (
+                                  <div key={i} className="bg-white p-3 rounded-xl border border-gray-110 flex items-center justify-between gap-3 shadow-3xs hover:border-gray-205 transition-all text-left">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-sans font-black text-brand-dark text-xs">{usr.username}</span>
+                                        {usr.role === 'admin' ? (
+                                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200 select-none">
+                                            <Shield className="w-2 h-2" /> Admin
+                                          </span>
+                                        ) : (
+                                          <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-green-50 text-green-700 border border-green-200 select-none">
+                                            Student
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] text-brand-muted font-sans space-y-0.5 font-semibold">
+                                        <p>Password: <code className="bg-gray-50 text-brand-dark px-1 py-0.5 rounded font-mono font-bold text-brand-dark">{usr.password || 'password123'}</code></p>
+                                        <p>Progress: <span className="text-brand-purple font-black font-mono">{usr.role === 'admin' ? '—' : `${usr.xp} XP (LVL ${Math.floor(usr.xp / 1000) + 1})`}</span></p>
+                                        <p>Joined: <span className="text-gray-500 font-mono font-bold">{usr.dateJoined}</span></p>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      onClick={() => {
+                                        const confirmed = window.confirm(`Are you sure you want to delete the user account "${usr.username}"? This cannot be undone.`);
+                                        if (confirmed) {
+                                          setRegisteredUsers((prev) => {
+                                            const updated = prev.filter(u => u.username !== usr.username);
+                                            localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
+                                            return updated;
+                                          });
+                                          addSystemLog('admin', `Deregistered account of "${usr.username}"`);
+                                        }
+                                      }}
+                                      className="p-2.5 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-xl cursor-pointer transition-all border border-transparent hover:border-red-100 flex items-center justify-center shrink-0"
+                                      title="Delete Account"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* PREMIUM SYSTEM ANNOUNCEMENT BANNER */}
+                <div id="system-broadcast-config-card" className="bg-white rounded-2xl border-2 border-gray-100 p-5 sm:p-6 text-left space-y-5 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                    <div>
+                      <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+                        <Megaphone className="w-4 h-4 text-brand-purple shrink-0 animate-pulse" />
+                        📢 Public Student Announcement Banner Configuration (စနစ်အလံထုတ်ပြန်ချက်)
+                      </h4>
+                      <p className="text-[10px] text-brand-muted font-sans font-semibold mt-1">
+                        Compose and update the global scrolling dynamic announcement marquee bar displayed instantly on all students' dashboards.
+                      </p>
+                    </div>
+
+                    {/* Miniature live status indicator badge */}
+                    <div className="flex items-center gap-1.5 self-start sm:self-auto select-none">
+                      {activeBroadcast ? (
+                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[8.5px] font-sans font-black uppercase text-brand-green bg-gradient-to-r from-green-50 to-emerald-50 text-brand-green border border-brand-green/30 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-brand-green text-transparent inline-block">●</span> LIVE STREAMING
+                        </span>
+                      ) : (
+                        <span className="inline-block px-2.5 py-1 rounded-full text-[8.5px] font-sans font-black uppercase text-brand-muted bg-gray-50 border border-gray-200">
+                          ○ HIDDEN / OFFLINE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Split Visual Layout for Announcement Banner */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left Column: Form & Template Pills */}
+                    <div className="lg:col-span-7 space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[9.5px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                            Compose Marquee Text (မြန်မာ/အင်္ဂလိပ်/ထိုင်း)
+                          </label>
+                          <span className="text-[9px] font-mono text-brand-muted font-bold block select-none">
+                            {activeBroadcastInput.length} characters
+                          </span>
+                        </div>
+                        <textarea
+                          placeholder="Welcome students! Enter the update notification marquee bar text here..."
+                          value={activeBroadcastInput}
+                          onChange={(e) => setActiveBroadcastInput(e.target.value)}
+                          rows={3}
+                          className="w-full px-3.5 py-3 border-2 border-gray-200 rounded-xl text-xs sm:text-sm font-semibold font-sans focus:border-brand-purple focus:outline-none transition-colors text-brand-dark placeholder-gray-400 bg-gray-50/30 font-sans"
+                        />
+                      </div>
+
+                      {/* Quick Template Pills */}
+                      <div className="space-y-2 bg-[#fcfbfe] border border-brand-purple/10 p-3 rounded-xl">
+                        <span className="block text-[9px] font-sans font-black text-brand-purple uppercase tracking-wider select-none">
+                          ⚡ Quick Pre-configured Templates:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5 pt-1.5">
+                          {[
+                            {
+                              label: "Maintenance 🛠️",
+                              text: "System maintenance is scheduled for tonight at 11:30 PM (MMT). The application database will be updated for roughly 20 mins. 🛠️"
+                            },
+                            {
+                              label: "New Lesson Content 📚",
+                              text: "Exciting News! Level 10 dialogues and vocabulary list with native speed audio clips are now added! Check them out in learning path! 📚"
+                            },
+                            {
+                              label: "Handbook Sale 📕",
+                              text: "Exclusive promo active! Get access code for advanced Thai-Myanmar Grammar Manual with worksheets for 50% off! 📕"
+                            },
+                            {
+                              label: "Double XP Boost ⚡",
+                              text: "Supercharge weekend is here! Earn double XP (+2x score multiplier) on all translation quizzes until Sunday midnight. Go go go! ⚡"
+                            }
+                          ].map((pill, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setActiveBroadcastInput(pill.text)}
+                              className="px-2 py-1 bg-white hover:bg-brand-purple/5 text-brand-dark hover:text-brand-purple border border-gray-250 hover:border-brand-purple/30 rounded-lg text-[9.5px] font-semibold font-sans transition-all cursor-pointer text-left shadow-3xs"
+                            >
+                              {pill.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Control buttons */}
+                      <div className="flex gap-2 pt-1">
                         <button
                           onClick={() => {
+                            if (!activeBroadcastInput.trim()) {
+                              alert("Please enter message body before broadcasting.");
+                              return;
+                            }
                             setActiveBroadcast(activeBroadcastInput);
                             localStorage.setItem('thai_active_broadcast', activeBroadcastInput);
                             addSystemLog('admin', `Updated system broadcast marquee alert`);
                           }}
-                          className="flex-1 duo-btn duo-btn-purple text-xs font-black py-3.5"
+                          className="flex-1 py-3 bg-brand-purple hover:bg-brand-purple/95 border-b-4 border-brand-purple-shadow text-white rounded-xl text-xs font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs"
                         >
-                          BROADCAST TO WORLD
+                          <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                          Publish Live Broadcast
                         </button>
                         <button
                           onClick={() => {
@@ -2719,294 +3656,410 @@ export default function App() {
                             setActiveBroadcastInput('');
                             addSystemLog('admin', 'Disabled system broadcast marquee');
                           }}
-                          className="px-4 py-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-sans font-black text-xs transition-colors cursor-pointer"
+                          className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200/60 font-sans font-black text-xs transition-colors cursor-pointer flex items-center justify-center gap-1"
                           title="Clear banner and hide"
                         >
-                          DISABLE Banner
+                          <X className="w-4 h-4 shrink-0" />
+                          Disable Banner
                         </button>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Registered Users Audit Card Directory */}
-                  <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4 flex flex-col justify-between lg:col-span-1">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                        <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5">
-                          <Users className="w-4 h-4 text-brand-purple shrink-0" />
-                          Registered Accounts Directory ({registeredUsers.length})
-                        </h4>
+                    {/* Right Column: Live Broadcast Simulator Display Container */}
+                    <div className="lg:col-span-5 bg-gradient-to-br from-[#1d232a] to-brand-dark rounded-2xl border-2 border-[#12161a] p-4.5 text-white flex flex-col justify-between items-stretch shadow-md select-none relative overflow-hidden text-left">
+                      {/* Grid background effect */}
+                      <div className="absolute inset-0 bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none opacity-40" />
+
+                      <div className="z-10 flex items-center justify-between border-b border-white/10 pb-2.5">
+                        <span className="text-[9px] font-mono font-black text-brand-purple-light uppercase tracking-widest flex items-center gap-1.5_wrap">
+                          <Activity className="w-3 h-3 text-brand-purple-light shrink-0" />
+                          Broadcast Monitor Simulator
+                        </span>
+                        {activeBroadcast ? (
+                          <div className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-ping" />
+                            <span className="text-[8px] font-mono text-brand-green font-extrabold uppercase">TX TRANSMITTING</span>
+                          </div>
+                        ) : (
+                          <span className="text-[8px] font-mono text-gray-500 font-extrabold uppercase">STBY OFFLINE</span>
+                        )}
                       </div>
 
-                      {/* Admin Form to Create Accounts */}
-                      <div className="bg-gray-50/50 p-3 sm:p-4 rounded-xl border border-gray-200/85 space-y-2.5">
-                        <h5 className="text-[10px] sm:text-xs font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                          Create New Account (Admin Quick-Add Credentials)
-                        </h5>
-                        <form onSubmit={(e) => {
-                          e.preventDefault();
-                          const cleanUser = adminNewUserUsername.trim();
-                          const cleanPassword = adminNewUserPassword.trim();
-                          if (!cleanUser || !cleanPassword) {
-                            alert("Username and password are required.");
-                            return;
-                          }
-                          const alreadyHas = registeredUsers.some(u => u.username.toLowerCase() === cleanUser.toLowerCase()) || cleanUser.toLowerCase() === 'admin';
-                          if (alreadyHas) {
-                            alert("This username is already taken!");
-                            return;
-                          }
-                          const newUser: RegisteredUser = {
-                            username: cleanUser,
-                            password: cleanPassword,
-                            role: adminNewUserRole,
-                            xp: adminNewUserRole === 'student' ? 0 : 5000,
-                            dateJoined: new Date().toISOString().split('T')[0]
-                          };
-                          const updated = [...registeredUsers, newUser];
-                          setRegisteredUsers(updated);
-                          localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
-                          addSystemLog('admin', `Created a new ${adminNewUserRole.toUpperCase()} account for "${cleanUser}"`);
-                          setAdminNewUserUsername('');
-                          setAdminNewUserPassword('');
-                          alert(`Account successfully created!\nUsername: ${cleanUser}\nRole: ${adminNewUserRole.toUpperCase()}`);
-                        }} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <div>
-                            <input
-                              type="text"
-                              placeholder="Username"
-                              value={adminNewUserUsername}
-                              onChange={(e) => setAdminNewUserUsername(e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <input
-                              type="text"
-                              placeholder="Password"
-                              value={adminNewUserPassword}
-                              onChange={(e) => setAdminNewUserPassword(e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <select
-                              value={adminNewUserRole}
-                              onChange={(e) => setAdminNewUserRole(e.target.value as 'student' | 'admin')}
-                              className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-black font-sans text-brand-purple focus:border-brand-purple focus:outline-none"
-                            >
-                              <option value="student">STUDENT (ကျောင်းသား)</option>
-                              <option value="admin">ADMIN (စီမံသူ)</option>
-                            </select>
-                          </div>
-                          <button
-                            type="submit"
-                            className="sm:col-span-3 w-full py-2 bg-brand-purple text-white rounded-lg border-b-4 border-brand-purple-shadow text-[10px] font-black uppercase tracking-wider hover:brightness-105 active:translate-y-0.5 cursor-pointer"
-                          >
-                            Add New Credentials Securely
-                          </button>
-                        </form>
-                      </div>
-
-                      {/* Scrollable list of user cards - HIGH POLISH CARDS */}
-                      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                        {registeredUsers.map((usr, i) => (
-                          <div key={i} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between gap-3 shadow-xs hover:border-gray-200 transition-all text-left">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-sans font-black text-brand-dark text-xs">{usr.username}</span>
-                                {usr.role === 'admin' ? (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                                    <Shield className="w-2 h-2" /> Admin
-                                  </span>
-                                ) : (
-                                  <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-green-50 text-green-700 border border-green-200">
-                                    Student
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-brand-muted font-sans space-y-0.5 font-semibold">
-                                <p>Password: <code className="bg-gray-50 text-brand-dark px-1 py-0.5 rounded font-mono font-bold">{usr.password || 'password123'}</code></p>
-                                <p>Progress: <span className="text-brand-purple font-black font-mono">{usr.role === 'admin' ? '—' : `${usr.xp} XP (LVL ${Math.floor(usr.xp / 1000) + 1})`}</span></p>
-                                <p>Joined: <span>{usr.dateJoined}</span></p>
-                              </div>
+                      {/* Display Screen */}
+                      <div className="z-10 my-4 py-6 px-4 bg-black/45 rounded-xl border border-white/5 flex flex-col items-center justify-center text-center min-h-[90px]">
+                        {activeBroadcast ? (
+                          <div className="w-full space-y-3">
+                            <span className="inline-block px-2 py-0.5 rounded text-[8px] font-mono font-black uppercase bg-brand-purple/20 text-brand-purple-light border border-brand-purple/30">
+                              📡 Global Active Marquee Banner
+                            </span>
+                            <div className="bg-brand-purple text-white py-2 px-3 rounded-xl shadow-inner text-[10px] font-sans font-bold text-left border-l-4 border-amber-300 relative overflow-hidden w-full">
+                              <p className="truncate uppercase tracking-wide leading-normal text-white">
+                                {activeBroadcast}
+                              </p>
                             </div>
-
-                            <button
-                              onClick={() => {
-                                const confirmed = window.confirm(`Are you sure you want to delete the user account "${usr.username}"? This cannot be undone.`);
-                                if (confirmed) {
-                                  setRegisteredUsers((prev) => {
-                                    const updated = prev.filter(u => u.username !== usr.username);
-                                    localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
-                                    return updated;
-                                  });
-                                  addSystemLog('admin', `Deregistered account of "${usr.username}"`);
-                                }
-                              }}
-                              className="p-2 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-red-100"
-                              title="Delete Account"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="space-y-1.5">
+                            <p className="text-gray-400 font-mono text-xs font-bold uppercase tracking-wide">○ Digital Display Empty</p>
+                            <p className="text-gray-500 text-[10px] leading-relaxed max-w-xs font-sans font-semibold">
+                              Compose marquee notification text on the left and click "Publish Live Broadcast" to activate.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Simulator Telemetry Footing */}
+                      <div className="z-10 border-t border-white/5 pt-2 flex items-center justify-between text-[8.5px] font-mono text-gray-400 font-semibold">
+                        <span>Device: Student Client Frame</span>
+                        <span>Update: Instant Sync</span>
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => {
-                        const confirmReset = window.confirm("Are you sure you want to reset user table? (Will reset standard entries)");
-                        if (confirmReset) {
-                          const initialUsers: RegisteredUser[] = [
-                            { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12" },
-                            { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01" },
-                            { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10" },
-                            { username: "admin_thura", password: "adminpassword", role: "admin", xp: 5000, dateJoined: "2026-06-05" }
-                          ];
-                          setRegisteredUsers(initialUsers);
-                          localStorage.setItem('thai_registered_users_list', JSON.stringify(initialUsers));
-                          addSystemLog('admin', 'Reset student user directory catalog to factory seed');
-                        }
-                      }}
-                      className="w-full py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-[10px] font-sans font-black text-brand-dark mt-4 cursor-pointer"
-                    >
-                      FACTORY RESET USER DIRECTORY
-                    </button>
                   </div>
                 </div>
 
-                {/* Brand New Section: student Purchase Orders Manager */}
-                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4 text-left">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-3">
+
+
+                {/* CSV Excel Database Import Sync Hub */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
                     <div>
                       <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 text-brand-purple">
-                        <ShoppingBag className="w-4 h-4 shrink-0 text-brand-purple" />
-                        📋 student Purchase Orders Manager (ကျောင်းသားများ ဝယ်ယူမှုအော်ဒါများ ပန်နယ်)
+                        <FileText className="w-4 h-4 shrink-0 text-brand-purple" />
+                        📂 CSV & Excel Data Import Hub • သင်ခန်းစာများ ဖိုင်ဖြင့်ထည့်သွင်းရန်
                       </h4>
-                      <p className="text-[10px] font-sans font-bold text-brand-muted mt-1">
-                        Review, audit, Approve or cancel client transactions submitted from study resource store checkout.
+                      <p className="text-[10px] font-sans font-semibold text-brand-muted mt-1 leading-relaxed">
+                        Import vocabulary rows, dialogue lines, grammar rules, quizzes, or whole lessons in bulk with standard Excel CSV files. All changes persist instantly to students.
                       </p>
                     </div>
-
                     <button
-                      onClick={() => {
-                        if (window.confirm("Restore demo mock transactions?")) {
-                          const initialOrders: PurchaseOrder[] = [
-                            {
-                              id: "ORD-99321",
-                              username: "ko_nay_min",
-                              itemName: "🗣️ 1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
-                              itemType: "tutoring",
-                              priceAmount: 45000,
-                              currency: "MMK",
-                              status: "completed",
-                              orderDate: "2026-06-10"
-                            },
-                            {
-                              id: "ORD-99322",
-                              username: "ma_khine",
-                              itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
-                              itemType: "e-book",
-                              priceAmount: 25000,
-                              currency: "MMK",
-                              status: "pending",
-                              orderDate: "2026-06-13"
-                            }
-                          ];
-                          setOrders(initialOrders);
-                          addSystemLog('admin', 'Seeded demo simulated purchase orders ledger');
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-sans font-black text-brand-dark rounded-lg cursor-pointer"
+                      onClick={() => setIsCsvImportExpanded(!isCsvImportExpanded)}
+                      className="px-3 py-1.5 border-2 border-brand-purple/20 bg-[#fbfaff] hover:bg-brand-purple/10 text-brand-purple rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-colors"
                     >
-                      SEED DEFAULT ORDERS
+                      {isCsvImportExpanded ? "COLLAPSE PANEL • ပိတ်ပါ" : "EXPAND IMPORT ENGINE • ဖွင့်ပါ"}
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                    <table className="w-full text-left font-sans text-xs">
-                      <thead className="bg-gray-50/70">
-                        <tr className="border-b border-gray-100 text-brand-muted text-[9px] font-black uppercase tracking-wider">
-                          <th className="py-2.5 px-3">ORDER ID</th>
-                          <th className="py-2.5 px-3">USERNAME</th>
-                          <th className="py-2.5 px-3">PACKAGE DESCRIPTION</th>
-                          <th className="py-2.5 px-3">DATE PLACED</th>
-                          <th className="py-2.5 px-3">METHOD TOTAL</th>
-                          <th className="py-2.5 px-3">STATUS</th>
-                          <th className="py-2.5 px-3 text-right">ADMIN ACTIONS</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50 font-sans">
-                        {orders.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="py-8 text-center text-brand-muted font-bold">
-                              No purchase orders currently submitted in system memory.
-                            </td>
-                          </tr>
-                        ) : (
-                          orders.map((ord) => (
-                            <tr key={ord.id} className="hover:bg-gray-50/50">
-                              <td className="py-3 px-3 font-mono font-black text-brand-purple">{ord.id}</td>
-                              <td className="py-3 px-3 font-bold text-brand-dark">{ord.username}</td>
-                              <td className="py-3 px-3 font-semibold text-brand-dark text-[11px]">{ord.itemName}</td>
-                              <td className="py-3 px-3 text-brand-muted font-bold">{ord.orderDate}</td>
-                              <td className="py-3 px-3 font-mono font-black text-brand-dark">
-                                {ord.priceAmount.toLocaleString()} {ord.currency}
-                              </td>
-                              <td className="py-3 px-3">
-                                {ord.status === 'pending' ? (
-                                  <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                                    Pending Review
-                                  </span>
-                                ) : ord.status === 'completed' ? (
-                                  <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-green-50 text-green-700 border border-green-200">
-                                    Completed
-                                  </span>
-                                ) : (
-                                  <span className="inline-block px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-red-50 text-red-700 border border-red-200">
-                                    Cancelled
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 text-right">
-                                {ord.status === 'pending' && (
-                                  <div className="flex gap-1 justify-end">
-                                    <button
-                                      onClick={() => {
-                                        setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'completed' } : o));
-                                        addSystemLog('admin', `Approved purchase of "${ord.itemName}" by "${ord.username}"`);
-                                      }}
-                                      className="px-2 py-1 bg-brand-green text-white text-[9px] font-black uppercase rounded hover:opacity-90 cursor-pointer"
-                                      title="Mark order as Completed"
-                                    >
-                                      Approve
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'cancelled' } : o));
-                                        addSystemLog('admin', `Denied and Cancelled order "${ord.id}"`);
-                                      }}
-                                      className="px-2 py-1 bg-red-500 text-white text-[9px] font-black uppercase rounded hover:opacity-90 cursor-pointer"
-                                      title="Reject order"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                )}
-                                {ord.status !== 'pending' && (
-                                  <span className="text-[10px] text-brand-muted italic font-bold">Processed</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  {isCsvImportExpanded && (
+                    <div className="space-y-6 animate-fade-in shadow-xs">
+                      {/* Step 1: Download Templates */}
+                      <div className="bg-amber-50/25 border border-amber-200/55 p-4 rounded-xl space-y-3.5">
+                        <h5 className="text-[11px] font-sans font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                          📊 STEP 1: DOWNLOAD EXCEL / CSV TEMPLATES • စံနမူနာ ဒေါင်းလုဒ် ရယူရန်
+                        </h5>
+                        <p className="text-[10.5px] font-sans font-medium text-brand-dark leading-relaxed">
+                          Click any button below to download the official structural CSV template. Open in Microsoft Excel or Google Sheets, fill in your lesson data, click export/save as CSV, and upload in Step 2.
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <button
+                            onClick={() => downloadCsvTemplate('vocabulary')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Vocabulary Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('dialogue')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Dialogue Lines Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('grammar')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Grammar Notes Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('quiz')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Quiz Questions Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('lessons')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Lessons Metadata Template (.csv)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Upload Configurator */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 bg-gray-50 p-4.5 border border-gray-150 rounded-xl">
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                            1. Select Import Content type
+                          </label>
+                          <select
+                            value={csvImportType}
+                            onChange={(e) => {
+                              const type = e.target.value as any;
+                              setCsvImportType(type);
+                              setCsvFile(null);
+                              setCsvParsedData([]);
+                              setCsvErrors([]);
+                              setCsvFileName('');
+                            }}
+                            className="w-full bg-white border-2 border-gray-200 px-3.5 py-2 rounded-xl text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer"
+                          >
+                            <option value="vocabulary">Vocabulary List • ဝေါဟာရအသစ်များ</option>
+                            <option value="dialogue">Dialogue Conversational Lines • စကားပြောများ</option>
+                            <option value="grammar">Grammar Notes & Examples • သဒ္ဒါစည်းမျဉ်း</option>
+                            <option value="quiz">Quiz Questions & Choices • ပဟေဠိများ</option>
+                            <option value="lessons">Bulk Syllabus Lessons (Metadata) • သင်ခန်းစာအသစ်များ</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                            2. SELECT TARGET LESSON
+                          </label>
+                          <select
+                            disabled={csvImportType === 'lessons'}
+                            value={csvImportTargetLesson}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCsvImportTargetLesson(val === 'all' ? 'all' : Number(val));
+                            }}
+                            className="w-full bg-white border-2 border-gray-200 px-3.5 py-2 rounded-xl text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            <option value="all">-- Active Selected Lesson ({adminSelectedLessonId || 'None'}) --</option>
+                            {lessons.map(l => (
+                              <option key={l.id} value={l.id}>
+                                Lesson {l.id}: {l.titleEnglish}
+                              </option>
+                            ))}
+                          </select>
+                          {csvImportType === 'lessons' && (
+                            <p className="text-[9px] text-brand-muted font-bold block pt-1">
+                              * Entire curriculum directory mode
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                            3. CHOOSE FILE • ဖိုင်ရွေးချယ်ရန်
+                          </label>
+                          <div
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setIsCsvDragOver(true);
+                            }}
+                            onDragLeave={() => setIsCsvDragOver(false)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setIsCsvDragOver(false);
+                              const file = e.dataTransfer.files?.[0];
+                              if (file) {
+                                processCsvFile(file);
+                              }
+                            }}
+                            className={`border-2 border-dashed rounded-xl px-4 py-2 flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                              isCsvDragOver ? 'border-brand-purple bg-brand-purple/5' : 'border-gray-300 bg-white hover:border-gray-400'
+                            }`}
+                            onClick={() => {
+                              const input = document.getElementById('csv-file-selector-input');
+                              if (input) input.click();
+                            }}
+                          >
+                            <input
+                              type="file"
+                              id="csv-file-selector-input"
+                              accept=".csv"
+                              onChange={handleCsvFileSelection}
+                              className="hidden"
+                            />
+                            <Upload className="w-4 h-4 text-gray-400 mb-1 animate-bounce" />
+                            <span className="text-[10px] font-sans font-black text-brand-dark text-center truncate max-w-full">
+                              {csvFileName ? `✓ ${csvFileName}` : "Click/Drag CSV here"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: Parse Status Preview & Merging */}
+                      {csvFile && (
+                        <div className="bg-white border-2 border-brand-purple/20 rounded-xl p-4.5 space-y-4 shadow-3xs animate-fade-in text-brand-dark">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                            <div>
+                              <h6 className="text-[11px] font-sans font-black uppercase tracking-wider flex items-center gap-1.5">
+                                <CheckCircle className="w-4 h-4 text-brand-purple" />
+                                CSV PARSED PREVIEW DETAILS • သွင်းယူမည့် ဒေတာ အကျဉ်းချုပ်
+                              </h6>
+                              <p className="text-[9.5px] font-sans font-medium text-brand-muted mt-0.5">
+                                Verify that column headers and structures align before finalizing the synchronization update.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {csvErrors.length === 0 ? (
+                                <span className="bg-brand-green-light border border-brand-green/30 text-brand-green font-mono font-black text-[9.5px] px-3 py-1 rounded-full uppercase">
+                                  ✓ Valid Format
+                                </span>
+                              ) : (
+                                <span className="bg-red-50 border border-red-200 text-red-600 font-mono font-black text-[9.5px] px-3 py-1 rounded-full uppercase">
+                                  ⚠ {csvErrors.length} Warning(s)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {csvErrors.length > 0 && (
+                            <div className="bg-red-50 border border-red-150 p-3.5 rounded-xl text-[10.5px] font-sans font-semibold text-red-700 space-y-1.5 max-h-[150px] overflow-y-auto">
+                              <p className="font-sans font-black">Warning Warnings found in lines/headers structure:</p>
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                {csvErrors.map((err, idx) => (
+                                  <li key={idx}>{err}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-bold text-brand-muted">
+                                Content Type: <strong className="text-brand-dark font-black uppercase">{csvImportType}</strong>
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-brand-muted">
+                                Row Count: <strong className="text-brand-dark font-black">{csvParsedData.length} records found</strong>
+                              </span>
+                            </div>
+
+                            <div className="max-h-[180px] overflow-y-auto border border-gray-150 rounded-xl overflow-x-auto">
+                              <table className="w-full text-[10px] text-left border-collapse font-sans">
+                                <thead>
+                                  <tr className="bg-gray-100/80 border-b border-gray-200 text-brand-dark font-black tracking-wide uppercase select-none">
+                                    <th className="p-2 border-r border-gray-200">#</th>
+                                    {csvImportType === 'vocabulary' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Thai Word</th>
+                                        <th className="p-2 border-r border-gray-200">Phonetic</th>
+                                        <th className="p-2 border-r border-gray-200">English</th>
+                                        <th className="p-2">Myanmar</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'dialogue' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Speaker</th>
+                                        <th className="p-2 border-r border-gray-200">Thai Sentence</th>
+                                        <th className="p-2 border-r border-gray-200">English</th>
+                                        <th className="p-2">Myanmar</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'grammar' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Title</th>
+                                        <th className="p-2 border-r border-gray-200">Title (MM)</th>
+                                        <th className="p-2 border-r border-gray-200">Explanation</th>
+                                        <th className="p-2">Example Count</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'quiz' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Type</th>
+                                        <th className="p-2 border-r border-gray-200">Prompt</th>
+                                        <th className="p-2 border-r border-gray-200">Options</th>
+                                        <th className="p-2">Correct Answer</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'lessons' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">ID</th>
+                                        <th className="p-2 border-r border-gray-200">English Title</th>
+                                        <th className="p-2 border-r border-gray-200">Myanmar Title</th>
+                                        <th className="p-2">Description</th>
+                                      </>
+                                    )}
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white/50 text-brand-dark font-semibold">
+                                  {csvParsedData.slice(0, 5).map((row, idx) => (
+                                    <tr key={idx} className="border-b border-gray-100 hover:bg-brand-purple/5 transition-colors">
+                                      <td className="p-2 border-r border-gray-200 font-mono text-brand-muted text-center">{idx + 1}</td>
+                                      {csvImportType === 'vocabulary' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold text-xs">{row.thai}</td>
+                                          <td className="p-2 border-r border-gray-200 italic font-mono text-brand-green">{row.phonetic}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.english}</td>
+                                          <td className="p-2">{row.myanmar}</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'dialogue' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 font-mono text-center font-black">{row.speaker}</td>
+                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold text-xs">{row.thai}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.english}</td>
+                                          <td className="p-2">{row.myanmar}</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'grammar' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold">{row.title}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.titleMyanmar}</td>
+                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.explanation}</td>
+                                          <td className="p-2 font-mono text-center">{row.examples?.length || 0} examples</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'quiz' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 font-mono text-[9px] uppercase">{row.type}</td>
+                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.prompt}</td>
+                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.options?.join(' | ')}</td>
+                                          <td className="p-2 text-brand-green font-bold">{row.correctAnswer}</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'lessons' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 font-mono font-bold text-center">{row.id}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.titleEnglish}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.titleMyanmar}</td>
+                                          <td className="p-2 truncate max-w-xs">{row.descriptionEnglish}</td>
+                                        </>
+                                      )}
+                                    </tr>
+                                  ))}
+                                  {csvParsedData.length > 5 && (
+                                    <tr className="bg-gray-50/50">
+                                      <td colSpan={10} className="p-2 text-center text-brand-muted font-mono italic">
+                                        ... and {csvParsedData.length - 5} more rows parsed and ready ...
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div className="pt-3 flex gap-3">
+                              <button
+                                type="button"
+                                onClick={submitCsvImport}
+                                className="flex-1 duo-btn duo-btn-purple text-xs font-black py-3 select-none uppercase tracking-wide flex items-center justify-center gap-1.5"
+                              >
+                                <CheckSquare className="w-4 h-4" />
+                                IMPORT NOW • ဒေတာထည့်သွင်းပါ
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCsvFile(null);
+                                  setCsvParsedData([]);
+                                  setCsvErrors([]);
+                                  setCsvFileName('');
+                                }}
+                                className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-sans font-black text-xs transition-colors cursor-pointer"
+                              >
+                                Clear File
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Curriculum & Lesson Database Manager */}
@@ -3173,6 +4226,175 @@ export default function App() {
                             );
                           })}
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dedicated Syllabus Lessons CSV Bulk Upload Card */}
+                  <div className="bg-brand-purple/[0.02] border-2 border-brand-purple/10 p-4 sm:p-5 rounded-2xl space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <h5 className="font-sans font-black text-brand-dark text-xs uppercase tracking-wider flex items-center gap-1.5 text-brand-purple">
+                          <FileText className="w-4 h-4 shrink-0 text-brand-purple" />
+                          📂 Excel/CSV Bulk Syllabus Importer • သင်ခန်းစာများ ဖိုင်ဖြင့်အမြန်ထည့်ရန်
+                        </h5>
+                        <p className="text-[10px] font-sans font-semibold text-brand-muted mt-1 leading-relaxed text-left">
+                          Busy users can download our sample lesson format below, fill in your lesson ids, titles, and descriptions, then drop it here to upload multiple lessons at once instead of manually entering them.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsSyllabusImportExpanded(!isSyllabusImportExpanded)}
+                        className="px-3 py-1.5 border-2 border-brand-purple/35 bg-[#fbfaff] hover:bg-brand-purple/10 text-brand-purple rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                      >
+                        {isSyllabusImportExpanded ? "CLOSE IMPORTER • ပိတ်ရန်" : "OPEN IMPORTER • ဖိုင်တင်ရန်"}
+                      </button>
+                    </div>
+
+                    {isSyllabusImportExpanded && (
+                      <div className="space-y-4 animate-fade-in border-t border-brand-purple/10 pt-4 text-left">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Left column: Template Downloader */}
+                          <div className="bg-white p-4 rounded-xl border border-gray-150 space-y-2.5 flex flex-col justify-between">
+                            <div>
+                              <h6 className="text-[10.5px] font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1">
+                                📋 DOWNLOAD SAMPLE TEMPLATE
+                              </h6>
+                              <p className="text-[10px] font-sans font-medium text-brand-muted leading-relaxed">
+                                Get our structured template to fill on Excel, Google Sheets or Numbers. Save as CSV prior to uploading.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => downloadCsvTemplate('lessons')}
+                              className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-[10.5px] font-black font-sans px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                            >
+                              <Download className="w-4 h-4 text-amber-700 animate-pulse" />
+                              Download Lesson Template (.csv)
+                            </button>
+                          </div>
+
+                          {/* Right column: Drag and Drop upload block */}
+                          <div className="bg-white p-4 rounded-xl border border-gray-150 space-y-2">
+                            <h6 className="text-[10.5px] font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1">
+                              📤 UPLOAD & PARSE CSV FILE
+                            </h6>
+                            <div
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                setIsSyllabusCsvDragOver(true);
+                              }}
+                              onDragLeave={() => setIsSyllabusCsvDragOver(false)}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setIsSyllabusCsvDragOver(false);
+                                const file = e.dataTransfer.files?.[0];
+                                if (file) {
+                                  processSyllabusCsvFile(file);
+                                }
+                              }}
+                              onClick={() => {
+                                const input = document.getElementById('syllabus-csv-file-selector');
+                                if (input) input.click();
+                              }}
+                              className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                isSyllabusCsvDragOver ? 'border-brand-purple bg-brand-purple/5 scale-98' : 'border-gray-200 hover:border-brand-purple bg-gray-50/50 hover:bg-white'
+                              }`}
+                            >
+                              <input
+                                type="file"
+                                id="syllabus-csv-file-selector"
+                                accept=".csv"
+                                onChange={handleSyllabusCsvFileSelection}
+                                className="hidden"
+                              />
+                              <Upload className="w-5 h-5 text-brand-purple/60 mb-2" />
+                              <span className="text-[10.5px] font-sans font-black text-brand-dark text-center truncate max-w-full">
+                                {syllabusCsvFileName ? `✓ Selected: ${syllabusCsvFileName}` : "Drag CSV file or Click here to Browse"}
+                              </span>
+                              <span className="text-[9px] text-brand-muted mt-1">Accepts standard lesson schema CSV file</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Parsed Output Details */}
+                        {syllabusCsvFile && (
+                          <div className="bg-white border border-brand-purple/20 rounded-xl p-4 space-y-3.5 animate-fade-in text-brand-dark text-left">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                              <div>
+                                <h6 className="text-[10.5px] font-sans font-black uppercase text-brand-dark flex items-center gap-1">
+                                  <CheckCircle className="w-4 h-4 text-brand-green" />
+                                  PARSED LESSONS PREVIEW • အရေအတွက် စစ်ဆေးရန်
+                                </h6>
+                                <p className="text-[9px] text-brand-muted font-medium">
+                                  Check parsed row values below. If IDs match an existing lesson, its english/myanmar values will be updated while preserving all vocab/quizzes inside.
+                                </p>
+                              </div>
+                              <div className="text-[10px] font-mono font-black text-brand-purple bg-brand-purple/5 px-2.5 py-1 rounded-full shrink-0">
+                                {syllabusCsvParsedData.length} Lessons Found
+                              </div>
+                            </div>
+
+                            {/* Syllabus errors list */}
+                            {syllabusCsvErrors.length > 0 && (
+                              <div className="bg-red-50 border border-red-150 p-3 rounded-lg text-[10px] space-y-1 max-h-[120px] overflow-y-auto font-sans text-red-700">
+                                <span className="font-extrabold flex items-center gap-1">⚠ Parsing Errors Detected:</span>
+                                <ul className="list-disc pl-4 space-y-0.5 font-medium">
+                                  {syllabusCsvErrors.map((err, idx) => (
+                                    <li key={idx}>{err}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Table of read results */}
+                            <div className="max-h-[180px] overflow-y-auto border border-gray-200 rounded-lg overflow-x-auto">
+                              <table className="w-full text-[10px] text-left border-collapse font-sans font-semibold">
+                                <thead className="bg-gray-50 text-brand-muted font-black border-b border-gray-200">
+                                  <tr>
+                                    <th className="p-2 border-r border-gray-200 w-12 text-center">ID</th>
+                                    <th className="p-2 border-r border-gray-200">ENGLISH TITLE</th>
+                                    <th className="p-2 border-r border-gray-200">MYANMAR TITLE</th>
+                                    <th className="p-2">THAI / PHONETIC</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 bg-white">
+                                  {syllabusCsvParsedData.map((row, idx) => (
+                                    <tr key={idx} className="hover:bg-brand-purple/5 transition-colors">
+                                      <td className="p-2 border-r border-gray-200 font-mono font-extrabold text-brand-purple text-center">{row.id}</td>
+                                      <td className="p-2 border-r border-gray-200 font-bold text-brand-dark">{row.titleEnglish}</td>
+                                      <td className="p-2 border-r border-gray-200 text-brand-dark">{row.titleMyanmar}</td>
+                                      <td className="p-2 text-brand-muted font-mono">{row.titleThai} ({row.titlePhonetic})</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={submitSyllabusCsvImport}
+                                className="flex-1 bg-brand-purple hover:bg-brand-purple/95 text-white font-sans font-black text-xs py-2.5 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 uppercase cursor-pointer"
+                              >
+                                <CheckSquare className="w-4 h-4" />
+                                CONFIRM SYLLABUS IMPORT • တင်သွင်းမှု လျှောက်ထားမည်
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSyllabusCsvFile(null);
+                                  setSyllabusCsvParsedData([]);
+                                  setSyllabusCsvErrors([]);
+                                  setSyllabusCsvFileName('');
+                                }}
+                                className="px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-brand-dark rounded-xl font-sans font-extrabold text-xs transition-colors cursor-pointer"
+                              >
+                                Clear File
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -4442,30 +5664,33 @@ export default function App() {
                               {activeLessonExamples.map((ex, exIdx) => (
                                 <div key={exIdx} className="duo-card p-4.5 bg-brand-purple-light/10 border-brand-purple/10 flex flex-col justify-between">
                                   <div>
-                                    <div className="flex justify-between items-center mb-1">
+                                    <div className="flex justify-between items-center gap-4 mb-1">
                                       <span className="font-sans font-black text-brand-dark text-[15px]">{ex.thai}</span>
-                                      <button
-                                        onClick={() => speakText(ex.thai)}
-                                        className="px-2 h-7 rounded-xl bg-white border-2 border-b-4 border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-1 font-bold transition-all active:translate-y-0.5 shadow-xs"
-                                        title={`Listen (${audioSpeedIndex === 0 ? "Normal" : audioSpeedIndex === 1 ? "Slow 0.7x" : "Slower 0.5x"})`}
-                                      >
-                                        {audioSpeedIndex === 0 ? (
-                                          <>
-                                            <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
-                                            <span className="text-[8px] font-sans font-black text-brand-purple bg-brand-purple-light px-1 py-0.5 rounded-md select-none leading-none">1.0x</span>
-                                          </>
-                                        ) : audioSpeedIndex === 1 ? (
-                                          <>
-                                            <Volume1 className="w-3.5 h-3.5 text-indigo-500" />
-                                            <span className="text-[8px] font-sans font-black text-indigo-500 bg-indigo-50 px-1 py-0.5 rounded-md select-none leading-none">0.7x</span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Volume className="w-3.5 h-3.5 text-orange-500" />
-                                            <span className="text-[8px] font-sans font-black text-orange-500 bg-orange-50 px-1 py-0.5 rounded-md select-none leading-none">0.5x</span>
-                                          </>
-                                        )}
-                                      </button>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <GrammarVocabDropdown sentence={ex.thai} allLessons={lessons} />
+                                        <button
+                                          onClick={() => speakText(ex.thai)}
+                                          className="px-2 h-7 rounded-xl bg-white border-2 border-b-4 border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-1 font-bold transition-all active:translate-y-0.5 shadow-xs"
+                                          title={`Listen (${audioSpeedIndex === 0 ? "Normal" : audioSpeedIndex === 1 ? "Slow 0.7x" : "Slower 0.5x"})`}
+                                        >
+                                          {audioSpeedIndex === 0 ? (
+                                            <>
+                                              <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
+                                              <span className="text-[8px] font-sans font-black text-brand-purple bg-brand-purple-light px-1 py-0.5 rounded-md select-none leading-none">1.0x</span>
+                                            </>
+                                          ) : audioSpeedIndex === 1 ? (
+                                            <>
+                                              <Volume1 className="w-3.5 h-3.5 text-indigo-500" />
+                                              <span className="text-[8px] font-sans font-black text-indigo-500 bg-indigo-50 px-1 py-0.5 rounded-md select-none leading-none">0.7x</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Volume className="w-3.5 h-3.5 text-orange-500" />
+                                              <span className="text-[8px] font-sans font-black text-orange-500 bg-orange-50 px-1 py-0.5 rounded-md select-none leading-none">0.5x</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="text-xs font-sans text-brand-green font-extrabold italic mt-0.5">{ex.phonetic}</div>
                                   </div>
@@ -4963,6 +6188,117 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Pinned Bottom Navigation Tab Bar */}
+      <div id="bottom-tab-bar" className="fixed bottom-0 left-0 right-0 sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[500px] sm:rounded-2xl sm:border sm:border-gray-150 sm:shadow-xl bg-white border-t border-gray-200 z-50 h-16 flex items-center justify-around px-3 select-none shadow-[0_-4px_16px_rgba(0,0,0,0.04)] pb-safe">
+        
+        {/* Learning Path */}
+        <button
+          onClick={() => handleTabClick('lessons')}
+          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+            isLessonsActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+          }`}
+          id="tab-btn-lessons"
+        >
+          <div className="relative">
+            <MapPin className={`w-5 h-5 transition-transform duration-200 ${isLessonsActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+            {isLessonsActive && (
+              <motion.span 
+                layoutId="activeTabIndicatorDot" 
+                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full" 
+                transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              />
+            )}
+          </div>
+          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Path</span>
+        </button>
+
+        {/* Notebook */}
+        <button
+          onClick={() => handleTabClick('notebook')}
+          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+            isNotebookActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+          }`}
+          id="tab-btn-notebook"
+        >
+          <div className="relative">
+            <FileText className={`w-5 h-5 transition-transform duration-200 ${isNotebookActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+            {isNotebookActive && (
+              <motion.span 
+                layoutId="activeTabIndicatorDot" 
+                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              />
+            )}
+          </div>
+          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Notebook</span>
+        </button>
+
+        {/* Courses */}
+        <button
+          onClick={() => handleTabClick('courses')}
+          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+            isCoursesActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+          }`}
+          id="tab-btn-courses"
+        >
+          <div className="relative">
+            <BookOpen className={`w-5 h-5 transition-transform duration-200 ${isCoursesActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+            {isCoursesActive && (
+              <motion.span 
+                layoutId="activeTabIndicatorDot" 
+                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              />
+            )}
+          </div>
+          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Courses</span>
+        </button>
+
+        {/* Profile */}
+        <button
+          onClick={() => handleTabClick('profile')}
+          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+            isProfileActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+          }`}
+          id="tab-btn-profile"
+        >
+          <div className="relative">
+            <User className={`w-5 h-5 transition-transform duration-200 ${isProfileActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+            {isProfileActive && (
+              <motion.span 
+                layoutId="activeTabIndicatorDot" 
+                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              />
+            )}
+          </div>
+          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Profile</span>
+        </button>
+
+        {/* Conditional Admin Hub */}
+        {isAdmin && (
+          <button
+            onClick={() => handleTabClick('admin')}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+              isAdminActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+            }`}
+            id="tab-btn-admin"
+          >
+            <div className="relative">
+              <Shield className={`w-5 h-5 transition-transform duration-200 ${isAdminActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+              {isAdminActive && (
+                <motion.span 
+                  layoutId="activeTabIndicatorDot" 
+                  className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                />
+              )}
+            </div>
+            <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Admin</span>
+          </button>
+        )}
+      </div>
 
     </div>
   );
