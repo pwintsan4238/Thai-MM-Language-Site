@@ -77,10 +77,22 @@ export interface PurchaseOrder {
   id: string;
   username: string;
   itemName: string;
-  itemType: 'e-book' | 'tutoring' | 'vip-package' | 'certificate';
+  itemType: 'e-book' | 'tutoring' | 'vip-package' | 'certificate' | 'course';
   priceAmount: number;
-  currency: 'MMK' | 'XP';
+  currency: 'MMK' | 'THB' | 'XP';
   status: 'pending' | 'completed' | 'cancelled';
   orderDate: string;
+}
+
+export interface Course {
+  id: string;
+  name: string;
+  nameMm: string;
+  priceAmount: number;
+  currency: 'MMK';
+  duration: string;
+  description: string;
+  descriptionMm: string;
+  instructor: string;
 }
 

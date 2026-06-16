@@ -10,6 +10,7 @@ import VocabularyView from './components/VocabularyView';
 import QuizView from './components/QuizView';
 import AlphabetGuide from './components/AlphabetGuide';
 import { GrammarVocabDropdown } from './components/GrammarVocabDropdown';
+import { CheckoutGateway } from './components/CheckoutGateway';
 import { 
   BookOpen, 
   Award, 
@@ -101,6 +102,45 @@ const STORE_ITEMS = [
   }
 ];
 
+export const PREMIUM_COURSES = [
+  {
+    id: "course-basic",
+    name: "Complete Thai Foundational Mastery Course",
+    nameMm: "ထိုင်းစကားပြောနှင့် စာရေးစာဖတ် အခြေခံအထူးတန်းသင်တန်း",
+    priceAmount: 35000,
+    currency: "MMK" as const,
+    duration: "6 Weeks (Self-paced Interactive Training)",
+    description: "Perfect for complete beginners. Cover Thai phonetic consonants, low/mid/high class letters, compound vowels, and tone rules with native audio worksheets and direct conversational practices.",
+    descriptionMm: "ထိုင်းအက္ခရာ လုံးချင်းအသံထွက်များ၊ သရတွဲများနှင့် အသံနိမ့်မြင့်သင်္ကေတစည်းမျဉ်းများကို တစ်သက်တာ ဗီဒီယို သင်ခန်းစာများ စနစ်တကျ သင်ယူလေ့လာနိုင်မည့် အခြေခံအထူးတန်း။",
+    instructor: "Kru Jane (Experienced Native Tutor)",
+    includes: ["20 HD Video Lessons", "Downloadable Exercise Workbook", "Private QA Forum Access"]
+  },
+  {
+    id: "course-business",
+    name: "Advanced Business Thai Speaking & Letters Course",
+    nameMm: "အလုပ်အကိုင်နှင့် စီးပွားရေးသုံး အဆင့်မြင့် ထိုင်းစကားပြောသင်တန်း",
+    priceAmount: 65000,
+    currency: "MMK" as const,
+    duration: "8 Weeks (Structured Learning Tracks)",
+    description: "Best for career professionals, translators, and cross-border business seekers. Master professional business email drafts, complex negotiation terms, formal speech patterns, and custom terminology.",
+    descriptionMm: "စီးပွားရေးညှိနှိုင်းမှုများ၊ ရုံးသုံးစာပေးစာယူများ၊ အင်တာဗျူးပုံစံများနှင့် လုပ်ငန်းခွင်သုံး စကားပြောအဆင့်မြင့်စကားလုံးများကို ကျွမ်းကျင်စွာ ပြောဆိုရေးသားနိုင်ရန် အထူးသင်ရိုး။",
+    instructor: "Kru Jane & Sayar Thura",
+    includes: ["35 Advanced Masterclass Videos", "Professional Letter Templates", "Certificate of Completion"]
+  },
+  {
+    id: "course-consonants-quick",
+    name: "Intensive Thai Consonants & Tones Quick-Crash Course",
+    nameMm: "ထိုင်းဗျည်း ၄၄ လုံးနှင့် အသံတန်ဖိုး အမြန်လေ့လာရေးသင်တန်း",
+    priceAmount: 15000,
+    currency: "MMK" as const,
+    duration: "2 Weeks (High-Intensity Crash Practice)",
+    description: "An intensive training track designed exclusively to master the 44 consonants, 32 vowels, and their complex tone combinations within days using active audio visual memory techniques.",
+    descriptionMm: "ဉာဏ်ရည်မြှင့်နည်းစနစ်များ သုံးစွဲ၍ အသံထွက် အခက်အခဲအရှိဆုံး ထိုင်းဗျည်းစု၊ သရစုများနှင့် အသံဖလှယ်နည်းစနစ်များကို အချိန်တိုအတွင်း ပိုင်နိုင်စေမည့် အမြန်လေ့လာရေးတန်း။",
+    instructor: "Sayar Thura (Senior Thai Linguist)",
+    includes: ["10 Interactive Sprint Videos", "Consonant Tone Memory Map", "Consonants Audio Quizzes"]
+  }
+];
+
 const INITIAL_PROGRESS: ProgressState = {
   completedLessons: [],
   masteredWords: [],
@@ -161,6 +201,18 @@ export default function App() {
   const [checkoutPhone, setCheckoutPhone] = useState<string>('');
   const [checkoutName, setCheckoutName] = useState<string>('');
   const [checkoutNetwork, setCheckoutNetwork] = useState<string>('KBZPay');
+
+  // Interactive Course Store and 2C2P Payment Gateway Simulation states
+  const [isCourseStoreExpanded, setIsCourseStoreExpanded] = useState<boolean>(false);
+  const [isGatewayOpen, setIsGatewayOpen] = useState<boolean>(false);
+  const [gatewayCourse, setGatewayCourse] = useState<any | null>(null);
+  const [gatewayPaymentMethod, setGatewayPaymentMethod] = useState<'kbzpay' | 'cbpay' | 'truemoney' | 'promptpay'>('kbzpay');
+  const [gatewayPhone, setGatewayPhone] = useState<string>('');
+  const [gatewayStep, setGatewayStep] = useState<number>(1); // 1 = input contact/order, 2 = select method & complete gateway step, 3 = dynamic qr/otp confirmation, 4 = complete success
+  const [gatewayProcessing, setGatewayProcessing] = useState<boolean>(false);
+  const [gatewayOtp, setGatewayOtp] = useState<string>('');
+  const [gatewayTimer, setGatewayTimer] = useState<number>(180); // 3 minutes Countdown timer for dynamic QR codes
+  const [gatewayEmail, setGatewayEmail] = useState<string>('');
 
   // Drag and drop states for admin sorting
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
@@ -249,6 +301,16 @@ export default function App() {
   };
 
   useEffect(() => {
+    let interval: any;
+    if (isGatewayOpen && gatewayStep === 3 && gatewayTimer > 0) {
+      interval = setInterval(() => {
+        setGatewayTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isGatewayOpen, gatewayStep, gatewayTimer]);
+
+  useEffect(() => {
     localStorage.setItem('thai_lessons_curriculum', JSON.stringify(lessons));
   }, [lessons]);
 
@@ -295,6 +357,7 @@ export default function App() {
   const [authUsername, setAuthUsername] = useState<string>('');
   const [authPassword, setAuthPassword] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
+  const [isAuthModalCoursePurchaseExpanded, setIsAuthModalCoursePurchaseExpanded] = useState<boolean>(false);
 
   // Custom Words Notebook state variables
   const [customWords, setCustomWords] = useState<(WordBreakdown & { author?: string })[]>(() => {
@@ -2910,6 +2973,146 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* 1.5. PREMIUM LANGUAGE COURSES ACQUISITION HUB */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-brand-purple/15 shadow-sm space-y-5 text-left relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-2 h-full bg-brand-purple"></div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-3">
+                    <div>
+                      <h4 className="font-sans font-black text-brand-dark text-xs uppercase tracking-wider flex items-center gap-1.5 text-brand-purple">
+                        <Award className="w-4 h-4 shrink-0" />
+                        🎓 Premium Thai-Myanmar Language Courses • အွန်လိုင်းတန်းခွဲများ
+                      </h4>
+                      <p className="text-[10px] font-sans font-semibold text-brand-muted mt-1 leading-relaxed">
+                        Improve your fluency quickly! Purchase lifetime-access structured courses with Kru Jane. Secure payments processed instantly.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCourseStoreExpanded(!isCourseStoreExpanded)}
+                      className="px-3.5 py-1.5 border-2 border-brand-purple/30 bg-[#fbfaff] hover:bg-brand-purple/10 text-brand-purple rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                    >
+                      {isCourseStoreExpanded ? "HIDE CHANNELS • ဖျောက်ထားရန်" : "VIEW COURSE SILLYABUS • သင်တန်းများကြည့်ရန်"}
+                    </button>
+                  </div>
+
+                  {isCourseStoreExpanded && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-1 animate-fade-in">
+                      {PREMIUM_COURSES.map((course) => {
+                        const calculatedThb = Math.round(course.priceAmount / 70); // Simulated approximate THB rate
+                        return (
+                          <div 
+                            key={course.id} 
+                            className="bg-gray-50/50 hover:bg-white hover:shadow-md transition-all duration-300 p-5 rounded-2xl border border-gray-200/90 flex flex-col justify-between space-y-5 relative group"
+                          >
+                            <div className="space-y-3">
+                              {/* Header Card Badges */}
+                              <div className="flex items-center justify-between">
+                                <span className="px-2.5 py-0.5 rounded-md text-[8.5px] font-black uppercase bg-brand-purple/10 text-brand-purple">
+                                  {course.duration}
+                                </span>
+                                <span className="text-[10.5px] font-mono font-black text-brand-muted">
+                                  ID: {course.id.toUpperCase()}
+                                </span>
+                              </div>
+
+                              <div className="space-y-1">
+                                <h5 className="font-sans font-black text-brand-dark text-[14px] leading-tight group-hover:text-brand-purple transition-colors">
+                                  {course.name}
+                                </h5>
+                                <h6 className="font-sans font-extrabold text-[12px] text-brand-purple leading-tight">
+                                  {course.nameMm}
+                                </h6>
+                              </div>
+
+                              <div className="border-t border-gray-150 pt-2.5 text-[9.5px] text-brand-muted font-semibold space-y-1">
+                                <div><span className="text-brand-dark font-extrabold">Instructor:</span> {course.instructor}</div>
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="text-[10.5px] text-brand-muted leading-relaxed">
+                                  {course.description}
+                                </p>
+                                <p className="text-[10.5px] italic text-brand-dark/85 leading-relaxed font-semibold">
+                                  {course.descriptionMm}
+                                </p>
+                              </div>
+
+                              {/* Included bullet items */}
+                              <div className="space-y-1.5 pt-1.5 border-t border-dashed border-gray-200">
+                                <span className="text-[8.5px] font-black text-brand-dark uppercase tracking-wider block">Course Resources Included:</span>
+                                <div className="space-y-1">
+                                  {course.includes.map((inc, i) => (
+                                    <div key={i} className="flex items-center gap-1.5 text-[10px] text-brand-dark font-semibold">
+                                      <Check className="w-3 h-3 text-brand-green bg-brand-green/10 rounded-full p-0.5 shrink-0" />
+                                      <span>{inc}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Price and CTA */}
+                            <div className="border-t border-gray-150 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="text-left">
+                                <span className="text-[8px] font-mono text-brand-muted block uppercase font-extrabold leading-none mb-1">Tuition Fee</span>
+                                <div className="space-y-0.5">
+                                  <span className="text-sm sm:text-base font-black text-brand-purple font-mono block leading-none">
+                                    {course.priceAmount.toLocaleString()} MMK
+                                  </span>
+                                  <span className="text-[10px] text-brand-muted font-mono font-bold block">
+                                    ~ {calculatedThb.toLocaleString()} THB (PromptPay)
+                                  </span>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!isLoggedIn) {
+                                    alert("Oops! You must be registered and logged in as a student to purchase dynamic courses.");
+                                    setAuthTab('student-signup');
+                                    setShowAuthModal(true);
+                                    return;
+                                  }
+                                  // Initialize simulated 2C2P checkout terminal state
+                                  setGatewayCourse(course);
+                                  setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                  setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                  setGatewayStep(1);
+                                  setGatewayPaymentMethod('kbzpay');
+                                  setGatewayOtp('');
+                                  setGatewayTimer(180);
+                                  setIsGatewayOpen(true);
+                                }}
+                                className="px-4 py-2 bg-gradient-to-r from-brand-purple to-brand-purple/90 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform hover:-translate-y-0.5 text-center flex items-center justify-center gap-1"
+                              >
+                                🎓 Enroll • ဝယ်ယူမည်
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!isCourseStoreExpanded && (
+                    <div className="bg-brand-purple/[0.02] p-4 rounded-xl border border-dashed border-brand-purple/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="text-left space-y-1">
+                        <span className="px-2 py-0.5 rounded text-[8.5px] font-black uppercase bg-brand-purple text-white">PROMOTION VALUE</span>
+                        <h6 className="text-[12px] font-sans font-black text-brand-dark">Special Interactive Structured Course Modules with Kru Jane</h6>
+                        <p className="text-[10px] font-sans font-medium text-brand-muted leading-tight">Complete grammar lessons, native tone guidelines and digital worksheets with dynamic 1-click gateway checkouts.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsCourseStoreExpanded(true)}
+                        className="px-4 py-2 bg-brand-purple text-white border-b-4 border-brand-purple-shadow rounded-xl text-[10px] font-black uppercase tracking-wider hover:brightness-105 cursor-pointer transform transition-transform"
+                      >
+                        Enroll Course Now • သင်တန်းအပ်ရန်
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. PREMIUM RESOURCE STUDY STORE (WHERE USERS PURCHASE ORDERS) */}
@@ -5703,91 +5906,17 @@ export default function App() {
                             </div>
                           </div>
                         )}
-
-                        {/* Under-The-Grammar Navigation Jumper Bar */}
-                        <div className="mt-6 pt-3 border-t border-gray-100 flex items-center justify-center gap-3 bg-[#fdfcff] -mx-6 -mb-6 p-4 rounded-b-2xl">
-                          {currentGrammarPageIndex < activeLesson.grammarNotes.length - 1 ? (
-                            <button
-                              onClick={() => setCurrentGrammarPageIndex(currentGrammarPageIndex + 1)}
-                              className="text-brand-purple font-sans font-black text-xs flex items-center gap-1 hover:underline active:translate-y-0.5 transition-transform"
-                            >
-                              Next
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setActiveTab('quiz')}
-                              className="text-[#13a10e] font-sans font-black text-xs flex items-center gap-1 hover:underline active:translate-y-0.5 transition-transform"
-                            >
-                              Next
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
                       </motion.div>
                     );
-                  })() : (
-                    <div className="text-center font-sans text-brand-muted font-black py-12">
-                      No grammar notes found.
-                    </div>
-                  )}
-
-                  {/* Navigation Actions */}
-                  <div className="flex items-center justify-between gap-4 mt-6">
-                    <button
-                      onClick={() => setCurrentGrammarPageIndex((prev) => Math.max(0, prev - 1))}
-                      disabled={currentGrammarPageIndex === 0}
-                      className="duo-btn duo-btn-white text-xs px-5 py-3 font-black disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
-                    >
-                      <ChevronLeft className="w-4 h-4 shrink-0" />
-                      PREV NOTE • ရှေ့သို့
-                    </button>
-
-                    <div className="flex gap-1.5 items-center">
-                      {activeLesson.grammarNotes.map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setCurrentGrammarPageIndex(i)}
-                          className={`w-2.5 h-2.5 rounded-full transition-all border-2 ${
-                            i === currentGrammarPageIndex
-                              ? 'bg-brand-purple border-brand-purple scale-125'
-                              : 'bg-gray-200 border-transparent hover:bg-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        if (currentGrammarPageIndex < activeLesson.grammarNotes.length - 1) {
-                          setCurrentGrammarPageIndex((prev) => prev + 1);
-                        } else {
-                          setActiveTab('quiz');
-                        }
-                      }}
-                      className="duo-btn duo-btn-purple text-xs px-5 py-3 font-black flex items-center gap-1.5"
-                    >
-                      {currentGrammarPageIndex < activeLesson.grammarNotes.length - 1 ? (
-                        <>
-                          NEXT NOTE • နောက်သို့
-                          <ChevronRight className="w-4 h-4 shrink-0" />
-                        </>
-                      ) : (
-                        <>
-                          TAKE QUIZ • စစ်ဆေးမည်
-                          <Award className="w-4 h-4 shrink-0" />
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  })() : null}
                 </div>
               )}
 
               {activeTab === 'quiz' && activeLesson && (
                 <QuizView
-                  questions={activeLesson.quiz}
+                  questions={activeLesson.quiz || []}
                   lessonId={activeLesson.id}
-                  dialogue={activeLesson.dialogue}
+                  dialogue={activeLesson.dialogue || []}
                   onWordMastered={handleToggleMasteredWord}
                   masteredWords={progress.masteredWords}
                   onQuizFinished={(score, xp) => handleQuizFinished(activeLesson.id, score, xp)}
@@ -5796,165 +5925,40 @@ export default function App() {
                 />
               )}
             </div>
-
-            {/* Unified Bottom Lesson Control Deck */}
-            <div className="mt-6 pt-4 border-t border-gray-100 space-y-4 animate-fade-in" id="bottom-lesson-ctrl-deck">
-              
-              {/* Part 1: Page-to-Page Navigation for active lesson */}
-              <div className="bg-white rounded-xl border border-gray-150 p-3 flex items-center justify-between gap-4">
-                {/* Back Button */}
-                <button
-                  onClick={() => {
-                    if (activeTab === 'quiz') {
-                      setActiveTab('grammar');
-                    } else if (activeTab === 'grammar') {
-                      setActiveTab('sentence');
-                    } else if (activeTab === 'sentence') {
-                      setActiveTab('vocabulary');
-                    } else if (activeTab === 'vocabulary') {
-                      if (prevLesson) {
-                        setActiveLessonId(prevLesson.id);
-                        setActiveTab('quiz');
-                      } else {
-                        setActiveLessonId(null);
-                      }
-                    }
-                  }}
-                  className="duo-btn duo-btn-white text-xs px-4 py-2 font-black flex items-center justify-center gap-1.5 min-w-[120px] transition-all cursor-pointer"
-                  id="nav-btn-back"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
-                  {activeTab === 'vocabulary' ? (
-                    prevLesson ? `LESSON ${prevLesson.id}` : 'DASHBOARD'
-                  ) : (
-                    'BACK • ရှေ့သို့'
-                  )}
-                </button>
-
-                {/* Compact Current Page Indicator */}
-                <span className="text-[10px] font-sans text-brand-purple bg-brand-purple-light px-3 py-1 rounded-full font-black select-none uppercase tracking-wider">
-                  Page {activeTab === 'vocabulary' ? '1' : activeTab === 'sentence' ? '2' : activeTab === 'grammar' ? '3' : '4'} of 4
-                </span>
-
-                {/* Next Button */}
-                <button
-                  onClick={() => {
-                    if (activeTab === 'vocabulary') {
-                      setActiveTab('sentence');
-                    } else if (activeTab === 'sentence') {
-                      setActiveTab('grammar');
-                      setCurrentGrammarPageIndex(0);
-                    } else if (activeTab === 'grammar') {
-                      setActiveTab('quiz');
-                    } else if (activeTab === 'quiz') {
-                      if (nextLesson) {
-                        setActiveLessonId(nextLesson.id);
-                        setActiveTab('vocabulary');
-                      } else {
-                        setActiveLessonId(null);
-                      }
-                    }
-                  }}
-                  className="duo-btn duo-btn-purple text-xs px-4 py-2 font-black flex items-center justify-center gap-1.5 min-w-[120px] transition-all cursor-pointer"
-                  id="nav-btn-next"
-                >
-                  {activeTab === 'quiz' ? (
-                    nextLesson ? (
-                      <>
-                        LESSON {nextLesson.id}
-                        <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-                      </>
-                    ) : (
-                      <>
-                        FINISH • ပြီးဆုံးပါပြီ
-                        <Check className="w-3.5 h-3.5 shrink-0" />
-                      </>
-                    )
-                  ) : (
-                    <>
-                      NEXT • နောက်သို့
-                      <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Part 2: Lesson Switcher / All Lessons Pagination */}
-              <div className="bg-gray-50/50 rounded-xl border border-gray-150 p-3" id="lessons-nav-pager">
-                <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-gray-100">
-                  <span className="text-[10px] font-sans text-brand-dark font-black uppercase tracking-wider">
-                    Hop to Lesson • သင်ခန်းစာများ
-                  </span>
-                  <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light/50 px-2 py-0.5 rounded-full font-black select-none">
-                    LESSON {activeLesson.id} OF {lessons.length}
-                  </span>
-                </div>
-
-                {/* Grid of All available Lesson Numbers */}
-                <div className="flex flex-wrap gap-1.5 justify-center">
-                  {lessons.map((lesson) => {
-                    const isLessonActive = lesson.id === activeLesson.id;
-                    const isCompleted = (progress.quizHighScores[lesson.id] || 0) >= 80;
-                    return (
-                      <button
-                        key={lesson.id}
-                        id={`lesson-nav-btn-${lesson.id}`}
-                        onClick={() => {
-                          setActiveLessonId(lesson.id);
-                          setActiveTab('vocabulary');
-                        }}
-                        className={`w-7 h-7 rounded-lg text-[10px] font-sans font-black transition-all border flex items-center justify-center cursor-pointer relative ${
-                          isLessonActive
-                            ? 'bg-brand-purple text-white border-brand-purple border-b-2 border-brand-purple-shadow scale-105 z-10'
-                            : isCompleted
-                            ? 'bg-brand-green-light border-brand-green/25 text-brand-green hover:bg-brand-green-light/80'
-                            : 'bg-white border-gray-200 text-brand-dark hover:bg-gray-50 border-b-2'
-                        }`}
-                        title={lesson.titleEnglish}
-                      >
-                        {lesson.id}
-                        {isCompleted && !isLessonActive && (
-                          <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-
           </div>
         )}
 
-      </main>
+        {isGatewayOpen && (
+          <CheckoutGateway
+            isGatewayOpen={isGatewayOpen}
+            setIsGatewayOpen={setIsGatewayOpen}
+            gatewayCourse={gatewayCourse}
+            checkoutName={checkoutName}
+            setCheckoutName={setCheckoutName}
+            gatewayEmail={gatewayEmail}
+            setGatewayEmail={setGatewayEmail}
+            gatewayPhone={gatewayPhone}
+            setGatewayPhone={setGatewayPhone}
+            gatewayStep={gatewayStep}
+            setGatewayStep={setGatewayStep}
+            gatewayPaymentMethod={gatewayPaymentMethod}
+            setGatewayPaymentMethod={setGatewayPaymentMethod}
+            gatewayOtp={gatewayOtp}
+            setGatewayOtp={setGatewayOtp}
+            gatewayTimer={gatewayTimer}
+            setGatewayTimer={setGatewayTimer}
+            gatewayProcessing={gatewayProcessing}
+            setGatewayProcessing={setGatewayProcessing}
+            currentUser={currentUser}
+            setCurrentUser={setCurrentUser}
+            setIsLoggedIn={setIsLoggedIn}
+            addSystemLog={addSystemLog}
+            setOrders={setOrders}
+            setIsCourseStoreExpanded={setIsCourseStoreExpanded}
+          />
+        )}
 
-      {/* Dynamic Admin System Broadcast Marquee Banner (Low Priority Footer Banner) */}
-      {showBroadcastBanner && activeBroadcast && (
-        <div className="max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 mt-6">
-          <div className="bg-gradient-to-r from-brand-purple/90 to-brand-purple-shadow/90 text-white py-2.5 px-4 rounded-2xl shadow-xs text-[11px] sm:text-xs font-sans font-bold flex items-center justify-between gap-4 transition-all">
-            <div className="flex items-center gap-2 min-w-0">
-              <Sparkles className="w-4 h-4 animate-bounce shrink-0 text-amber-300" />
-              <p className="truncate leading-none uppercase tracking-wide">{activeBroadcast}</p>
-            </div>
-            <button 
-              onClick={() => setShowBroadcastBanner(false)}
-              className="text-white/70 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors shrink-0 cursor-pointer"
-              title="Dismiss Announcement"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Footer credits */}
-      <footer className="border-t border-gray-100 bg-white mt-16 py-8 text-center text-[11px] text-brand-muted font-sans font-semibold leading-relaxed">
-        <p className="font-sans uppercase tracking-widest text-[9px]">Thai-Myanmar Vocabulary & Grammar Builder</p>
-      </footer>
-
-      {/* Elegantly Polished Authentication Modal (Floating Card overlay) */}
-      <AnimatePresence>
         {showAuthModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] overflow-y-auto">
             <motion.div 
@@ -6172,6 +6176,76 @@ export default function App() {
                 </form>
               )}
 
+              {/* DIRECT COURSE PURCHASE EXPANSION ZONE */}
+              <div className="mt-4 pt-4 border-t border-gray-100/80">
+                {!isAuthModalCoursePurchaseExpanded ? (
+                  <button
+                    onClick={() => setIsAuthModalCoursePurchaseExpanded(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-tr from-orange-500 via-amber-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 font-sans font-black text-xs text-white uppercase tracking-wider rounded-2xl shadow-sm transition-all transform active:translate-y-0.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 animate-pulse shrink-0 text-white" />
+                    ⚡ Direct Enrollment / Buy Course
+                  </button>
+                ) : (
+                  <div className="space-y-3 animate-fade-in text-left">
+                    <div className="flex justify-between items-start bg-amber-50 border border-amber-200 p-2.5 rounded-xl gap-2">
+                      <div>
+                        <span className="text-[10px] text-amber-800 font-sans font-black uppercase tracking-tight block">Direct Buy Gateway (2C2P)</span>
+                        <p className="text-[9.5px] text-amber-700 font-sans font-semibold leading-tight mt-0.5">
+                          Purchase any premium course & get an auto-provisioned student account instantly!
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsAuthModalCoursePurchaseExpanded(false)}
+                        className="text-[9.5px] font-sans font-black text-slate-500 hover:text-slate-800 underline uppercase shrink-0"
+                      >
+                        Hide
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1">
+                      {PREMIUM_COURSES.map((course) => (
+                        <div
+                          key={course.id}
+                          className="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 hover:border-brand-purple/25 transition-all text-left flex flex-col justify-between gap-2"
+                        >
+                          <div>
+                            <h4 className="text-[10px] sm:text-[11px] font-sans font-black text-brand-dark leading-snug">{course.name}</h4>
+                            <p className="text-[9px] sm:text-[9.5px] italic text-[#583092] mt-0.5 font-bold leading-normal">{course.nameMm}</p>
+                            <div className="flex items-center gap-1.5 mt-1 text-[8.5px] text-brand-muted font-bold">
+                              <span>⏱️ {course.duration}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between gap-2 mt-1 border-t border-gray-100 pt-2">
+                            <span className="text-[11px] font-mono font-black text-brand-purple">
+                              {course.priceAmount.toLocaleString()} MMK
+                            </span>
+                            <button
+                              onClick={() => {
+                                // Close auth modal and open 2C2P secure checkout modal
+                                setShowAuthModal(false);
+                                setGatewayCourse(course);
+                                setGatewayPhone("09-");
+                                setGatewayEmail("student@classroom.edu");
+                                setGatewayStep(1);
+                                setGatewayPaymentMethod('kbzpay');
+                                setGatewayOtp('');
+                                setGatewayTimer(180);
+                                setIsGatewayOpen(true);
+                              }}
+                              className="px-3 py-1.5 bg-brand-purple text-white text-[9.5px] font-sans font-black uppercase tracking-wider rounded-lg border-b-2 border-brand-purple-shadow hover:bg-brand-purple/90 transition-all cursor-pointer flex items-center gap-0.5"
+                            >
+                              ⚡ BUY • ဝယ်မည်
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
                 <button 
                   onClick={handleDismissPromo}
@@ -6187,7 +6261,7 @@ export default function App() {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </main>
 
       {/* Pinned Bottom Navigation Tab Bar */}
       <div id="bottom-tab-bar" className="fixed bottom-0 left-0 right-0 sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[500px] sm:rounded-2xl sm:border sm:border-gray-150 sm:shadow-xl bg-white border-t border-gray-200 z-50 h-16 flex items-center justify-around px-3 select-none shadow-[0_-4px_16px_rgba(0,0,0,0.04)] pb-safe">
