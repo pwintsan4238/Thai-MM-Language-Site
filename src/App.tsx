@@ -202,11 +202,11 @@ export default function App() {
   const [checkoutName, setCheckoutName] = useState<string>('');
   const [checkoutNetwork, setCheckoutNetwork] = useState<string>('KBZPay');
 
-  // Interactive Course Store and 2C2P Payment Gateway Simulation states
+  // Interactive Course Store and Secure Payment Gateway Simulation states
   const [isCourseStoreExpanded, setIsCourseStoreExpanded] = useState<boolean>(false);
   const [isGatewayOpen, setIsGatewayOpen] = useState<boolean>(false);
   const [gatewayCourse, setGatewayCourse] = useState<any | null>(null);
-  const [gatewayPaymentMethod, setGatewayPaymentMethod] = useState<'kbzpay' | 'cbpay' | 'truemoney' | 'promptpay'>('kbzpay');
+  const [gatewayPaymentMethod, setGatewayPaymentMethod] = useState<'kbzpay' | 'wavepay' | 'cbpay' | 'truemoney' | 'promptpay'>('kbzpay');
   const [gatewayPhone, setGatewayPhone] = useState<string>('');
   const [gatewayStep, setGatewayStep] = useState<number>(1); // 1 = input contact/order, 2 = select method & complete gateway step, 3 = dynamic qr/otp confirmation, 4 = complete success
   const [gatewayProcessing, setGatewayProcessing] = useState<boolean>(false);
@@ -3070,13 +3070,9 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (!isLoggedIn) {
-                                    alert("Oops! You must be registered and logged in as a student to purchase dynamic courses.");
-                                    setAuthTab('student-signup');
-                                    setShowAuthModal(true);
-                                    return;
-                                  }
-                                  // Initialize simulated 2C2P checkout terminal state
+                                  // Parse current student name if logged in
+                                  setCheckoutName(currentUser || '');
+                                  // Initialize simulated secure checkout terminal state
                                   setGatewayCourse(course);
                                   setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
                                   setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
@@ -6190,7 +6186,7 @@ export default function App() {
                   <div className="space-y-3 animate-fade-in text-left">
                     <div className="flex justify-between items-start bg-amber-50 border border-amber-200 p-2.5 rounded-xl gap-2">
                       <div>
-                        <span className="text-[10px] text-amber-800 font-sans font-black uppercase tracking-tight block">Direct Buy Gateway (2C2P)</span>
+                        <span className="text-[10px] text-amber-800 font-sans font-black uppercase tracking-tight block">⚡ Premium Course Enrollment</span>
                         <p className="text-[9.5px] text-amber-700 font-sans font-semibold leading-tight mt-0.5">
                           Purchase any premium course & get an auto-provisioned student account instantly!
                         </p>
@@ -6223,8 +6219,9 @@ export default function App() {
                             </span>
                             <button
                               onClick={() => {
-                                // Close auth modal and open 2C2P secure checkout modal
+                                // Close auth modal and open secure checkout modal
                                 setShowAuthModal(false);
+                                setCheckoutName('');
                                 setGatewayCourse(course);
                                 setGatewayPhone("09-");
                                 setGatewayEmail("student@classroom.edu");
@@ -6265,112 +6262,213 @@ export default function App() {
 
       {/* Pinned Bottom Navigation Tab Bar */}
       <div id="bottom-tab-bar" className="fixed bottom-0 left-0 right-0 sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[500px] sm:rounded-2xl sm:border sm:border-gray-150 sm:shadow-xl bg-white border-t border-gray-200 z-50 h-16 flex items-center justify-around px-3 select-none shadow-[0_-4px_16px_rgba(0,0,0,0.04)] pb-safe">
-        
-        {/* Learning Path */}
-        <button
-          onClick={() => handleTabClick('lessons')}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
-            isLessonsActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
-          }`}
-          id="tab-btn-lessons"
-        >
-          <div className="relative">
-            <MapPin className={`w-5 h-5 transition-transform duration-200 ${isLessonsActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
-            {isLessonsActive && (
-              <motion.span 
-                layoutId="activeTabIndicatorDot" 
-                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full" 
-                transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              />
-            )}
-          </div>
-          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Path</span>
-        </button>
+        {activeLessonId !== null ? (
+          <>
+            {/* Back Arrow / Exit */}
+            <button
+              onClick={() => setActiveLessonId(null)}
+              className="flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative text-brand-muted hover:text-brand-dark"
+              id="tab-btn-back"
+            >
+              <div className="relative">
+                <ChevronLeft className="w-5 h-5 transition-transform duration-200" />
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Exit</span>
+            </button>
 
-        {/* Notebook */}
-        <button
-          onClick={() => handleTabClick('notebook')}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
-            isNotebookActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
-          }`}
-          id="tab-btn-notebook"
-        >
-          <div className="relative">
-            <FileText className={`w-5 h-5 transition-transform duration-200 ${isNotebookActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
-            {isNotebookActive && (
-              <motion.span 
-                layoutId="activeTabIndicatorDot" 
-                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
-                transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              />
-            )}
-          </div>
-          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Notebook</span>
-        </button>
+            {/* Vocab Module */}
+            <button
+              onClick={() => setActiveTab('vocabulary')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                activeTab === 'vocabulary' ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-vocab"
+            >
+              <div className="relative">
+                <Sparkles className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'vocabulary' ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {activeTab === 'vocabulary' && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full" 
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Vocab</span>
+            </button>
 
-        {/* Courses */}
-        <button
-          onClick={() => handleTabClick('courses')}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
-            isCoursesActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
-          }`}
-          id="tab-btn-courses"
-        >
-          <div className="relative">
-            <BookOpen className={`w-5 h-5 transition-transform duration-200 ${isCoursesActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
-            {isCoursesActive && (
-              <motion.span 
-                layoutId="activeTabIndicatorDot" 
-                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
-                transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              />
-            )}
-          </div>
-          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Courses</span>
-        </button>
+            {/* Sentence Module */}
+            <button
+              onClick={() => setActiveTab('sentence')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                activeTab === 'sentence' ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-sentence"
+            >
+              <div className="relative">
+                <BookOpen className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'sentence' ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {activeTab === 'sentence' && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full" 
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Sentence</span>
+            </button>
 
-        {/* Profile */}
-        <button
-          onClick={() => handleTabClick('profile')}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
-            isProfileActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
-          }`}
-          id="tab-btn-profile"
-        >
-          <div className="relative">
-            <User className={`w-5 h-5 transition-transform duration-200 ${isProfileActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
-            {isProfileActive && (
-              <motion.span 
-                layoutId="activeTabIndicatorDot" 
-                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
-                transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              />
-            )}
-          </div>
-          <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Profile</span>
-        </button>
+            {/* Grammar Module */}
+            <button
+              onClick={() => setActiveTab('grammar')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                activeTab === 'grammar' ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-grammar"
+            >
+              <div className="relative">
+                <FileText className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'grammar' ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {activeTab === 'grammar' && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full" 
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Grammar</span>
+            </button>
 
-        {/* Conditional Admin Hub */}
-        {isAdmin && (
-          <button
-            onClick={() => handleTabClick('admin')}
-            className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
-              isAdminActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
-            }`}
-            id="tab-btn-admin"
-          >
-            <div className="relative">
-              <Shield className={`w-5 h-5 transition-transform duration-200 ${isAdminActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
-              {isAdminActive && (
-                <motion.span 
-                  layoutId="activeTabIndicatorDot" 
-                  className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
-                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                />
-              )}
-            </div>
-            <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Admin</span>
-          </button>
+            {/* Quiz Module */}
+            <button
+              onClick={() => setActiveTab('quiz')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                activeTab === 'quiz' ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-quiz"
+            >
+              <div className="relative">
+                <Award className={`w-5 h-5 transition-transform duration-200 ${activeTab === 'quiz' ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {activeTab === 'quiz' && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full" 
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Quiz</span>
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Learning Path */}
+            <button
+              onClick={() => handleTabClick('lessons')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                isLessonsActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-lessons"
+            >
+              <div className="relative">
+                <MapPin className={`w-5 h-5 transition-transform duration-200 ${isLessonsActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {isLessonsActive && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full" 
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Path</span>
+            </button>
+
+            {/* Notebook */}
+            <button
+              onClick={() => handleTabClick('notebook')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                isNotebookActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-notebook"
+            >
+              <div className="relative">
+                <FileText className={`w-5 h-5 transition-transform duration-200 ${isNotebookActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {isNotebookActive && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Notebook</span>
+            </button>
+
+            {/* Courses */}
+            <button
+              onClick={() => handleTabClick('courses')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                isCoursesActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-courses"
+            >
+              <div className="relative">
+                <BookOpen className={`w-5 h-5 transition-transform duration-200 ${isCoursesActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {isCoursesActive && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Courses</span>
+            </button>
+
+            {/* Profile */}
+            <button
+              onClick={() => handleTabClick('profile')}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                isProfileActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+              }`}
+              id="tab-btn-profile"
+            >
+              <div className="relative">
+                <User className={`w-5 h-5 transition-transform duration-150 ${isProfileActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                {isProfileActive && (
+                  <motion.span 
+                    layoutId="activeTabIndicatorDot" 
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Profile</span>
+            </button>
+
+            {/* Conditional Admin Hub */}
+            {isAdmin && (
+              <button
+                onClick={() => handleTabClick('admin')}
+                className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all cursor-pointer relative ${
+                  isAdminActive ? 'text-brand-purple' : 'text-brand-muted hover:text-brand-dark'
+                }`}
+                id="tab-btn-admin"
+              >
+                <div className="relative">
+                  <Shield className={`w-5 h-5 transition-transform duration-200 ${isAdminActive ? 'scale-110 stroke-[2.5px]' : 'scale-100'}`} />
+                  {isAdminActive && (
+                    <motion.span 
+                      layoutId="activeTabIndicatorDot" 
+                      className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-brand-purple rounded-full"
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    />
+                  )}
+                </div>
+                <span className="text-[10px] font-sans font-black tracking-tight mt-1 leading-none uppercase">Admin</span>
+              </button>
+            )}
+          </>
         )}
       </div>
 
