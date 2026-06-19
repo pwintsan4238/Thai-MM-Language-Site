@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { lessonsData } from './data/lessonsData';
-import { grammarChapters } from './data/grammarChapters';
-import { orientationData } from './data/orientation';
+import { grammarChapters as initialGrammarChapters, GrammarChapter } from './data/grammarChapters';
+import { orientationData as initialOrientationData, OrientationArticle } from './data/orientation';
 import { pdfVocabulary } from './data/pdfVocabulary';
 import { ProgressState, Lesson, WordBreakdown, DialogueLine, GrammarNote, QuizQuestion, RegisteredUser, PurchaseOrder, Course, StoreItem } from './types';
 import ProgressCard from './components/ProgressCard';
@@ -265,6 +265,30 @@ export default function App() {
     return mappedInitialLessons;
   });
 
+  const [grammarChapters, setGrammarChapters] = useState<GrammarChapter[]>(() => {
+    const saved = localStorage.getItem('thai_grammar_chapters_curriculum_list');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing saved grammar chapters:", e);
+      }
+    }
+    return initialGrammarChapters;
+  });
+
+  const [orientationData, setOrientationData] = useState<OrientationArticle[]>(() => {
+    const saved = localStorage.getItem('thai_orientation_articles_list');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing saved orientation articles:", e);
+      }
+    }
+    return initialOrientationData;
+  });
+
   const [courses, setCourses] = useState<Course[]>(() => {
     const saved = localStorage.getItem('thai_courses_curriculum');
     if (saved) {
@@ -377,7 +401,255 @@ export default function App() {
 
   const [adminSelectedLessonId, setAdminSelectedLessonId] = useState<number | null>(null);
   const [adminEditTab, setAdminEditTab] = useState<'metadata' | 'vocabulary' | 'dialogue' | 'grammar' | 'quiz'>('metadata');
-  const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts' | 'courses' | 'store'>('orders');
+  const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts' | 'courses' | 'store' | 'orientation' | 'grammar'>('orders');
+
+  const [adminSelectedOrientId, setAdminSelectedOrientId] = useState<string>('better-thai');
+  const [adminSelectedGrammarChId, setAdminSelectedGrammarChId] = useState<number>(1);
+
+  const [orientEditArticle, setOrientEditArticle] = useState<OrientationArticle | null>(null);
+  const [grammarEditChapter, setGrammarEditChapter] = useState<GrammarChapter | null>(null);
+
+  useEffect(() => {
+    const article = orientationData.find(a => a.id === adminSelectedOrientId);
+    if (article) {
+      setOrientEditArticle(JSON.parse(JSON.stringify(article)));
+    } else {
+      setOrientEditArticle(null);
+    }
+  }, [adminSelectedOrientId, orientationData]);
+
+  useEffect(() => {
+    const chapter = grammarChapters.find(c => c.id === adminSelectedGrammarChId);
+    if (chapter) {
+      setGrammarEditChapter(JSON.parse(JSON.stringify(chapter)));
+    } else {
+      setGrammarEditChapter(null);
+    }
+  }, [adminSelectedGrammarChId, grammarChapters]);
+
+  const updateOrientField = (field: string, val: any) => {
+    if (!orientEditArticle) return;
+    setOrientEditArticle({ ...orientEditArticle, [field]: val });
+  };
+
+  const updateOrientSectionHeading = (sIdx: number, valEn: string, valMm: string) => {
+    if (!orientEditArticle) return;
+    const nextSections = orientEditArticle.sections.map((sec, i) => {
+      if (i === sIdx) {
+        return { ...sec, headingEnglish: valEn, headingMyanmar: valMm };
+      }
+      return sec;
+    });
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const addOrientSection = () => {
+    if (!orientEditArticle) return;
+    const nextSections = [
+      ...orientEditArticle.sections,
+      {
+        headingEnglish: "New Section",
+        headingMyanmar: "အပိုင်းသစ်",
+        paragraphs: [{ en: "", mm: "" }],
+        highlights: []
+      }
+    ];
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const deleteOrientSection = (sIdx: number) => {
+    if (!orientEditArticle) return;
+    if (confirm("Are you sure you want to delete this entire section, including all its paragraphs and highlights?")) {
+      const nextSections = orientEditArticle.sections.filter((_, i) => i !== sIdx);
+      setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+    }
+  };
+
+  const updateOrientParagraph = (sIdx: number, pIdx: number, field: 'en' | 'mm', val: string) => {
+    if (!orientEditArticle) return;
+    const nextSections = orientEditArticle.sections.map((sec, i) => {
+      if (i === sIdx) {
+        const nextParas = sec.paragraphs.map((p, j) => {
+          if (j === pIdx) {
+            return { ...p, [field]: val };
+          }
+          return p;
+        });
+        return { ...sec, paragraphs: nextParas };
+      }
+      return sec;
+    });
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const addOrientParagraph = (sIdx: number) => {
+    if (!orientEditArticle) return;
+    const nextSections = orientEditArticle.sections.map((sec, i) => {
+      if (i === sIdx) {
+        return { ...sec, paragraphs: [...sec.paragraphs, { en: "", mm: "" }] };
+      }
+      return sec;
+    });
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const deleteOrientParagraph = (sIdx: number, pIdx: number) => {
+    if (!orientEditArticle) return;
+    const nextSections = orientEditArticle.sections.map((sec, i) => {
+      if (i === sIdx) {
+        return { ...sec, paragraphs: sec.paragraphs.filter((_, j) => j !== pIdx) };
+      }
+      return sec;
+    });
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const updateOrientHighlight = (sIdx: number, hIdx: number, field: string, val: string) => {
+    if (!orientEditArticle) return;
+    const nextSections = orientEditArticle.sections.map((sec, i) => {
+      if (i === sIdx) {
+        const nextHighlights = sec.highlights.map((h, j) => {
+          if (j === hIdx) {
+            return { ...h, [field]: val };
+          }
+          return h;
+        });
+        return { ...sec, highlights: nextHighlights };
+      }
+      return sec;
+    });
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const addOrientHighlight = (sIdx: number) => {
+    if (!orientEditArticle) return;
+    const nextSections = orientEditArticle.sections.map((sec, i) => {
+      if (i === sIdx) {
+        return {
+          ...sec,
+          highlights: [
+            ...sec.highlights,
+            { termThai: "", termPhonetic: "", meaningEnglish: "", meaningMyanmar: "" }
+          ]
+        };
+      }
+      return sec;
+    });
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const deleteOrientHighlight = (sIdx: number, hIdx: number) => {
+    if (!orientEditArticle) return;
+    const nextSections = orientEditArticle.sections.map((sec, i) => {
+      if (i === sIdx) {
+        return { ...sec, highlights: sec.highlights.filter((_, j) => j !== hIdx) };
+      }
+      return sec;
+    });
+    setOrientEditArticle({ ...orientEditArticle, sections: nextSections });
+  };
+
+  const handleSaveOrientation = () => {
+    if (!orientEditArticle) return;
+    const nextList = orientationData.map(a => a.id === orientEditArticle.id ? orientEditArticle : a);
+    setOrientationData(nextList);
+    localStorage.setItem('thai_orientation_articles_list', JSON.stringify(nextList));
+    addSystemLog('admin', `Updated orientation article content: "${orientEditArticle.titleEnglish}"`);
+    alert("Orientation article content updated successfully!");
+  };
+
+  const updateGrammarChField = (field: string, val: any) => {
+    if (!grammarEditChapter) return;
+    setGrammarEditChapter({ ...grammarEditChapter, [field]: val });
+  };
+
+  const updateGrammarRuleField = (rIdx: number, field: string, val: any) => {
+    if (!grammarEditChapter) return;
+    const nextRules = grammarEditChapter.rules.map((rule, i) => {
+      if (i === rIdx) {
+        return { ...rule, [field]: val };
+      }
+      return rule;
+    });
+    setGrammarEditChapter({ ...grammarEditChapter, rules: nextRules });
+  };
+
+  const addGrammarRule = () => {
+    if (!grammarEditChapter) return;
+    const nextRules = [
+      ...grammarEditChapter.rules,
+      {
+        title: "New Rule",
+        titleMyanmar: "စည်းမျဉ်းသစ်",
+        explanation: "Rule explanation",
+        explanationMyanmar: "စည်းမျဉ်း ရှင်းလင်းချက်",
+        examples: []
+      }
+    ];
+    setGrammarEditChapter({ ...grammarEditChapter, rules: nextRules });
+  };
+
+  const deleteGrammarRule = (rIdx: number) => {
+    if (!grammarEditChapter) return;
+    if (confirm("Are you sure you want to delete this rule?")) {
+      const nextRules = grammarEditChapter.rules.filter((_, i) => i !== rIdx);
+      setGrammarEditChapter({ ...grammarEditChapter, rules: nextRules });
+    }
+  };
+
+  const updateGrammarExampleField = (rIdx: number, eIdx: number, field: string, val: any) => {
+    if (!grammarEditChapter) return;
+    const nextRules = grammarEditChapter.rules.map((rule, i) => {
+      if (i === rIdx) {
+        const nextExamples = rule.examples.map((ex, j) => {
+          if (j === eIdx) {
+            return { ...ex, [field]: val };
+          }
+          return ex;
+        });
+        return { ...rule, examples: nextExamples };
+      }
+      return rule;
+    });
+    setGrammarEditChapter({ ...grammarEditChapter, rules: nextRules });
+  };
+
+  const addGrammarExample = (rIdx: number) => {
+    if (!grammarEditChapter) return;
+    const nextRules = grammarEditChapter.rules.map((rule, i) => {
+      if (i === rIdx) {
+        return {
+          ...rule,
+          examples: [
+            ...rule.examples,
+            { thai: "", phonetic: "", english: "", myanmar: "" }
+          ]
+        };
+      }
+      return rule;
+    });
+    setGrammarEditChapter({ ...grammarEditChapter, rules: nextRules });
+  };
+
+  const deleteGrammarExample = (rIdx: number, eIdx: number) => {
+    if (!grammarEditChapter) return;
+    const nextRules = grammarEditChapter.rules.map((rule, i) => {
+      if (i === rIdx) {
+        return { ...rule, examples: rule.examples.filter((_, j) => j !== eIdx) };
+      }
+      return rule;
+    });
+    setGrammarEditChapter({ ...grammarEditChapter, rules: nextRules });
+  };
+
+  const handleSaveGrammarChapter = () => {
+    if (!grammarEditChapter) return;
+    const nextList = grammarChapters.map(c => c.id === grammarEditChapter.id ? grammarEditChapter : c);
+    setGrammarChapters(nextList);
+    localStorage.setItem('thai_grammar_chapters_curriculum_list', JSON.stringify(nextList));
+    addSystemLog('admin', `Updated grammar handbook chapter details: Chapter ${grammarEditChapter.chapterNumber} - "${grammarEditChapter.titleEnglish}"`);
+    alert("Grammar handbook chapter content updated successfully!");
+  };
   const [editingVocabIndex, setEditingVocabIndex] = useState<number | null>(null);
   const [editingVocabThai, setEditingVocabThai] = useState<string>('');
   const [editingVocabPhonetic, setEditingVocabPhonetic] = useState<string>('');
@@ -2107,49 +2379,56 @@ startxref
     <div className="h-screen h-[100dvh] bg-brand-light text-brand-dark flex flex-col font-sans overflow-hidden">
       
       {/* Top Header Navigation bar */}
-      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-50 transition-all shadow-3xs">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/60 shrink-0 sticky top-0 z-50 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="min-h-16 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="min-h-16 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             
             {/* Left: Brand Logo & Title + Mobile Actions Row */}
-            <div className="flex items-center justify-between w-full md:w-auto gap-4">
+            <div className="flex items-center justify-between w-full lg:w-auto gap-4">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 bg-gradient-to-tr from-brand-purple to-[#7a42c4] text-white rounded-xl shadow-xs border-b-2 border-brand-purple-shadow flex items-center justify-center font-sans font-black text-base select-none shrink-0 transition-transform hover:scale-105">
-                  TH
+                <div className="w-11 h-11 bg-slate-950 border border-slate-800 text-white rounded-2xl flex items-center justify-center font-sans font-black text-xs shrink-0 select-none shadow-md relative overflow-hidden group">
+                  <span className="relative z-10 font-sans font-extrabold bg-gradient-to-tr from-cyan-400 via-brand-purple to-pink-300 bg-clip-text text-transparent transform group-hover:scale-105 transition-transform">TH</span>
+                  <div className="absolute inset-x-0 bottom-0 h-[2px] bg-brand-purple" />
                 </div>
-                <div className="min-w-0">
-                  <h1 className="text-xs sm:text-sm font-sans font-black text-slate-800 tracking-tight leading-tight select-none uppercase">
-                    Thai Language Tutor
-                  </h1>
-                  <p className="text-[8.5px] sm:text-[10px] text-brand-purple font-sans font-black tracking-wide uppercase mt-0.5 truncate">
-                    <span className="hidden xs:inline">Myanmar Repat Course • </span>ထိုင်း-မြန်မာ အပြန်အလှန်လေ့လာရေး
+                <div className="min-w-0 text-left">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h1 className="text-[12px] sm:text-[13px] font-sans font-black text-slate-800 tracking-tight leading-none uppercase select-none">
+                      Thai Language Tutor
+                    </h1>
+                    <span className="lg:hidden inline-flex items-center gap-1 text-[7.5px] font-sans font-extrabold text-emerald-800 bg-emerald-50/90 border border-emerald-100 px-1.5 py-0.5 rounded-lg select-none uppercase tracking-wider shrink-0 transition-all">
+                      <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0 inline-block animate-pulse" />
+                      <span>OFFLINE READY</span>
+                    </span>
+                  </div>
+                  <p className="text-[8.5px] sm:text-[9.5px] text-brand-purple/90 font-sans font-bold tracking-wider uppercase mt-1 truncate">
+                    <span className="font-semibold text-slate-500">Myanmar Repat •</span> ထိုင်း-မြန်မာ အပြန်အလှန်လေ့လာရေး
                   </p>
                 </div>
               </div>
 
-              {/* Mobile Right Authenticated controls / Sign In (hidden on md and above) */}
-              <div className="flex md:hidden items-center gap-2">
+              {/* Mobile Right Authenticated controls / Sign In (hidden on lg and above) */}
+              <div className="flex lg:hidden items-center gap-2">
                 {isLoggedIn ? (
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 p-1 pl-2.5 rounded-xl shadow-3xs">
+                  <div className="flex items-center gap-2 bg-slate-100/80 border border-slate-200 p-1.5 pl-3 rounded-2xl shadow-3xs">
                     <div className="flex flex-col text-right">
                       <div className="flex items-center gap-1 justify-end">
                         {isAdmin ? (
-                          <Shield className="w-3 h-3 text-amber-500 fill-amber-500/25 shrink-0" />
+                          <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/10 shrink-0 animate-pulse" />
                         ) : (
-                          <CheckCircle className="w-3 h-3 text-brand-purple shrink-0" />
+                          <CheckCircle className="w-3.5 h-3.5 text-brand-purple shrink-0" />
                         )}
-                        <span className="text-[9px] font-sans font-black text-[#583092] truncate max-w-[64px] uppercase tracking-tight">
+                        <span className="text-[10px] font-sans font-black text-slate-800 truncate max-w-[80px] uppercase tracking-tight">
                           {currentUser}
                         </span>
                       </div>
-                      <span className="text-[7.5px] font-mono text-brand-muted font-bold -mt-0.5">
+                      <span className="text-[8px] font-mono text-brand-purple font-extrabold -mt-0.5 uppercase">
                         {isAdmin ? 'ADMIN' : `${progress.totalXp} XP`}
                       </span>
                     </div>
                     {/* Sign Out Button */}
                     <button
                       onClick={handleSignOut}
-                      className="p-1 px-2 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-lg border border-slate-250 transition-colors cursor-pointer text-brand-muted text-[8.5px] font-sans font-black uppercase leading-none"
+                      className="h-8 px-2.5 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-xl border border-slate-300 transition-colors cursor-pointer text-slate-500 text-[9px] font-sans font-black uppercase leading-none min-h-[32px] flex items-center justify-center shrink-0 shadow-3xs"
                       title="Sign Out • အကောင့်ထွက်မည်"
                     >
                       Out
@@ -2161,9 +2440,9 @@ startxref
                       setAuthTab('user');
                       setShowAuthModal(true);
                     }}
-                    className="px-3 py-2 bg-gradient-to-r from-brand-purple to-[#7a42c4] hover:brightness-105 text-white rounded-lg border-b-2 border-brand-purple-shadow flex items-center gap-1 font-sans font-black text-[9px] sm:text-[10px] transition-transform active:translate-y-0.5 cursor-pointer uppercase tracking-wider select-none shrink-0 shadow-xs"
+                    className="h-9 px-3.5 bg-brand-purple hover:bg-brand-purple/95 text-white rounded-xl border-b-2 border-brand-purple-shadow flex items-center gap-1.5 font-sans font-black text-[9.5px] transition-transform active:translate-y-0.5 cursor-pointer uppercase tracking-wider select-none shrink-0 shadow-xs min-h-[36px]"
                   >
-                    <User className="w-3 h-3 shrink-0" />
+                    <User className="w-3.5 h-3.5 shrink-0" />
                     Sign In
                   </button>
                 )}
@@ -2171,7 +2450,7 @@ startxref
             </div>
 
             {/* Middle: Integrated 4 Course Selection Tabs (Combined with Header Group) */}
-            <div className="flex items-center justify-start md:justify-center bg-slate-100/90 p-1 rounded-2xl border border-slate-200 select-none overflow-x-auto scrollbar-none gap-1 w-full md:w-auto max-w-full">
+            <div className="flex items-center justify-start lg:justify-center bg-slate-100/90 p-1 rounded-2xl border border-slate-205 select-none overflow-x-auto scrollbar-none gap-1 w-full lg:w-auto max-w-full flex-nowrap shrink-0">
               {courses.map((course) => {
                 const isSelected = selectedCourseTab === course.id && dashboardTab === 'lessons';
                 let icon = "⭐️";
@@ -2191,14 +2470,14 @@ startxref
                       setSelectedCourseTab(course.id);
                       setDashboardTab('lessons');
                     }}
-                    className={`px-3 py-1.5 rounded-xl font-sans font-black text-[9px] sm:text-[10px] xl:text-[11px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
+                    className={`px-4 sm:px-3 py-2.5 sm:py-2 rounded-xl font-sans font-black text-[10px] sm:text-[10.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 min-h-[38px] sm:min-h-0 ${
                       isSelected
-                        ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs scale-102 border-b-2 border-brand-purple-shadow'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/80'
+                        ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
                     }`}
                     title={course.name}
                   >
-                    <span className="text-[10px] sm:text-[11px] leading-none">{icon}</span>
+                    <span className="text-[11px] sm:text-[11.5px] leading-none">{icon}</span>
                     <span>{displayName}</span>
                   </button>
                 );
@@ -2208,28 +2487,28 @@ startxref
                   setSelectedCourseTab('resources');
                   setDashboardTab('lessons');
                 }}
-                className={`px-3 py-1.5 rounded-xl font-sans font-black text-[9px] sm:text-[10px] xl:text-[11px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
+                className={`px-4 sm:px-3 py-2.5 sm:py-2 rounded-xl font-sans font-black text-[10px] sm:text-[10.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 min-h-[38px] sm:min-h-0 ${
                   selectedCourseTab === 'resources' && dashboardTab === 'lessons'
-                    ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs scale-102 border-b-2 border-brand-purple-shadow'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/80'
+                    ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
                 }`}
                 title="Syllabus Resources & Document Material PDFs"
               >
-                <span className="text-[10px] sm:text-[11px] leading-none">📚</span>
+                <span className="text-[11px] sm:text-[11.5px] leading-none">📚</span>
                 <span>Resources</span>
               </button>
             </div>
 
             {/* Right Group: Offline Badge & User Profile Controls for Desktop */}
-            <div className="hidden md:flex items-center gap-3 shrink-0 justify-end">
-              <span className="flex leading-none items-center gap-1.5 text-[10px] font-sans font-black text-brand-purple bg-purple-50 border border-purple-100 px-3 py-2 rounded-xl select-none animate-pulse">
-                <WifiOff className="w-3.5 h-3.5 shrink-0 text-brand-purple" />
+            <div className="hidden lg:flex items-center gap-3 shrink-0 justify-end">
+              <span className="flex leading-none items-center gap-1 text-[9px] font-sans font-black text-emerald-800 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-xl select-none uppercase tracking-wider shrink-0 transition-all hover:scale-102">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 inline-block animate-ping" />
                 <span>Offline Ready</span>
               </span>
 
               {/* Authentication Controls */}
               {isLoggedIn ? (
-                <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-150 p-1 pl-3 rounded-2xl transition-colors">
+                <div className="flex items-center gap-3.5 bg-slate-50 hover:bg-slate-100/40 border border-slate-200 p-1 pl-3.5 rounded-2xl transition-colors">
                   <div className="flex flex-col text-right">
                     <div className="flex items-center gap-1 justify-end">
                       {isAdmin ? (
@@ -2237,11 +2516,11 @@ startxref
                       ) : (
                         <CheckCircle className="w-3.5 h-3.5 text-brand-purple shrink-0" />
                       )}
-                      <span className="text-[10px] sm:text-xs font-sans font-black text-slate-800 uppercase tracking-tight">
+                      <span className="text-[10.5px] font-sans font-black text-slate-800 uppercase tracking-tight">
                         {currentUser}
                       </span>
                     </div>
-                    <span className="text-[8px] sm:text-[9.5px] font-mono text-brand-purple font-black uppercase tracking-wider -mt-0.5">
+                    <span className="text-[8px] sm:text-[9px] font-mono text-brand-purple font-black uppercase tracking-wider -mt-0.5 leading-none">
                       {isAdmin ? 'ADMINISTRATOR' : `${progress.totalXp} XP • LEVEL ${Math.floor(progress.totalXp / 1000) + 1}`}
                     </span>
                   </div>
@@ -2249,11 +2528,11 @@ startxref
                   {/* Sign Out Button */}
                   <button
                     onClick={handleSignOut}
-                    className="p-2 sm:px-3 sm:py-2 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-xl border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer text-slate-500 flex items-center gap-1"
+                    className="p-1 px-3 py-2 bg-white hover:bg-rose-50 hover:text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl transition-all cursor-pointer text-slate-500 flex items-center gap-1.5 shadow-3xs"
                     title="Sign Out • အကောင့်ထွက်မည်"
                   >
                     <LogOut className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-                    <span className="font-sans font-black text-[9.5px] leading-none uppercase tracking-wider">
+                    <span className="font-sans font-black text-[9px] leading-none uppercase tracking-wider">
                       Out
                     </span>
                   </button>
@@ -2333,38 +2612,45 @@ startxref
 
                   if (unlocked) {
                     const courseResources = storeItems.filter(item => item.courseId === activeCourse.id);
+                    const hasDirectResources = activeCourse.resources && activeCourse.resources.length > 0;
+                    const hasStoreResources = courseResources.length > 0;
+                    const hasAnyResources = hasDirectResources || hasStoreResources;
+                    const activeSubTab = (courseSubTab === 'resources' && !hasAnyResources) ? 'lessons' : courseSubTab;
+
                     return (
                       <>
-                        {/* Course Tab Navigation */}
-                        <div className="bg-white p-2 rounded-2xl border-2 border-gray-100 flex items-center gap-2 select-none shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => setCourseSubTab('lessons')}
-                            className={`flex-1 py-3 px-4 rounded-xl text-xs font-sans font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                              courseSubTab === 'lessons'
-                                ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow shadow-sm'
-                                : 'text-brand-muted hover:text-brand-dark hover:bg-slate-50'
-                            }`}
-                          >
-                            <BookOpen className="w-4 h-4" />
-                            Study Syllabus Lessons (သင်ခန်းစာများ)
-                          </button>
-                          
-                          <button
-                            type="button"
-                            onClick={() => setCourseSubTab('resources')}
-                            className={`flex-1 py-3 px-4 rounded-xl text-xs font-sans font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                              courseSubTab === 'resources'
-                                ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow shadow-sm'
-                                : 'text-brand-muted hover:text-brand-dark hover:bg-slate-50'
-                            }`}
-                          >
-                            <FileText className={`w-4 h-4 ${courseSubTab === 'resources' ? 'text-white' : 'text-brand-purple'}`} />
-                            Course eBooks & PDFs ({courseResources.length})
-                          </button>
-                        </div>
+                        {/* Course Tab Navigation - Display only if eBook or PDF resources exist */}
+                        {hasAnyResources && (
+                          <div className="bg-white p-2 rounded-2xl border-2 border-gray-100 flex items-center gap-2 select-none shadow-sm mb-6">
+                            <button
+                              type="button"
+                              onClick={() => setCourseSubTab('lessons')}
+                              className={`flex-1 py-3 px-4 rounded-xl text-xs font-sans font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                                activeSubTab === 'lessons'
+                                  ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow shadow-sm'
+                                  : 'text-brand-muted hover:text-brand-dark hover:bg-slate-50'
+                              }`}
+                            >
+                              <BookOpen className="w-4 h-4" />
+                              Study Syllabus Lessons (သင်ခန်းစာများ)
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={() => setCourseSubTab('resources')}
+                              className={`flex-1 py-3 px-4 rounded-xl text-xs font-sans font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                                activeSubTab === 'resources'
+                                  ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow shadow-sm'
+                                  : 'text-brand-muted hover:text-brand-dark hover:bg-slate-50'
+                              }`}
+                            >
+                              <FileText className={`w-4 h-4 ${activeSubTab === 'resources' ? 'text-white' : 'text-brand-purple'}`} />
+                              Course eBooks & PDFs ({courseResources.length + (activeCourse.resources?.length || 0)})
+                            </button>
+                          </div>
+                        )}
 
-                        {courseSubTab === 'lessons' ? (
+                        {activeSubTab === 'lessons' ? (
                           <div className="space-y-6 animate-fade-in text-left">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border-2 border-gray-100">
                               <div>
@@ -4792,8 +5078,9 @@ startxref
                     </div>
 
                     {/* Segmented controls button */}
-                    <div className="bg-white/10 p-1.5 rounded-xl border border-white/10 flex items-center gap-1.5 w-full md:w-auto self-start md:self-auto select-none">
+                    <div className="bg-white/10 p-1.5 rounded-xl border border-white/10 flex flex-wrap items-center gap-1.5 w-full md:w-auto self-start md:self-auto select-none">
                       <button
+                        type="button"
                         onClick={() => setAdminHubTab('orders')}
                         className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           adminHubTab === 'orders'
@@ -4805,6 +5092,7 @@ startxref
                         Purchase Orders ({orders.length})
                       </button>
                       <button
+                        type="button"
                         onClick={() => setAdminHubTab('accounts')}
                         className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           adminHubTab === 'accounts'
@@ -4816,6 +5104,7 @@ startxref
                         Student Directory ({registeredUsers.length})
                       </button>
                       <button
+                        type="button"
                         onClick={() => setAdminHubTab('courses')}
                         className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           adminHubTab === 'courses'
@@ -4827,6 +5116,7 @@ startxref
                         Course Manager ({courses.length})
                       </button>
                       <button
+                        type="button"
                         onClick={() => setAdminHubTab('store')}
                         className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
                           adminHubTab === 'store'
@@ -4836,6 +5126,30 @@ startxref
                       >
                         <ShoppingBag className="w-3.5 h-3.5" />
                         Study Store ({storeItems.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdminHubTab('orientation')}
+                        className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          adminHubTab === 'orientation'
+                            ? 'bg-brand-purple text-white shadow-sm shadow-brand-purple-shadow'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Orientation Articles ({orientationData.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdminHubTab('grammar')}
+                        className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          adminHubTab === 'grammar'
+                            ? 'bg-brand-purple text-white shadow-sm shadow-brand-purple-shadow'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Grammar Handbook ({grammarChapters.length})
                       </button>
                     </div>
                   </div>
@@ -6175,6 +6489,589 @@ startxref
                                 </button>
                               </div>
                             </form>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-SECTION 5: DYNAMIC ORIENTATION BOOK CONTEXT MANAGER */}
+                    {adminHubTab === 'orientation' && (
+                      <div className="space-y-6 animate-fade-in text-left" id="admin-orientation-tab-view">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                          {/* Left Panel: Available Articles Switcher */}
+                          <div className="lg:col-span-4 bg-gray-50/70 p-4 sm:p-5 rounded-2xl border border-gray-150 space-y-4">
+                            <h5 className="text-xs font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1.5">
+                              <FileText className="w-4 h-4 shrink-0 text-brand-purple" />
+                              ORIENTATION MATERIALS ({orientationData.length})
+                            </h5>
+                            <p className="text-[10px] text-brand-muted font-sans font-semibold leading-relaxed">
+                              Select a public Orientation Guide article to edit headings, custom sections, paragraphs, and language lookup highlights.
+                            </p>
+                            <div className="space-y-2">
+                              {orientationData.map((article) => {
+                                const isSelected = adminSelectedOrientId === article.id;
+                                return (
+                                  <button
+                                    key={article.id}
+                                    type="button"
+                                    onClick={() => setAdminSelectedOrientId(article.id)}
+                                    className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-white border-brand-purple/50 shadow-xs'
+                                        : 'bg-white/40 hover:bg-white border-gray-200'
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="text-xs font-bold font-sans text-brand-dark flex items-center gap-1.5 font-sans">
+                                        <span>📚 {article.titleEnglish}</span>
+                                      </div>
+                                      <div className="text-[10px] text-brand-muted font-sans font-medium mt-0.5">
+                                        ID: {article.id} • {article.sections.length} Sections
+                                      </div>
+                                    </div>
+                                    <ChevronRight className={`w-4 h-4 text-brand-dark shrink-0 transition-transform ${isSelected ? 'translate-x-0.5 text-brand-purple' : ''}`} />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Right Panel: Selected Article Editor Form */}
+                          <div className="lg:col-span-8 bg-white p-5 sm:p-6 rounded-2xl border border-gray-150 space-y-6">
+                            {!orientEditArticle ? (
+                              <p className="text-xs text-brand-muted py-8 text-center font-semibold">
+                                Select an article from the left side panel to edit its details.
+                              </p>
+                            ) : (
+                              <div className="space-y-6 col-span-1">
+                                <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-sans font-black text-sm uppercase text-brand-dark">
+                                      📝 Edit: {orientEditArticle.titleEnglish}
+                                    </h4>
+                                    <span className="text-[10px] text-brand-muted font-bold font-mono">
+                                      Database ID: {orientEditArticle.id}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveOrientation}
+                                    className="px-4 py-2 bg-brand-purple hover:bg-brand-purple/95 text-white text-[10.5px] font-sans font-black uppercase tracking-wider rounded-xl shadow-xs cursor-pointer hover:brightness-105 transition-all font-sans"
+                                  >
+                                    💾 Save Article changes
+                                  </button>
+                                </div>
+
+                                {/* Article Global Titles */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      Article Main Title (English)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={orientEditArticle.titleEnglish || ''}
+                                      onChange={(e) => updateOrientField('titleEnglish', e.target.value)}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+                                  <div className="space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      ဆောင်းပါးခေါင်းစဉ် (မြန်မာဘာသာ)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={orientEditArticle.titleMyanmar || ''}
+                                      onChange={(e) => updateOrientField('titleMyanmar', e.target.value)}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Section Accompanying Rules */}
+                                <div className="space-y-4 pt-3 text-left">
+                                  <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                                    <h5 className="text-[11px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      Article Content Sections ({orientEditArticle.sections.length})
+                                    </h5>
+                                    <button
+                                      type="button"
+                                      onClick={addOrientSection}
+                                      className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[9.5px] font-sans font-black uppercase tracking-wider rounded-lg flex items-center gap-1 cursor-pointer font-sans"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      ADD SECTION
+                                    </button>
+                                  </div>
+
+                                  {orientEditArticle.sections.map((section, sIdx) => (
+                                    <div key={sIdx} className="p-4 rounded-xl border border-gray-200 bg-gray-50/40 text-left space-y-4 relative">
+                                      <div className="absolute top-4 right-4 flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteOrientSection(sIdx)}
+                                          className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100 cursor-pointer"
+                                          title="Delete entire section"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+
+                                      <div className="pr-12 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                                        <div className="space-y-1">
+                                          <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                            Section Heading {sIdx + 1} (English)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={section.headingEnglish}
+                                            onChange={(e) => updateOrientSectionHeading(sIdx, e.target.value, section.headingMyanmar)}
+                                            className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                            ခေါင်းစဉ်ငယ် {sIdx + 1} (မြန်မာဘာသာ)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={section.headingMyanmar}
+                                            onChange={(e) => updateOrientSectionHeading(sIdx, section.headingEnglish, e.target.value)}
+                                            className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Paras section code */}
+                                      <div className="space-y-2 border-t border-gray-150/60 pt-3 text-left">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[9.5px] font-sans font-black text-brand-purple uppercase tracking-wider">
+                                            Paragraph Blocks ({section.paragraphs.length})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => addOrientParagraph(sIdx)}
+                                            className="px-2 py-0.5 bg-white hover:bg-gray-50 text-brand-purple hover:text-brand-purple border border-brand-purple/20 rounded text-[8.5px] font-black uppercase tracking-wider cursor-pointer"
+                                          >
+                                            + Add paragraph
+                                          </button>
+                                        </div>
+
+                                        {section.paragraphs.map((para, pIdx) => (
+                                          <div key={pIdx} className="bg-white p-3 rounded-lg border border-gray-200 space-y-2 relative pr-10 text-left">
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteOrientParagraph(sIdx, pIdx)}
+                                              className="absolute top-3 right-3 text-gray-400 hover:text-red-500 cursor-pointer"
+                                              title="Remove Paragraph block"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-left">
+                                              <textarea
+                                                rows={2}
+                                                placeholder="English Paragraph Text..."
+                                                value={para.en}
+                                                onChange={(e) => updateOrientParagraph(sIdx, pIdx, 'en', e.target.value)}
+                                                className="w-full p-2 border border-gray-150 rounded text-[11px] font-medium font-sans text-brand-dark focus:outline-none focus:border-brand-purple"
+                                              />
+                                              <textarea
+                                                rows={2}
+                                                placeholder="မြန်မာဘာသာပြန် စာစု..."
+                                                value={para.mm}
+                                                onChange={(e) => updateOrientParagraph(sIdx, pIdx, 'mm', e.target.value)}
+                                                className="w-full p-2 border border-gray-150 rounded text-[11.5px] font-semibold font-sans text-brand-dark focus:outline-none focus:border-brand-purple"
+                                              />
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+
+                                      {/* Vocabulary highlights in that section */}
+                                      <div className="space-y-2 border-t border-gray-150/60 pt-3 text-left">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[9.5px] font-sans font-black text-[#0288d1] uppercase tracking-wider">
+                                            Vocabulary Highlights &amp; Lookup Terms ({section.highlights ? section.highlights.length : 0})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => addOrientHighlight(sIdx)}
+                                            className="px-2 py-0.5 bg-white hover:bg-gray-50 text-[#0288d1] border border-[#0288d1]/20 rounded text-[8.5px] font-black uppercase tracking-wider cursor-pointer font-sans"
+                                          >
+                                            + Add word highlight
+                                          </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-2 text-left">
+                                          {(section.highlights || []).map((hl, hIdx) => (
+                                            <div key={hIdx} className="bg-white p-3 rounded-lg border border-gray-200 flex flex-col md:flex-row gap-2 items-center relative pr-10 text-left">
+                                              <button
+                                                type="button"
+                                                onClick={() => deleteOrientHighlight(sIdx, hIdx)}
+                                                className="absolute top-2 right-2 text-gray-400 hover:text-red-500 md:top-auto md:right-3 cursor-pointer"
+                                              >
+                                                <X className="w-3.5 h-3.5" />
+                                              </button>
+
+                                              <input
+                                                type="text"
+                                                placeholder="Thai Script (e.g. ภาษา)"
+                                                value={hl.termThai}
+                                                onChange={(e) => updateOrientHighlight(sIdx, hIdx, 'termThai', e.target.value)}
+                                                className="w-full md:w-1/4 px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-sans font-bold"
+                                              />
+                                              <input
+                                                type="text"
+                                                placeholder="Phonetic (e.g. phaa-saa)"
+                                                value={hl.termPhonetic}
+                                                onChange={(e) => updateOrientHighlight(sIdx, hIdx, 'termPhonetic', e.target.value)}
+                                                className="w-full md:w-1/4 px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-mono text-[10px]"
+                                              />
+                                              <input
+                                                type="text"
+                                                placeholder="English Meaning"
+                                                value={hl.meaningEnglish}
+                                                onChange={(e) => updateOrientHighlight(sIdx, hIdx, 'meaningEnglish', e.target.value)}
+                                                className="w-full md:w-1/4 px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-sans font-medium"
+                                              />
+                                              <input
+                                                type="text"
+                                                placeholder="Myanmar Meaning"
+                                                value={hl.meaningMyanmar}
+                                                onChange={(e) => updateOrientHighlight(sIdx, hIdx, 'meaningMyanmar', e.target.value)}
+                                                className="w-full md:w-1/4 px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-sans font-semibold"
+                                              />
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-100 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveOrientation}
+                                    className="px-6 py-3 bg-brand-purple hover:bg-brand-purple/95 text-white text-xs font-sans font-black uppercase tracking-wider rounded-xl shadow-md cursor-pointer hover:brightness-105 transition-all text-center flex items-center justify-center gap-1.5 font-sans"
+                                  >
+                                    <CheckSquare className="w-4 h-4" />
+                                    Save entire orientation article details
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-SECTION 6: DYNAMIC GRAMMAR HANDBOOK CONTEXT MANAGER */}
+                    {adminHubTab === 'grammar' && (
+                      <div className="space-y-6 animate-fade-in text-left" id="admin-grammar-tab-view">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                          {/* Left Panel: Chapters Switcher */}
+                          <div className="lg:col-span-4 bg-gray-50/70 p-4 sm:p-5 rounded-2xl border border-gray-150 space-y-4 text-left">
+                            <h5 className="text-xs font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1.5">
+                              <BookOpen className="w-4 h-4 shrink-0 text-brand-purple" />
+                              GRAMMAR HANDBOOK CHAPTERS ({grammarChapters.length})
+                            </h5>
+                            <p className="text-[10px] text-brand-muted font-sans font-semibold leading-relaxed">
+                              Select a grammar handbook chapter (Chapters 1 to 15+) or review higher content chapters to dynamically edit explanations, rules, structure concepts, and examples.
+                            </p>
+                            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                              {grammarChapters.map((chapter) => {
+                                const isSelected = adminSelectedGrammarChId === chapter.id;
+                                return (
+                                  <button
+                                    key={chapter.id}
+                                    type="button"
+                                    onClick={() => setAdminSelectedGrammarChId(chapter.id)}
+                                    className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-white border-brand-purple/50 shadow-xs'
+                                        : 'bg-white/40 hover:bg-white border-gray-200'
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="text-xs font-bold font-sans text-brand-dark flex items-center gap-1 font-sans">
+                                        <span>📖 Chapter {chapter.chapterNumber}: {chapter.titleEnglish}</span>
+                                      </div>
+                                      <div className="text-[10px] text-brand-muted font-sans font-semibold mt-0.5">
+                                        Core Concept: {chapter.thaiCoreConcept || 'General'}
+                                      </div>
+                                      <div className="text-[9px] text-brand-purple font-sans font-black mt-0.5">
+                                        {chapter.rules.length} Grammar Rules
+                                      </div>
+                                    </div>
+                                    <ChevronRight className={`w-4 h-4 text-brand-dark shrink-0 transition-transform ${isSelected ? 'translate-x-0.5 text-brand-purple' : ''}`} />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Right Panel: Selected Chapter Editor Form */}
+                          <div className="lg:col-span-8 bg-white p-5 sm:p-6 rounded-2xl border border-gray-150 space-y-6 text-left">
+                            {!grammarEditChapter ? (
+                              <p className="text-xs text-brand-muted py-8 text-center font-semibold">
+                                Select a grammar chapter from the left side panel to edit its details.
+                              </p>
+                            ) : (
+                              <div className="space-y-6 text-left">
+                                <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-sans font-black text-sm uppercase text-brand-dark">
+                                      📝 Edit: Chapter {grammarEditChapter.chapterNumber} - {grammarEditChapter.titleEnglish}
+                                    </h4>
+                                    <span className="text-[10px] text-brand-muted font-bold font-mono">
+                                      Database Chapter Key: {grammarEditChapter.id}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveGrammarChapter}
+                                    className="px-4 py-2 bg-brand-purple hover:bg-brand-purple/95 text-white text-[10.5px] font-sans font-black uppercase tracking-wider rounded-xl shadow-xs cursor-pointer hover:brightness-105 transition-all font-sans"
+                                  >
+                                    💾 Save Chapter Changes
+                                  </button>
+                                </div>
+
+                                {/* Chapter Basic Meta Info */}
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 text-left">
+                                  <div className="md:col-span-3 space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      Chapter #
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={grammarEditChapter.chapterNumber}
+                                      onChange={(e) => updateGrammarChField('chapterNumber', Number(e.target.value))}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-9 space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      Thai Core Concept (e.g. คำนาม / ကတ္တားများ)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={grammarEditChapter.thaiCoreConcept || ''}
+                                      onChange={(e) => updateGrammarChField('thaiCoreConcept', e.target.value)}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-6 space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      Chapter Title (English)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={grammarEditChapter.titleEnglish}
+                                      onChange={(e) => updateGrammarChField('titleEnglish', e.target.value)}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-6 space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      အခန်းခေါင်းစဉ် (မြန်မာဘာသာ)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={grammarEditChapter.titleMyanmar || ''}
+                                      onChange={(e) => updateGrammarChField('titleMyanmar', e.target.value)}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-6 space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      Introductory Outline Description (English)
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      value={grammarEditChapter.descriptionEnglish || ''}
+                                      onChange={(e) => updateGrammarChField('descriptionEnglish', e.target.value)}
+                                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-6 space-y-1 text-left">
+                                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      မိတ်ဆက် ရှင်းလင်းချက်များ (မြန်မာဘာသာ)
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      value={grammarEditChapter.descriptionMyanmar || ''}
+                                      onChange={(e) => updateGrammarChField('descriptionMyanmar', e.target.value)}
+                                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Rule lists */}
+                                <div className="space-y-4 pt-3 border-t border-gray-100 mt-4 text-left">
+                                  <div className="flex items-center justify-between">
+                                    <h5 className="text-[11px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                      Rules &amp; Syntactical Explanations ({grammarEditChapter.rules.length})
+                                    </h5>
+                                    <button
+                                      type="button"
+                                      onClick={addGrammarRule}
+                                      className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[9.5px] font-sans font-black uppercase tracking-wider rounded-lg flex items-center gap-1 cursor-pointer font-sans"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      ADD RULE
+                                    </button>
+                                  </div>
+
+                                  {grammarEditChapter.rules.map((rule, rIdx) => (
+                                    <div key={rIdx} className="p-4 rounded-xl border border-gray-200 bg-gray-50/40 text-left space-y-4 relative">
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteGrammarRule(rIdx)}
+                                        className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-red-500 rounded hover:bg-gray-100 cursor-pointer"
+                                        title="Delete Rule"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      <div className="pr-10 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                                        <div className="space-y-1 text-left">
+                                          <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                            Rule {rIdx + 1} Title (English)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={rule.title}
+                                            onChange={(e) => updateGrammarRuleField(rIdx, 'title', e.target.value)}
+                                            className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                          />
+                                        </div>
+                                        <div className="space-y-1 text-left">
+                                          <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                            စည်းမျဉ်းခေါင်းစဉ် (မြန်မာဘာသာ)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={rule.titleMyanmar || ''}
+                                            onChange={(e) => updateGrammarRuleField(rIdx, 'titleMyanmar', e.target.value)}
+                                            className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                          />
+                                        </div>
+
+                                        <div className="space-y-1 sm:col-span-2 text-left">
+                                          <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                            Grammar Rule Explanation (English)
+                                          </label>
+                                          <textarea
+                                            rows={2}
+                                            value={rule.explanation}
+                                            onChange={(e) => updateGrammarRuleField(rIdx, 'explanation', e.target.value)}
+                                            className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs font-medium font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                          />
+                                        </div>
+                                        <div className="space-y-1 sm:col-span-2 text-left">
+                                          <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                            မြန်မာဘာသာဖြင့် သဒ္ဒါစည်းမျဉ်း ရှင်းလင်းချက်
+                                          </label>
+                                          <textarea
+                                            rows={2}
+                                            value={rule.explanationMyanmar || ''}
+                                            onChange={(e) => updateGrammarRuleField(rIdx, 'explanationMyanmar', e.target.value)}
+                                            className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Examples row */}
+                                      <div className="space-y-2 border-t border-gray-150/60 pt-3 text-left">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[9.5px] font-sans font-black text-brand-purple uppercase tracking-wider">
+                                            Thai Example Sentences ({rule.examples ? rule.examples.length : 0})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => addGrammarExample(rIdx)}
+                                            className="px-2 py-0.5 bg-white hover:bg-gray-50 text-brand-purple border border-brand-purple/20 rounded text-[8.5px] font-black uppercase tracking-wider cursor-pointer"
+                                          >
+                                            + Add example
+                                          </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-2 text-left">
+                                          {(rule.examples || []).map((ex, eIdx) => (
+                                            <div key={eIdx} className="bg-white p-3 rounded-lg border border-gray-200 space-y-2 relative pr-10 text-left">
+                                              <button
+                                                type="button"
+                                                onClick={() => deleteGrammarExample(rIdx, eIdx)}
+                                                className="absolute top-2 right-2 text-gray-400 hover:text-red-500 cursor-pointer"
+                                              >
+                                                <X className="w-3.5 h-3.5" />
+                                              </button>
+
+                                              <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-left">
+                                                <div>
+                                                  <label className="block text-[8px] font-sans font-black uppercase text-brand-dark mb-0.5 leading-none">Thai Text</label>
+                                                  <input
+                                                    type="text"
+                                                    placeholder="thai text"
+                                                    value={ex.thai}
+                                                    onChange={(e) => updateGrammarExampleField(rIdx, eIdx, 'thai', e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-sans font-bold"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[8px] font-sans font-black uppercase text-brand-dark mb-0.5 leading-none">Phonetic</label>
+                                                  <input
+                                                    type="text"
+                                                    placeholder="phonetic spelling"
+                                                    value={ex.phonetic}
+                                                    onChange={(e) => updateGrammarExampleField(rIdx, eIdx, 'phonetic', e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-mono text-[10px]"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[8px] font-sans font-black uppercase text-brand-dark mb-0.5 leading-none">English Meaning</label>
+                                                  <input
+                                                    type="text"
+                                                    placeholder="english meaning"
+                                                    value={ex.english}
+                                                    onChange={(e) => updateGrammarExampleField(rIdx, eIdx, 'english', e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-sans font-medium"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[8px] font-sans font-black uppercase text-brand-dark mb-0.5 leading-none">Myanmar Translation</label>
+                                                  <input
+                                                    type="text"
+                                                    placeholder="မြန်မာအနက်အဓိပ္ပာယ်"
+                                                    value={ex.myanmar}
+                                                    onChange={(e) => updateGrammarExampleField(rIdx, eIdx, 'myanmar', e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-150 rounded text-xs text-brand-dark font-sans font-semibold"
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-100 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveGrammarChapter}
+                                    className="px-6 py-3 bg-brand-purple hover:bg-brand-purple/95 text-white text-xs font-sans font-black uppercase tracking-wider rounded-xl shadow-md cursor-pointer hover:brightness-105 transition-all text-center flex items-center justify-center gap-1.5 font-sans"
+                                  >
+                                    <CheckSquare className="w-4 h-4" />
+                                    Save current grammar chapter details
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
