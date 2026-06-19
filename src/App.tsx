@@ -15,6 +15,7 @@ import { OrderDetailModal } from './components/OrderDetailModal';
 import { 
   BookOpen, 
   Award, 
+  Palette,
   MapPin, 
   Volume2, 
   Volume1,
@@ -58,6 +59,38 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { isSingleSentenceEnglish } from './utils/sentenceUtils';
 import { autoFillWord } from './utils/dictionary';
+
+const adjustHexBrightness = (hex: string, percent: number): string => {
+  const cleanHex = hex.replace("#", "");
+  if (cleanHex.length !== 6) return hex;
+  let r = parseInt(cleanHex.substring(0, 2), 16);
+  let g = parseInt(cleanHex.substring(2, 4), 16);
+  let b = parseInt(cleanHex.substring(4, 6), 16);
+
+  if (percent > 0) {
+    // Tint (mix with white) -> approach 255
+    const factor = percent / 100;
+    r = Math.round(r + (255 - r) * factor);
+    g = Math.round(g + (255 - g) * factor);
+    b = Math.round(b + (255 - b) * factor);
+  } else {
+    // Shade (mix with black) -> approach 0
+    const factor = 1 + (percent / 100); // e.g. percent=-15 -> factor=0.85
+    r = Math.round(r * factor);
+    g = Math.round(g * factor);
+    b = Math.round(b * factor);
+  }
+
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+
+  const rHex = r.toString(16).padStart(2, "0");
+  const gHex = g.toString(16).padStart(2, "0");
+  const bHex = b.toString(16).padStart(2, "0");
+
+  return `#${rHex}${gHex}${bHex}`;
+};
 
 const DEFAULT_STORE_ITEMS: StoreItem[] = [
   {
@@ -401,7 +434,7 @@ export default function App() {
 
   const [adminSelectedLessonId, setAdminSelectedLessonId] = useState<number | null>(null);
   const [adminEditTab, setAdminEditTab] = useState<'metadata' | 'vocabulary' | 'dialogue' | 'grammar' | 'quiz'>('metadata');
-  const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts' | 'courses' | 'store' | 'orientation' | 'grammar'>('orders');
+  const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts' | 'courses' | 'store' | 'orientation' | 'grammar' | 'brand'>('orders');
 
   const [adminSelectedOrientId, setAdminSelectedOrientId] = useState<string>('better-thai');
   const [adminSelectedGrammarChId, setAdminSelectedGrammarChId] = useState<number>(1);
@@ -825,6 +858,50 @@ export default function App() {
   const [handbookSubPageIndex, setHandbookSubPageIndex] = useState<number>(0);
   const [exampleModeForRules, setExampleModeForRules] = useState<{[key: string]: 'standard' | 'more' | 'formal' | 'casual'}>({});
   const [audioSpeedIndex, setAudioSpeedIndex] = useState<number>(0); // 0: Normal, 1: Slow, 2: Much Slower
+
+  const [brandColor, setBrandColor] = useState<string>(() => {
+    return localStorage.getItem('thai_brand_color') || '#8234ea';
+  });
+  const [brandLogoText, setBrandLogoText] = useState<string>(() => {
+    return localStorage.getItem('thai_brand_logo_text') || 'TH';
+  });
+  const [brandLogoImg, setBrandLogoImg] = useState<string>(() => {
+    return localStorage.getItem('thai_brand_logo_img') || '';
+  });
+  const [brandName, setBrandName] = useState<string>(() => {
+    return localStorage.getItem('thai_brand_name') || 'Thai Language Tutor';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--color-brand-purple', brandColor);
+    
+    const hoverColor = adjustHexBrightness(brandColor, 10);
+    const shadowColor = adjustHexBrightness(brandColor, -15);
+    const lightColor = adjustHexBrightness(brandColor, 95);
+    const subtleColor = adjustHexBrightness(brandColor, 90);
+    const deepColor = adjustHexBrightness(brandColor, -75);
+    
+    root.style.setProperty('--color-brand-purple-hover', hoverColor);
+    root.style.setProperty('--color-brand-purple-shadow', shadowColor);
+    root.style.setProperty('--color-brand-purple-light', lightColor);
+    root.style.setProperty('--color-brand-purple-subtle', subtleColor);
+    root.style.setProperty('--color-brand-purple-deep', deepColor);
+    
+    localStorage.setItem('thai_brand_color', brandColor);
+  }, [brandColor]);
+
+  useEffect(() => {
+    localStorage.setItem('thai_brand_logo_text', brandLogoText);
+  }, [brandLogoText]);
+
+  useEffect(() => {
+    localStorage.setItem('thai_brand_logo_img', brandLogoImg);
+  }, [brandLogoImg]);
+
+  useEffect(() => {
+    localStorage.setItem('thai_brand_name', brandName);
+  }, [brandName]);
 
   // User engagement tracking state
   const [clickCount, setClickCount] = useState<number>(0);
@@ -2387,19 +2464,22 @@ startxref
             <div className="flex items-center justify-between w-full lg:w-auto gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 bg-slate-950 border border-slate-800 text-white rounded-2xl flex items-center justify-center font-sans font-black text-xs shrink-0 select-none shadow-md relative overflow-hidden group">
-                  <span className="relative z-10 font-sans font-extrabold bg-gradient-to-tr from-cyan-400 via-brand-purple to-pink-300 bg-clip-text text-transparent transform group-hover:scale-105 transition-transform">TH</span>
+                  {brandLogoImg ? (
+                    <img 
+                      src={brandLogoImg} 
+                      alt={brandName} 
+                      className="w-full h-full object-cover relative z-10" 
+                      referrerPolicy="no-referrer" 
+                    />
+                  ) : (
+                    <span className="relative z-10 font-sans font-extrabold bg-gradient-to-tr from-cyan-400 via-brand-purple to-pink-300 bg-clip-text text-transparent transform group-hover:scale-105 transition-transform">{brandLogoText}</span>
+                  )}
                   <div className="absolute inset-x-0 bottom-0 h-[2px] bg-brand-purple" />
                 </div>
                 <div className="min-w-0 text-left">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h1 className="text-[12px] sm:text-[13px] font-sans font-black text-slate-800 tracking-tight leading-none uppercase select-none">
-                      Thai Language Tutor
-                    </h1>
-                    <span className="lg:hidden inline-flex items-center gap-1 text-[7.5px] font-sans font-extrabold text-emerald-800 bg-emerald-50/90 border border-emerald-100 px-1.5 py-0.5 rounded-lg select-none uppercase tracking-wider shrink-0 transition-all">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0 inline-block animate-pulse" />
-                      <span>OFFLINE READY</span>
-                    </span>
-                  </div>
+                  <h1 className="text-[12.5px] sm:text-[14px] font-sans font-black text-slate-800 tracking-tight leading-none uppercase select-none">
+                    {brandName}
+                  </h1>
                   <p className="text-[8.5px] sm:text-[9.5px] text-brand-purple/90 font-sans font-bold tracking-wider uppercase mt-1 truncate">
                     <span className="font-semibold text-slate-500">Myanmar Repat •</span> ထိုင်း-မြန်မာ အပြန်အလှန်လေ့လာရေး
                   </p>
@@ -2450,7 +2530,7 @@ startxref
             </div>
 
             {/* Middle: Integrated 4 Course Selection Tabs (Combined with Header Group) */}
-            <div className="flex items-center justify-start lg:justify-center bg-slate-100/90 p-1 rounded-2xl border border-slate-205 select-none overflow-x-auto scrollbar-none gap-1 w-full lg:w-auto max-w-full flex-nowrap shrink-0">
+            <div className="flex items-center justify-start lg:justify-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-205 select-none overflow-x-auto scrollbar-none gap-2 w-full lg:w-auto max-w-full flex-nowrap shrink-0">
               {courses.map((course) => {
                 const isSelected = selectedCourseTab === course.id && dashboardTab === 'lessons';
                 let icon = "⭐️";
@@ -2470,7 +2550,7 @@ startxref
                       setSelectedCourseTab(course.id);
                       setDashboardTab('lessons');
                     }}
-                    className={`px-4 sm:px-3 py-2.5 sm:py-2 rounded-xl font-sans font-black text-[10px] sm:text-[10.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 min-h-[38px] sm:min-h-0 ${
+                    className={`px-6 sm:px-5 py-2.5 sm:py-2.5 rounded-xl font-sans font-black text-[11px] sm:text-[11.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0 min-h-[40px] sm:min-h-[38px] ${
                       isSelected
                         ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -2487,7 +2567,7 @@ startxref
                   setSelectedCourseTab('resources');
                   setDashboardTab('lessons');
                 }}
-                className={`px-4 sm:px-3 py-2.5 sm:py-2 rounded-xl font-sans font-black text-[10px] sm:text-[10.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 min-h-[38px] sm:min-h-0 ${
+                className={`px-6 sm:px-5 py-2.5 sm:py-2.5 rounded-xl font-sans font-black text-[11px] sm:text-[11.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0 min-h-[40px] sm:min-h-[38px] ${
                   selectedCourseTab === 'resources' && dashboardTab === 'lessons'
                     ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -2499,12 +2579,8 @@ startxref
               </button>
             </div>
 
-            {/* Right Group: Offline Badge & User Profile Controls for Desktop */}
+            {/* Right Group: User Profile Controls for Desktop */}
             <div className="hidden lg:flex items-center gap-3 shrink-0 justify-end">
-              <span className="flex leading-none items-center gap-1 text-[9px] font-sans font-black text-emerald-800 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-xl select-none uppercase tracking-wider shrink-0 transition-all hover:scale-102">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 inline-block animate-ping" />
-                <span>Offline Ready</span>
-              </span>
 
               {/* Authentication Controls */}
               {isLoggedIn ? (
@@ -5151,6 +5227,18 @@ startxref
                         <BookOpen className="w-3.5 h-3.5" />
                         Grammar Handbook ({grammarChapters.length})
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdminHubTab('brand')}
+                        className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          adminHubTab === 'brand'
+                            ? 'bg-brand-purple text-white shadow-sm shadow-brand-purple-shadow'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <Palette className="w-3.5 h-3.5" />
+                        Brand & Theme
+                      </button>
                     </div>
                   </div>
 
@@ -7073,6 +7161,264 @@ startxref
                               </div>
                             )}
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-SECTION 7: BRAND & THEME SETTINGS (DYNAMIC CONFIG) */}
+                    {adminHubTab === 'brand' && (
+                      <div className="space-y-6 animate-fade-in text-left">
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                          <h5 className="text-xs font-sans font-black text-slate-800 uppercase tracking-widest mb-2 flex items-center gap-1.5 font-sans">
+                            <Palette className="w-4 h-4 text-brand-purple animate-pulse" />
+                            Live Branding Customization
+                          </h5>
+                          <p className="text-[11px] text-slate-500 font-sans font-medium mb-4 leading-relaxed font-sans">
+                            Easily redefine the identity of your tuition system. Altering the brand color triggers dynamic math calculation models to shift shades, borders, shadows, highlights, and active state styles automatically over all student screens in real-time.
+                          </p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            {/* Left Panel: Inputs */}
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-[9px] font-sans font-black uppercase text-slate-700 mb-1.5">
+                                  App Logo Initials / Short text (2-3 chars)
+                                </label>
+                                <input
+                                  type="text"
+                                  maxLength={3}
+                                  value={brandLogoText}
+                                  onChange={(e) => setBrandLogoText(e.target.value)}
+                                  className="w-full px-3 py-2.5 bg-white border-2 border-slate-200 focus:border-brand-purple rounded-xl font-sans font-extrabold text-sm text-slate-800 tracking-wider shadow-2xs leading-none uppercase"
+                                  placeholder="e.g. TH"
+                                />
+                              </div>
+
+                              {/* New PNG Image Logo Uploader element */}
+                              <div>
+                                <label className="block text-[9px] font-sans font-black uppercase text-slate-700 mb-1.5 flex items-center justify-between">
+                                  <span>System Logo Image (PNG / JPG)</span>
+                                  {brandLogoImg && (
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setBrandLogoImg('')}
+                                      className="text-rose-600 hover:text-rose-700 font-sans font-extrabold text-[8.5px] uppercase cursor-pointer transition-colors"
+                                    >
+                                      Remove Logo Image
+                                    </button>
+                                  )}
+                                </label>
+                                
+                                {brandLogoImg ? (
+                                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border-2 border-slate-200">
+                                    <div className="w-12 h-12 rounded-lg bg-slate-900 overflow-hidden flex items-center justify-center p-0.5 border border-slate-300">
+                                      <img src={brandLogoImg} alt="Logotype" className="w-full h-full object-cover rounded" referrerPolicy="no-referrer" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[10px] font-sans font-black text-emerald-700 uppercase flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        Custom image active
+                                      </p>
+                                      <p className="text-[9px] text-slate-400 font-sans font-medium truncate">Saved locally and synchronized dynamically</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="relative border-2 border-dashed border-slate-250 hover:border-brand-purple rounded-xl p-4 bg-white/50 text-center transition-all cursor-pointer group">
+                                    <input
+                                      type="file"
+                                      accept="image/png, image/jpeg, image/gif, image/webp"
+                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          if (file.size > 2 * 1024 * 1024) {
+                                            alert("Notice: Image file size must be less than 2MB for high-performance LocalStorage buffer storage!");
+                                            return;
+                                          }
+                                          const reader = new FileReader();
+                                          reader.onload = (event) => {
+                                            if (event.target?.result && typeof event.target.result === 'string') {
+                                              setBrandLogoImg(event.target.result);
+                                              addSystemLog('admin', `Custom logo image uploaded successfully (${file.name})`);
+                                            }
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                    <div className="flex flex-col items-center gap-1">
+                                      <Upload className="w-4 h-4 text-slate-400 group-hover:text-brand-purple transition-colors" />
+                                      <span className="text-[9.5px] font-sans font-black text-slate-600 group-hover:text-brand-purple uppercase tracking-wide">Upload PNG Logo</span>
+                                      <span className="text-[8.5px] text-slate-400 font-sans font-medium">Click or Drag & Drop to attach image file</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div>
+                                <label className="block text-[9px] font-sans font-black uppercase text-slate-700 mb-1.5">
+                                  App Brand Name / Institution Title
+                                </label>
+                                <input
+                                  type="text"
+                                  value={brandName}
+                                  onChange={(e) => setBrandName(e.target.value)}
+                                  className="w-full px-3 py-2.5 bg-white border-2 border-slate-200 focus:border-brand-purple rounded-xl font-sans font-extrabold text-sm text-slate-800 shadow-2xs leading-none"
+                                  placeholder="e.g. Thai Language Tutor"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[9px] font-sans font-black uppercase text-slate-700 mb-2">
+                                  Select Brand Base Color
+                                </label>
+                                {/* Quick Color Presets */}
+                                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2.5 mb-3.5">
+                                  {[
+                                    { name: "Royal Purple", hex: "#8234ea" },
+                                    { name: "Emerald Green", hex: "#10b981" },
+                                    { name: "Ocean Blue", hex: "#3b82f6" },
+                                    { name: "Sly Blue", hex: "#06b6d4" },
+                                    { name: "Sunset Red", hex: "#ef4444" },
+                                    { name: "Mandarin Orange", hex: "#f97316" },
+                                    { name: "Charcoal", hex: "#1e293b" }
+                                  ].map((pColor) => (
+                                    <button
+                                      key={pColor.hex}
+                                      type="button"
+                                      onClick={() => setBrandColor(pColor.hex)}
+                                      className={`h-9 w-full rounded-xl border-2 transition-all relative flex items-center justify-center cursor-pointer p-0 shadow-2xs ${
+                                        brandColor.toLowerCase() === pColor.hex.toLowerCase()
+                                          ? 'scale-105 border-slate-800 ring-2 ring-slate-800/10'
+                                          : 'border-white hover:scale-102 hover:opacity-90'
+                                      }`}
+                                      style={{ backgroundColor: pColor.hex }}
+                                      title={pColor.name}
+                                    >
+                                      {brandColor.toLowerCase() === pColor.hex.toLowerCase() && (
+                                        <Check className="w-4 h-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <div className="flex gap-3 items-center">
+                                  <div className="relative shrink-0 select-none">
+                                    <input
+                                      type="color"
+                                      value={brandColor}
+                                      onChange={(e) => setBrandColor(e.target.value)}
+                                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                                    />
+                                    <div className="w-10 h-10 rounded-xl border border-slate-300 shadow-2xs transition-all cursor-pointer" style={{ backgroundColor: brandColor }} />
+                                  </div>
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      value={brandColor}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val.startsWith('#') && val.length <= 7) {
+                                          setBrandColor(val);
+                                        }
+                                      }}
+                                      className="w-full px-3 py-2 bg-white border-2 border-slate-200 focus:border-brand-purple rounded-xl font-mono text-xs text-slate-800 select-all"
+                                      placeholder="#8234ea"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right Panel: Live Dynamic Preview card */}
+                            <div className="space-y-4">
+                              <label className="block text-[9px] font-sans font-black uppercase text-slate-700 leading-none">
+                                Real-time Header & Card Preview
+                              </label>
+
+                              <div className="bg-white border-2 border-slate-200 rounded-2xl p-4 space-y-4 shadow-3xs overflow-hidden">
+                                
+                                {/* Top Banner Simulation */}
+                                <div className="border border-slate-100/80 p-2.5 rounded-xl bg-slate-50/50">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center font-sans font-black text-[9px] shrink-0 text-white relative overflow-hidden" style={{ backgroundColor: brandColor }}>
+                                      {brandLogoImg ? (
+                                        <img 
+                                          src={brandLogoImg} 
+                                          alt="Preview" 
+                                          className="w-full h-full object-cover relative z-10" 
+                                          referrerPolicy="no-referrer" 
+                                        />
+                                      ) : (
+                                        <span className="relative z-10 font-sans font-extrabold uppercase">{brandLogoText || 'TH'}</span>
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 text-left">
+                                      <h6 className="text-[10px] font-sans font-black text-slate-800 leading-none uppercase truncate">
+                                        {brandName || 'Thai Language Tutor'}
+                                      </h6>
+                                      <span className="text-[7px] text-slate-400 font-sans font-bold uppercase mt-0.5 block tracking-wider">PREVIEW COMPONENT</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Active Selection Element simulation */}
+                                <div className="grid grid-cols-2 gap-2.5">
+                                  <div className="p-3 rounded-2xl border-2 transition-all flex flex-col justify-between h-20 text-left bg-white border-slate-200">
+                                    <span className="text-[9px] font-sans font-bold text-slate-400 uppercase">Inactive element</span>
+                                    <span className="text-[10px] font-sans font-black text-slate-600">STANDARD TAB</span>
+                                  </div>
+                                  <div className="p-3 rounded-2xl border-2 transition-all flex flex-col justify-between h-20 text-left shadow-3xs" 
+                                    style={{ 
+                                      backgroundColor: adjustHexBrightness(brandColor, 90),
+                                      borderColor: brandColor,
+                                    }}>
+                                    <span className="text-[9px] font-sans font-bold uppercase" style={{ color: brandColor }}>Active state</span>
+                                    <span className="text-[10px] font-sans font-black" style={{ color: adjustHexBrightness(brandColor, -30) }}>DYNAMIC TINT</span>
+                                  </div>
+                                </div>
+
+                                {/* Buttons Simulation */}
+                                <div className="flex gap-2">
+                                  <button type="button" className="flex-1 py-2 text-[9px] font-sans font-extrabold uppercase tracking-wide rounded-xl text-white shadow-xs transition-transform active:translate-y-0.5 cursor-pointer text-center" 
+                                    style={{ 
+                                      backgroundColor: brandColor, 
+                                      borderBottom: `3px solid ${adjustHexBrightness(brandColor, -15)}`
+                                    }}>
+                                    Primary duo-btn
+                                  </button>
+                                  <button type="button" className="flex-1 py-2 text-[9px] font-sans font-extrabold uppercase tracking-wide rounded-xl border border-slate-300 bg-white transition-none text-center" style={{ color: brandColor, borderColor: adjustHexBrightness(brandColor, 40) }}>
+                                    Border outline
+                                  </button>
+                                </div>
+
+                              </div>
+
+                              <div className="p-3 bg-slate-100 border border-slate-250 rounded-xl">
+                                <span className="block text-[8px] font-sans font-black uppercase text-slate-700 tracking-wider mb-0.5 leading-none">Pro tip</span>
+                                <span className="text-[9.5px] text-slate-600 font-sans font-medium leading-normal">
+                                  The base color picker updates live instantly. There is no need to manually deploy css code. Changes persist dynamically across client browser reloads.
+                                </span>
+                              </div>
+                            </div>
+
+                          </div>
+
+                          <div className="mt-5 pt-4 border-t border-slate-200 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                addSystemLog('admin', `Customized look and feel: title="${brandName}", initials="${brandLogoText}", hex="${brandColor}"`);
+                                alert("Success! Brand Identity updated and propagated successfully across all panels. All changes persist automatically.");
+                              }}
+                              className="px-6 py-2.5 bg-brand-purple hover:bg-brand-purple/95 text-white text-xs font-sans font-black uppercase tracking-wider rounded-xl shadow-md cursor-pointer hover:brightness-105 transition-all text-center flex items-center justify-center gap-1.5 font-sans"
+                            >
+                              <CheckSquare className="w-4 h-4" />
+                              Save branding properties
+                            </button>
+                          </div>
+
                         </div>
                       </div>
                     )}
