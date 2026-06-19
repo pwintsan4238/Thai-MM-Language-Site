@@ -3,7 +3,7 @@ import { lessonsData } from './data/lessonsData';
 import { grammarChapters } from './data/grammarChapters';
 import { orientationData } from './data/orientation';
 import { pdfVocabulary } from './data/pdfVocabulary';
-import { ProgressState, Lesson, WordBreakdown, DialogueLine, GrammarNote, QuizQuestion, RegisteredUser, PurchaseOrder } from './types';
+import { ProgressState, Lesson, WordBreakdown, DialogueLine, GrammarNote, QuizQuestion, RegisteredUser, PurchaseOrder, Course, StoreItem } from './types';
 import ProgressCard from './components/ProgressCard';
 import DialogueView from './components/DialogueView';
 import VocabularyView from './components/VocabularyView';
@@ -11,6 +11,7 @@ import QuizView from './components/QuizView';
 import AlphabetGuide from './components/AlphabetGuide';
 import { GrammarVocabDropdown } from './components/GrammarVocabDropdown';
 import { CheckoutGateway } from './components/CheckoutGateway';
+import { OrderDetailModal } from './components/OrderDetailModal';
 import { 
   BookOpen, 
   Award, 
@@ -51,13 +52,14 @@ import {
   ShoppingBag,
   CreditCard,
   GripVertical,
-  Megaphone
+  Megaphone,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { isSingleSentenceEnglish } from './utils/sentenceUtils';
 import { autoFillWord } from './utils/dictionary';
 
-const STORE_ITEMS = [
+const DEFAULT_STORE_ITEMS: StoreItem[] = [
   {
     id: "premium-book",
     name: "Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
@@ -65,9 +67,33 @@ const STORE_ITEMS = [
     type: "e-book" as const,
     description: "Deep dive into 45 complex Sentence structures, silent consonants rules, and tone system markers with local audio tracks link.",
     descriptionMm: "ရှုပ်ထွေးသော ဝါကျတည်ဆောက်ပုံ ၄၅ မျိုး၊ အသံထွက် ခြွင်းချက်ပုံစံများနှင့် အသံနိမ့်မြင့်များ အသေးစိတ်ရှင်းလင်းချက်။",
-    price: 25000,
+    price: 15000,
     currency: "MMK" as const,
-    popular: true
+    popular: true,
+    pdfFileName: "Advanced_Grammar_Manual.pdf",
+    pdfDownloadUrl: "https://drive.google.com/open?id=demo_advanced_grammar"
+  },
+  {
+    id: "free-phrases",
+    name: "100 Daily Essential Thai Phrases Guide",
+    nameMm: "နေ့စဉ်သုံး အထူးထိုင်းစကားပြော စာအုပ်",
+    type: "e-book" as const,
+    description: "Contains vital expressions for daily commute, polite particles, asking directions, ordering meals, and instant street conversation guides.",
+    descriptionMm: "နေ့စဉ်သုံး အထူးထိုင်းစကားပြော စာအုပ် - ခရီးသွားလာခြင်း၊ လမ်းမေးခြင်း၊ အစားအသောက်မှာယူခြင်းတို့အတွက် အထူးလက်စွဲ။",
+    price: 0,
+    currency: "MMK" as const,
+    pdfFileName: "Kru_Jane_100_Daily_Essential_Thai_Phrases.pdf"
+  },
+  {
+    id: "free-writing",
+    name: "Thai Letters Writing Practice Sheet",
+    nameMm: "ထိုင်းဗျည်းနှင့် အရေးအသား အခြေခံလေ့ကျင့်ခန်း",
+    type: "e-book" as const,
+    description: "Includes basic Thai writing stroke keys, consonant class divisions (high, middle, low), and standard phonetic pronunciation guidelines.",
+    descriptionMm: "ထိုင်းဗျည်းနှင့် အရေးအသား အခြေခံလေ့ကျင့်ခန်း - အခြေခံစာရေးသားနည်းနှင့် အသံထွက်လမ်းညွှန်ချက်များ။",
+    price: 0,
+    currency: "MMK" as const,
+    pdfFileName: "Thai_Alphabet_Writing_Workbook.pdf"
   },
   {
     id: "tutoring-zoom",
@@ -153,19 +179,205 @@ const INITIAL_PROGRESS: ProgressState = {
 export default function App() {
   const [lessons, setLessons] = useState<Lesson[]>(() => {
     const saved = localStorage.getItem('thai_lessons_curriculum');
+    let baseLessons = lessonsData;
+    
+    // Process base lessons to distribute across courses and inject premium dialogue learning videos
+    const mappedInitialLessons = baseLessons.map((lesson) => {
+      let courseId = 'course-basic';
+      if (lesson.id >= 11 && lesson.id <= 20) {
+        courseId = 'course-business';
+      } else if (lesson.id >= 21) {
+        courseId = 'course-workspace';
+      }
+
+      let wholeDialogueVideoUrl: string | undefined = undefined;
+      let dialogue = lesson.dialogue;
+
+      if (courseId === 'course-business') {
+        if (lesson.id <= 15) {
+          // Case: One full video for the whole dialogue practice in this lesson
+          const ytUrls = [
+            "https://www.youtube.com/embed/nU2U3B4X2S0",
+            "https://www.youtube.com/embed/H7c2n-M8-3E",
+            "https://www.youtube.com/embed/SOf-hVsc_yU",
+            "https://www.youtube.com/embed/mK9k2tY6SVE",
+            "https://www.youtube.com/embed/T6WkCOx4-R8"
+          ];
+          wholeDialogueVideoUrl = ytUrls[(lesson.id - 11) % ytUrls.length];
+        } else {
+          // Case: Speaker A video and Speaker B video for each dialogue line
+          dialogue = lesson.dialogue.map((line, lineIdx) => {
+            const isSpeakerA = line.speaker.includes('A');
+            // Premium mixkit stock video clips depicting clear close-up speaking loops for native practice
+            const speakerAVideo = "https://assets.mixkit.co/videos/preview/mixkit-woman-explaining-something-during-a-video-call-40030-large.mp4";
+            const speakerBVideo = "https://assets.mixkit.co/videos/preview/mixkit-young-man-having-a-web-conference-40031-large.mp4";
+            return {
+              ...line,
+              videoUrl: isSpeakerA ? speakerAVideo : speakerBVideo
+            };
+          });
+        }
+      } else if (courseId === 'course-workspace') {
+        // Also inject a full video for some workplace lessons
+        const ytUrls = [
+          "https://www.youtube.com/embed/sRLO4p_rDss",
+          "https://www.youtube.com/embed/YnIdVscH_cE"
+        ];
+        wholeDialogueVideoUrl = ytUrls[(lesson.id - 21) % ytUrls.length];
+      }
+
+      return {
+        ...lesson,
+        courseId,
+        dialogue,
+        wholeDialogueVideoUrl
+      };
+    });
+
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Merge mapped properties if saved lines lack courseId or video fields
+        return parsed.map((savedL: any) => {
+          const matched = mappedInitialLessons.find(m => m.id === savedL.id);
+          if (matched) {
+            return {
+              ...matched,
+              ...savedL,
+              // Keep matched video fields & courseId if they aren't configured in saved
+              courseId: savedL.courseId || matched.courseId,
+              dialogue: savedL.dialogue && savedL.dialogue.length > 0
+                ? savedL.dialogue.map((line: any, idx: number) => ({
+                    ...matched.dialogue[idx],
+                    ...line,
+                    videoUrl: line.videoUrl || matched.dialogue[idx]?.videoUrl
+                  }))
+                : matched.dialogue,
+              wholeDialogueVideoUrl: savedL.wholeDialogueVideoUrl || matched.wholeDialogueVideoUrl
+            };
+          }
+          return savedL;
+        });
       } catch (e) {
         console.error("Error parsing saved lessons:", e);
       }
     }
-    return lessonsData;
+    return mappedInitialLessons;
   });
+
+  const [courses, setCourses] = useState<Course[]>(() => {
+    const saved = localStorage.getItem('thai_courses_curriculum');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing saved courses:", e);
+      }
+    }
+    return [
+      {
+        id: "course-basic",
+        name: "Complete Thai Foundational Mastery Course",
+        nameMm: "ထိုင်းစကားပြောနှင့် စာရေးစာဖတ် အခြေခံအထူးတန်းသင်တန်း",
+        priceAmount: 35000,
+        currency: "MMK" as const,
+        duration: "6 Weeks (Self-paced Interactive Training)",
+        description: "Perfect for complete beginners. Cover Thai phonetic consonants, low/mid/high class letters, compound vowels, and tone rules with native audio worksheets.",
+        descriptionMm: "ထိုင်းအက္ခရာ လုံးချင်းအသံထွက်များ၊ သရတွဲများနှင့် အသံနိမ့်မြင့်သင်္ကေတစည်းမျဉ်းများကို စနစ်တကျ သင်ယူလေ့လာနိုင်မည့် အခြေခံအထူးတန်း။",
+        instructor: "Kru Jane (Experienced Native Tutor)",
+        resources: [
+          {
+            id: "res-basic-alphabet",
+            name: "Premium Thai Alphabet Tracing Workbook",
+            nameMm: "ထိုင်းအခြေခံဗျည်းအက္ခရာ ရေးသားလေ့ကျင့်ခန်းစာအုပ်",
+            downloadUrl: "https://drive.google.com/open?id=demo_thai_tracing",
+            priceAmount: 0,
+            currency: 'MMK'
+          },
+          {
+            id: "res-basic-grammar",
+            name: "Complete Thai Tones & Grammar Pocket Guide",
+            nameMm: "ထိုင်းအသံမြှင့်စနစ်နှင့် အဓိကသဒ္ဒါစည်းမျဉ်း အိတ်ဆောင်လက်စွဲ",
+            downloadUrl: "https://drive.google.com/open?id=demo_thai_tones",
+            priceAmount: 4500,
+            currency: 'MMK'
+          }
+        ]
+      },
+      {
+        id: "course-business",
+        name: "Advanced Business Thai Speaking & Letters Course",
+        nameMm: "အလုပ်အကိုင်နှင့် စီးပွားရေးသုံး အဆင့်မြင့် ထိုင်းစကားပြောသင်တန်း",
+        priceAmount: 65000,
+        currency: "MMK" as const,
+        duration: "8 Weeks (Structured Learning Tracks)",
+        description: "Best for career professionals, translators, and cross-border business seekers. Master professional business email drafts, complex negotiation terms, formal speech patterns, and custom terminology.",
+        descriptionMm: "စီးပွားရေးညှိနှိုင်းမှုများ၊ ရုံးသုံးစာပေးစာယူများ၊ အင်တာဗျူးပုံစံများနှင့် လုပ်ငန်းခွင်သုံး စကားပြောအဆင့်မြင့်စကားလုံးများကို ကျွမ်းကျင်စွာ ပြောဆိုရေးသားနိုင်ရန် အထူးသင်ရိုး။",
+        instructor: "Kru Jane & Sayar Thura",
+        resources: [
+          {
+            id: "res-biz-email",
+            name: "Professional Business Thai Email Templates",
+            nameMm: "ရုံးသုံးထိုင်းအီးမေးလ်ရေးသားနည်း ပုံစံတူလက်စွဲစနစ်",
+            downloadUrl: "https://drive.google.com/open?id=demo_biz_email",
+            priceAmount: 6000,
+            currency: 'MMK'
+          }
+        ]
+      },
+      {
+        id: "course-workspace",
+        name: "Workspace & Professional Thai Learning Course",
+        nameMm: "လုပ်ငန်းခွင်သုံး ထိုင်းစကားပြောနှင့် လက်တွေ့အသုံးချသင်တန်း",
+        priceAmount: 45000,
+        currency: "MMK" as const,
+        duration: "6 Weeks (Self-paced Job-Oriented Training)",
+        description: "Master workplace communication, technical operations terminology, factory shift dialogues, and HR speech formulas for working in Thailand comfortably.",
+        descriptionMm: "ထိုင်းနိုင်ငံအတွင်း အလုပ်လုပ်ကိုင်နေသူများ၊ စက်ရုံ/အလုပ်ရုံတန်းများ၊ ရုံးဝန်ထမ်းများနှင့် အရောင်းကိုယ်စားလှယ်များအတွက် လက်တွေ့လုပ်ငန်းခွင်သုံး အထူးပြုပြောဆိုနည်းများ။",
+        instructor: "Kru Jane & Sayar Thura"
+      }
+    ];
+  });
+
+  // Course management edit form states
+  const [adminSelectedCourseId, setAdminSelectedCourseId] = useState<string>('course-basic');
+  const [courseFormName, setCourseFormName] = useState<string>('');
+  const [courseFormNameMm, setCourseFormNameMm] = useState<string>('');
+  const [courseFormPrice, setCourseFormPrice] = useState<number>(35000);
+  const [courseFormDuration, setCourseFormDuration] = useState<string>('');
+  const [courseFormDescription, setCourseFormDescription] = useState<string>('');
+  const [courseFormDescriptionMm, setCourseFormDescriptionMm] = useState<string>('');
+  const [courseFormInstructor, setCourseFormInstructor] = useState<string>('');
+  const [courseIsNew, setCourseIsNew] = useState<boolean>(false);
+  const [courseNewIdStr, setCourseNewIdStr] = useState<string>('');
+
+  // Course resource form state
+  const [resourceFormName, setResourceFormName] = useState<string>('');
+  const [resourceFormNameMm, setResourceFormNameMm] = useState<string>('');
+  const [resourceFormUrl, setResourceFormUrl] = useState<string>('');
+  const [resourceFormPrice, setResourceFormPrice] = useState<number>(0);
+  const [resourceFormType, setResourceFormType] = useState<'free' | 'premium'>('free');
+  const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
+
+  // Course filter for filtering lessons inside admin curriculum editor
+  const [adminCurriculumCourseFilter, setAdminCurriculumCourseFilter] = useState<string>('all');
+
+  useEffect(() => {
+    const activeC = courses.find(c => c.id === adminSelectedCourseId);
+    if (activeC && !courseIsNew) {
+      setCourseFormName(activeC.name);
+      setCourseFormNameMm(activeC.nameMm);
+      setCourseFormPrice(activeC.priceAmount);
+      setCourseFormDuration(activeC.duration);
+      setCourseFormDescription(activeC.description);
+      setCourseFormDescriptionMm(activeC.descriptionMm);
+      setCourseFormInstructor(activeC.instructor);
+    }
+  }, [adminSelectedCourseId, courses, courseIsNew]);
 
   const [adminSelectedLessonId, setAdminSelectedLessonId] = useState<number | null>(null);
   const [adminEditTab, setAdminEditTab] = useState<'metadata' | 'vocabulary' | 'dialogue' | 'grammar' | 'quiz'>('metadata');
-  const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts'>('orders');
+  const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts' | 'courses' | 'store'>('orders');
   const [editingVocabIndex, setEditingVocabIndex] = useState<number | null>(null);
   const [editingVocabThai, setEditingVocabThai] = useState<string>('');
   const [editingVocabPhonetic, setEditingVocabPhonetic] = useState<string>('');
@@ -206,7 +418,7 @@ export default function App() {
   const [isCourseStoreExpanded, setIsCourseStoreExpanded] = useState<boolean>(false);
   const [isGatewayOpen, setIsGatewayOpen] = useState<boolean>(false);
   const [gatewayCourse, setGatewayCourse] = useState<any | null>(null);
-  const [gatewayPaymentMethod, setGatewayPaymentMethod] = useState<'kbzpay' | 'wavepay' | 'cbpay' | 'truemoney' | 'promptpay'>('kbzpay');
+  const [gatewayPaymentMethod, setGatewayPaymentMethod] = useState<'kbzpay' | 'wavepay' | 'cbpay' | 'ayabank' | 'truemoney' | 'promptpay'>('kbzpay');
   const [gatewayPhone, setGatewayPhone] = useState<string>('');
   const [gatewayStep, setGatewayStep] = useState<number>(1); // 1 = input contact/order, 2 = select method & complete gateway step, 3 = dynamic qr/otp confirmation, 4 = complete success
   const [gatewayProcessing, setGatewayProcessing] = useState<boolean>(false);
@@ -315,6 +527,10 @@ export default function App() {
   }, [lessons]);
 
   useEffect(() => {
+    localStorage.setItem('thai_courses_curriculum', JSON.stringify(courses));
+  }, [courses]);
+
+  useEffect(() => {
     setEditingVocabIndex(null);
   }, [adminSelectedLessonId, adminEditTab]);
 
@@ -326,6 +542,8 @@ export default function App() {
   const [isOnline, setIsRecordingOnline] = useState<boolean>(navigator.onLine);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [dashboardTab, setDashboardTab] = useState<'lessons' | 'orientation' | 'handbook' | 'alphabet' | 'notebook' | 'profile' | 'admin'>('lessons');
+  const [selectedCourseTab, setSelectedCourseTab] = useState<string>('course-basic');
+  const [courseSubTab, setCourseSubTab] = useState<'lessons' | 'resources'>('lessons');
   const [activeChapterId, setActiveChapterId] = useState<number>(1);
   const [activeOrientationId, setActiveOrientationId] = useState<string>('better-thai');
   const [mobileChapterDetailActive, setMobileChapterDetailActive] = useState<boolean>(false);
@@ -442,16 +660,19 @@ export default function App() {
           password: u.password || 'password123',
           role: u.role || 'student',
           xp: u.xp || 0,
-          dateJoined: u.dateJoined || new Date().toISOString().split('T')[0]
+          dateJoined: u.dateJoined || new Date().toISOString().split('T')[0],
+          fullName: u.fullName,
+          phone: u.phone,
+          email: u.email
         }));
       } catch (e) {
         // Fallback
       }
     }
     return [
-      { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12" },
-      { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01" },
-      { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10" },
+      { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12", fullName: "Ko Nay Min", phone: "09-771234567", email: "naymin@gmail.com" },
+      { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01", fullName: "Ma Khine Oo", phone: "09-445890123", email: "makhineoo@viber-me.com" },
+      { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10", fullName: "Phyo Wai Tun", phone: "09-221345566", email: "phyowai@gmail.com" },
       { username: "admin_thura", password: "adminpassword", role: "admin", xp: 5000, dateJoined: "2026-06-05" }
     ];
   });
@@ -473,19 +694,25 @@ export default function App() {
         itemName: "🗣️ 1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
         itemType: "tutoring",
         priceAmount: 45000,
-         currency: "MMK",
+        currency: "MMK",
         status: "completed",
-        orderDate: "2026-06-10"
+        orderDate: "2026-06-10",
+        studentPhone: "09-771234567",
+        studentEmail: "konaymin@gmail.com",
+        adminNotes: "Session scheduled with Kru Jane. Zoom link dispatched to student mail/viber pipeline."
       },
       {
-         id: "ORD-99322",
-         username: "ma_khine",
-         itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
-         itemType: "e-book",
-         priceAmount: 25000,
-         currency: "MMK",
-         status: "pending",
-         orderDate: "2026-06-13"
+        id: "ORD-99322",
+        username: "ma_khine",
+        itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
+        itemType: "e-book",
+        priceAmount: 25000,
+        currency: "MMK",
+        status: "pending",
+        orderDate: "2026-06-13",
+        studentPhone: "09-445890123",
+        studentEmail: "makhineoo@viber-me.com",
+        evidenceImage: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='500' viewBox='0 0 300 500'><rect width='300' height='500' fill='%230056B3'/><rect x='15' y='15' width='270' height='470' rx='20' fill='white'/><circle cx='150' cy='80' r='30' fill='%2328A745'/><path d='M140 80 l7 7 l13 -13' fill='none' stroke='white' stroke-width='4'/><text x='150' y='135' font-family='sans-serif' font-size='16' font-weight='bold' fill='%2328A745' text-anchor='middle'>KPay Verification</text><text x='150' y='160' font-family='sans-serif' font-size='22' font-weight='bold' fill='%23333333' text-anchor='middle'>- 25,000 MMK</text><line x1='30' y1='185' x2='270' y2='185' stroke='%23EEEEEE' stroke-width='2'/><text x='35' y='210' font-family='sans-serif' font-size='11' fill='%23777777'>Transaction ID</text><text x='265' y='210' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>TXN7784013920</text><text x='35' y='245' font-family='sans-serif' font-size='11' fill='%23777777'>Sender</text><text x='265' y='245' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>Ma Khine</text><text x='35' y='280' font-family='sans-serif' font-size='11' fill='%23777777'>Recipient</text><text x='265' y='280' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>Kru Jane Thai School</text><text x='35' y='315' font-family='sans-serif' font-size='11' fill='%23777777'>Date &amp; Time</text><text x='265' y='315' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>2026-06-13 14:15</text><line x1='30' y1='345' x2='270' y2='345' stroke='%23EEEEEE' stroke-width='2'/><rect x='30' y='370' width='240' height='70' rx='10' fill='%23F8F9FA'/><text x='150' y='398' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23666666' text-anchor='middle'>Payment Channel: KBZPay Myanmar</text><text x='150' y='418' font-family='sans-serif' font-size='10' fill='%23999999' text-anchor='middle'>Reference: KBZ-PRINT-THAI</text></svg>"
       }
     ];
   });
@@ -493,6 +720,70 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('thai_user_orders_list', JSON.stringify(orders));
   }, [orders]);
+
+  // Study store items state for sale
+  const [storeItems, setStoreItems] = useState<StoreItem[]>(() => {
+    const saved = localStorage.getItem('thai_store_items_list');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return DEFAULT_STORE_ITEMS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('thai_store_items_list', JSON.stringify(storeItems));
+  }, [storeItems]);
+
+  // Admin Store / E-Book editor states
+  const [adminSelectedStoreId, setAdminSelectedStoreId] = useState<string>('premium-book');
+  const [storeFormName, setStoreFormName] = useState<string>('');
+  const [storeFormNameMm, setStoreFormNameMm] = useState<string>('');
+  const [storeFormType, setStoreFormType] = useState<'e-book' | 'tutoring' | 'certificate' | 'vip-package'>('e-book');
+  const [storeFormDescription, setStoreFormDescription] = useState<string>('');
+  const [storeFormDescriptionMm, setStoreFormDescriptionMm] = useState<string>('');
+  const [storeFormPrice, setStoreFormPrice] = useState<number>(25000);
+  const [storeFormCurrency, setStoreFormCurrency] = useState<'MMK' | 'XP'>('MMK');
+  const [storeFormPopular, setStoreFormPopular] = useState<boolean>(false);
+  const [storeIsNew, setStoreIsNew] = useState<boolean>(false);
+  const [storeNewIdStr, setStoreNewIdStr] = useState<string>('');
+  const [storeFormCourseId, setStoreFormCourseId] = useState<string>('');
+  const [storeFormPdfFileName, setStoreFormPdfFileName] = useState<string>('');
+  const [storeFormPdfDownloadUrl, setStoreFormPdfDownloadUrl] = useState<string>('');
+
+  useEffect(() => {
+    const activeItem = storeItems.find(item => item.id === adminSelectedStoreId);
+    if (activeItem && !storeIsNew) {
+      setStoreFormName(activeItem.name);
+      setStoreFormNameMm(activeItem.nameMm);
+      setStoreFormType(activeItem.type);
+      setStoreFormDescription(activeItem.description || '');
+      setStoreFormDescriptionMm(activeItem.descriptionMm || '');
+      setStoreFormPrice(activeItem.price);
+      setStoreFormCurrency(activeItem.currency);
+      setStoreFormPopular(!!activeItem.popular);
+      setStoreFormCourseId(activeItem.courseId || '');
+      setStoreFormPdfFileName(activeItem.pdfFileName || '');
+      setStoreFormPdfDownloadUrl(activeItem.pdfDownloadUrl || '');
+    }
+  }, [adminSelectedStoreId, storeItems, storeIsNew]);
+
+  // Load student account profile parameters into checkout form automatically when currentUser changes
+  useEffect(() => {
+    if (isLoggedIn && currentUser && !isAdmin) {
+      const parentUser = registeredUsers.find(u => u.username.toLowerCase() === currentUser.toLowerCase());
+      if (parentUser) {
+        setCheckoutName(parentUser.fullName || parentUser.username || '');
+        setGatewayPhone(parentUser.phone || '');
+        setGatewayEmail(parentUser.email || '');
+      }
+    }
+  }, [currentUser, isLoggedIn, isAdmin]);
+
+  const [selectedDetailOrder, setSelectedDetailOrder] = useState<PurchaseOrder | null>(null);
 
   // Dynamic system logs shown on the admin panel
   const [systemLogs, setSystemLogs] = useState<{ id: string; user: string; action: string; time: string }[]>(() => {
@@ -571,6 +862,76 @@ export default function App() {
       }
     }
   }, []);
+
+  // Helper to generate a genuine educational PDF guide on the fly and trigger file download
+  const triggerPdfDownload = (fileName: string, title: string, description: string, languageHighlights: { thai: string, pronunciation: string, myanmar: string }[]) => {
+    const itemsText = languageHighlights.map((hl, idx) => {
+      return `${idx + 1}. ${hl.thai} [${hl.pronunciation}] - ${hl.myanmar}`;
+    }).join("\n");
+
+    const pdfContent = `%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.275 841.889] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>
+endobj
+4 0 obj
+<< /Length 850 >>
+stream
+BT
+/F1 16 Tf
+50 780 Td
+(${title}) Tj
+/F2 10 Tf
+0 -25 Td
+(Kru Jane & Sayar Thura Thai Language Academy) Tj
+0 -15 Td
+(E-Book Reference Companion Guide) Tj
+0 -30 Td
+(About: ${description}) Tj
+0 -30 Td
+/F1 12 Tf
+(ESSENTIAL PHRASES & VOCABULARY HIGHLIGHTS:) Tj
+/F2 10 Tf
+0 -20 Td
+${itemsText.split('\n').map(line => `(${line}) Tj\n0 -15 Td`).join('\n')}
+0 -30 Td
+(Downloaded officially via classroom portal.) Tj
+0 -15 Td
+(Unlock Advanced levels to master Business negotiations, contracts & full speaking guides.) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000015 00000 n 
+0000000068 00000 n 
+0000000120 00000 n 
+0000000273 00000 n 
+trailer
+<< /Size 5 /Root 1 0 R >>
+startxref
+1100
+%%EOF`;
+
+    const blob = new Blob([pdfContent], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    addSystemLog(currentUser || "Student", `Downloaded free study textbook: "${title}"`);
+  };
 
   // Save progress changes
   const saveProgress = (newState: ProgressState) => {
@@ -844,6 +1205,71 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const downloadOrdersAsJSON = (filteredOrders: PurchaseOrder[], customFileName?: string) => {
+    try {
+      const dataStr = JSON.stringify(filteredOrders, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', customFileName || `${currentUser || 'my'}_orders_ledger.json`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      addSystemLog(currentUser || 'User', `Successfully downloaded orders ledger as JSON file: ${customFileName || 'default'}`);
+    } catch (e) {
+      alert('Failed to generate JSON download.');
+    }
+  };
+
+  const downloadOrdersAsCSV = (filteredOrders: PurchaseOrder[], customFileName?: string) => {
+    try {
+      const headers = ['Order ID', 'Item Name', 'Item Type', 'Price Amount', 'Currency', 'Status', 'Date Placed', 'Contact Phone', 'Contact Email', 'Admin Notes', 'Student Username', 'Payment Image Attached'];
+      const escapeCSVCell = (val: string | number | undefined) => {
+        if (val === undefined || val === null) return '""';
+        const str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return `"${str}"`;
+      };
+
+      const rows = filteredOrders.map(o => [
+        escapeCSVCell(o.id),
+        escapeCSVCell(o.itemName),
+        escapeCSVCell(o.itemType),
+        escapeCSVCell(o.priceAmount),
+        escapeCSVCell(o.currency),
+        escapeCSVCell(o.status),
+        escapeCSVCell(o.orderDate),
+        escapeCSVCell(o.studentPhone),
+        escapeCSVCell(o.studentEmail),
+        escapeCSVCell(o.adminNotes),
+        escapeCSVCell(o.username),
+        o.evidenceImage ? '"Yes"' : '"No"'
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', customFileName || `${currentUser || 'my'}_orders_ledger.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      addSystemLog(currentUser || 'User', `Successfully downloaded purchase ledger as CSV file: ${customFileName || 'default'}`);
+    } catch (e) {
+      alert('Failed to generate CSV download.');
+    }
   };
 
   const handleSyllabusCsvFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1631,96 +2057,227 @@ export default function App() {
   const isAdminActive = dashboardTab === 'admin';
   const isCoursesActive = ['orientation', 'handbook', 'alphabet'].includes(dashboardTab);
 
+  const isCourseUnlocked = (courseId: string) => {
+    if (currentUser === 'admin' || (currentUser && registeredUsers.find(u => u.username === currentUser)?.role === 'admin')) {
+      return true;
+    }
+    if (courseId === 'course-basic') {
+      return true;
+    }
+    return orders.some(o => 
+      o.username.toLowerCase() === (currentUser || "").toLowerCase() && 
+      o.status === 'completed' &&
+      (o.id === courseId || o.itemName.toLowerCase().includes(courseId.toLowerCase().replace('course-', '')))
+    );
+  };
+
+  const isStoreItemUnlocked = (itemId: string, itemPrice: number) => {
+    if (itemPrice === 0) return true;
+    if (currentUser === 'admin' || (currentUser && registeredUsers.find(u => u.username === currentUser)?.role === 'admin')) {
+      return true;
+    }
+    return orders.some(o => 
+      o.username.toLowerCase() === (currentUser || "").toLowerCase() && 
+      o.status === 'completed' &&
+      (o.id.toLowerCase() === itemId.toLowerCase() || o.itemName.toLowerCase().includes(itemId.trim().toLowerCase()))
+    );
+  };
+
+  const activeCourse = courses.find(c => c.id === selectedCourseTab);
+  const courseLessons = activeCourse 
+    ? lessons.filter(l => (l.courseId || 'course-basic') === activeCourse.id)
+    : lessons; // Fallback to all lessons if resources tab is picked
+
   const lessonsPerPage = 6;
-  const totalLessons = lessons.length;
-  const totalPages = Math.ceil(totalLessons / lessonsPerPage);
-  const paginatedLessons = lessons.slice(
+  const totalLessons = courseLessons.length;
+  const totalPages = Math.max(1, Math.ceil(totalLessons / lessonsPerPage));
+  const paginatedLessons = courseLessons.slice(
     (currentPage - 1) * lessonsPerPage,
     currentPage * lessonsPerPage
   );
 
   const activeLesson = lessons.find((l) => l.id === activeLessonId);
 
-  const activeLessonIndex = activeLesson ? lessons.findIndex(l => l.id === activeLesson.id) : -1;
-  const prevLesson = activeLessonIndex > 0 ? lessons[activeLessonIndex - 1] : null;
-  const nextLesson = activeLessonIndex >= 0 && activeLessonIndex < lessons.length - 1 ? lessons[activeLessonIndex + 1] : null;
+  // Use the course-filtered lessons for calculating prev/next lessons so that you stay within the selected course!
+  const activeLessonIndex = activeLesson ? courseLessons.findIndex(l => l.id === activeLesson.id) : -1;
+  const prevLesson = activeLessonIndex > 0 ? courseLessons[activeLessonIndex - 1] : null;
+  const nextLesson = activeLessonIndex >= 0 && activeLessonIndex < courseLessons.length - 1 ? courseLessons[activeLessonIndex + 1] : null;
 
   return (
-    <div className="min-h-screen bg-brand-light text-brand-dark flex flex-col font-sans">
+    <div className="h-screen h-[100dvh] bg-brand-light text-brand-dark flex flex-col font-sans overflow-hidden">
       
       {/* Top Header Navigation bar */}
-      <header className="bg-white border-b-2 border-gray-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-10 h-10 bg-brand-purple text-white rounded-xl border-b-4 border-brand-purple-shadow flex items-center justify-center font-sans font-black text-lg select-none shrink-0">
-              TH
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xs sm:text-sm font-sans font-black text-brand-dark tracking-tight leading-tight select-none uppercase truncate">
-                Thai Language Tutor
-              </h1>
-              <p className="text-[9px] sm:text-[10px] text-brand-muted font-sans font-extrabold tracking-wide uppercase mt-0.5 truncate">
-                <span className="hidden xs:inline">Myanmar Repat Course • </span>ထိုင်း-မြန်မာ အပြန်အလှန်လေ့လာရေး
-              </p>
-            </div>
-          </div>
-
-          {/* Offline/Online indicators and Auth/Identity Management Panel */}
-          <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 flex-wrap sm:flex-nowrap">
-            <span className="hidden leading-none xs:flex items-center gap-1 sm:gap-1.5 text-[10px] font-sans font-black text-brand-purple bg-brand-purple-light/50 px-2.5 py-1.5 rounded-full select-none">
-              <WifiOff className="w-3.5 h-3.5 shrink-0" />
-              <span>Offline Ready</span>
-            </span>
-
-            {/* Authentication controls */}
-            {isLoggedIn ? (
-              <div className="flex items-center gap-2 sm:gap-3 bg-gray-50 border border-gray-100 p-1 pl-2.5 rounded-xl">
-                <div className="flex flex-col text-right">
-                  <div className="flex items-center gap-1">
-                    {isAdmin ? (
-                      <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/25 shrink-0" />
-                    ) : (
-                      <CheckCircle className="w-3.5 h-3.5 text-brand-purple shrink-0" />
-                    )}
-                    <span className="text-[10px] sm:text-xs font-sans font-black text-brand-dark truncate max-w-[96px] uppercase tracking-tight">
-                      {currentUser}
-                    </span>
-                  </div>
-                  <span className="text-[8px] sm:text-[9px] font-mono text-brand-muted font-bold -mt-0.5">
-                    {isAdmin ? 'ADMINISTRATOR' : `${progress.totalXp} XP • LEVEL ${Math.floor(progress.totalXp / 1000) + 1}`}
-                  </span>
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 shrink-0 sticky top-0 z-50 transition-all shadow-3xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="min-h-16 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* Left: Brand Logo & Title + Mobile Actions Row */}
+            <div className="flex items-center justify-between w-full md:w-auto gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 bg-gradient-to-tr from-brand-purple to-[#7a42c4] text-white rounded-xl shadow-xs border-b-2 border-brand-purple-shadow flex items-center justify-center font-sans font-black text-base select-none shrink-0 transition-transform hover:scale-105">
+                  TH
                 </div>
-                
-                {/* Sign Out Button */}
-                <button
-                  onClick={handleSignOut}
-                  className="p-2 sm:px-3 sm:py-1.5 bg-white hover:bg-red-50 hover:text-red-600 rounded-lg border border-gray-200 hover:border-red-200 transition-colors cursor-pointer text-brand-muted"
-                  title="Sign Out • အကောင့်ထွက်မည်"
-                >
-                  <LogOut className="w-3.5 h-3.5 shrink-0 sm:mr-1 inline-block" />
-                  <span className="hidden sm:inline font-sans font-black text-[10px] leading-none uppercase tracking-wide">
-                    Out
-                  </span>
-                </button>
+                <div className="min-w-0">
+                  <h1 className="text-xs sm:text-sm font-sans font-black text-slate-800 tracking-tight leading-tight select-none uppercase">
+                    Thai Language Tutor
+                  </h1>
+                  <p className="text-[8.5px] sm:text-[10px] text-brand-purple font-sans font-black tracking-wide uppercase mt-0.5 truncate">
+                    <span className="hidden xs:inline">Myanmar Repat Course • </span>ထိုင်း-မြန်မာ အပြန်အလှန်လေ့လာရေး
+                  </p>
+                </div>
               </div>
-            ) : (
+
+              {/* Mobile Right Authenticated controls / Sign In (hidden on md and above) */}
+              <div className="flex md:hidden items-center gap-2">
+                {isLoggedIn ? (
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 p-1 pl-2.5 rounded-xl shadow-3xs">
+                    <div className="flex flex-col text-right">
+                      <div className="flex items-center gap-1 justify-end">
+                        {isAdmin ? (
+                          <Shield className="w-3 h-3 text-amber-500 fill-amber-500/25 shrink-0" />
+                        ) : (
+                          <CheckCircle className="w-3 h-3 text-brand-purple shrink-0" />
+                        )}
+                        <span className="text-[9px] font-sans font-black text-[#583092] truncate max-w-[64px] uppercase tracking-tight">
+                          {currentUser}
+                        </span>
+                      </div>
+                      <span className="text-[7.5px] font-mono text-brand-muted font-bold -mt-0.5">
+                        {isAdmin ? 'ADMIN' : `${progress.totalXp} XP`}
+                      </span>
+                    </div>
+                    {/* Sign Out Button */}
+                    <button
+                      onClick={handleSignOut}
+                      className="p-1 px-2 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-lg border border-slate-250 transition-colors cursor-pointer text-brand-muted text-[8.5px] font-sans font-black uppercase leading-none"
+                      title="Sign Out • အကောင့်ထွက်မည်"
+                    >
+                      Out
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setAuthTab('user');
+                      setShowAuthModal(true);
+                    }}
+                    className="px-3 py-2 bg-gradient-to-r from-brand-purple to-[#7a42c4] hover:brightness-105 text-white rounded-lg border-b-2 border-brand-purple-shadow flex items-center gap-1 font-sans font-black text-[9px] sm:text-[10px] transition-transform active:translate-y-0.5 cursor-pointer uppercase tracking-wider select-none shrink-0 shadow-xs"
+                  >
+                    <User className="w-3 h-3 shrink-0" />
+                    Sign In
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Middle: Integrated 4 Course Selection Tabs (Combined with Header Group) */}
+            <div className="flex items-center justify-start md:justify-center bg-slate-100/90 p-1 rounded-2xl border border-slate-200 select-none overflow-x-auto scrollbar-none gap-1 w-full md:w-auto max-w-full">
+              {courses.map((course) => {
+                const isSelected = selectedCourseTab === course.id && dashboardTab === 'lessons';
+                let icon = "⭐️";
+                if (course.id === 'course-basic') icon = "⭐️";
+                else if (course.id === 'course-business') icon = "💎";
+                else if (course.id === 'course-workspace') icon = "💼";
+
+                const displayName = course.id === 'course-basic' ? "Basic Course" :
+                                    course.id === 'course-business' ? "Advanced" :
+                                    course.id === 'course-workspace' ? "Workplace" :
+                                    course.name;
+
+                return (
+                  <button
+                    key={course.id}
+                    onClick={() => {
+                      setSelectedCourseTab(course.id);
+                      setDashboardTab('lessons');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-sans font-black text-[9px] sm:text-[10px] xl:text-[11px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs scale-102 border-b-2 border-brand-purple-shadow'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/80'
+                    }`}
+                    title={course.name}
+                  >
+                    <span className="text-[10px] sm:text-[11px] leading-none">{icon}</span>
+                    <span>{displayName}</span>
+                  </button>
+                );
+              })}
               <button
                 onClick={() => {
-                  setAuthTab('user');
-                  setShowAuthModal(true);
+                  setSelectedCourseTab('resources');
+                  setDashboardTab('lessons');
                 }}
-                className="px-3.5 py-2.5 bg-brand-purple hover:bg-brand-purple-shadow text-white rounded-xl border-b-4 border-brand-purple-shadow flex items-center gap-1.5 font-sans font-black text-[10px] sm:text-xs transition-transform active:translate-y-0.5 cursor-pointer uppercase tracking-wider select-none shrink-0 shadow-xs"
+                className={`px-3 py-1.5 rounded-xl font-sans font-black text-[9px] sm:text-[10px] xl:text-[11px] transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
+                  selectedCourseTab === 'resources' && dashboardTab === 'lessons'
+                    ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs scale-102 border-b-2 border-brand-purple-shadow'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/80'
+                }`}
+                title="Syllabus Resources & Document Material PDFs"
               >
-                <User className="w-3.5 h-3.5 shrink-0" />
-                Sign In • ဝင်ရောက်ရန်
+                <span className="text-[10px] sm:text-[11px] leading-none">📚</span>
+                <span>Resources</span>
               </button>
-            )}
+            </div>
+
+            {/* Right Group: Offline Badge & User Profile Controls for Desktop */}
+            <div className="hidden md:flex items-center gap-3 shrink-0 justify-end">
+              <span className="flex leading-none items-center gap-1.5 text-[10px] font-sans font-black text-brand-purple bg-purple-50 border border-purple-100 px-3 py-2 rounded-xl select-none animate-pulse">
+                <WifiOff className="w-3.5 h-3.5 shrink-0 text-brand-purple" />
+                <span>Offline Ready</span>
+              </span>
+
+              {/* Authentication Controls */}
+              {isLoggedIn ? (
+                <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-150 p-1 pl-3 rounded-2xl transition-colors">
+                  <div className="flex flex-col text-right">
+                    <div className="flex items-center gap-1 justify-end">
+                      {isAdmin ? (
+                        <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/10 shrink-0" />
+                      ) : (
+                        <CheckCircle className="w-3.5 h-3.5 text-brand-purple shrink-0" />
+                      )}
+                      <span className="text-[10px] sm:text-xs font-sans font-black text-slate-800 uppercase tracking-tight">
+                        {currentUser}
+                      </span>
+                    </div>
+                    <span className="text-[8px] sm:text-[9.5px] font-mono text-brand-purple font-black uppercase tracking-wider -mt-0.5">
+                      {isAdmin ? 'ADMINISTRATOR' : `${progress.totalXp} XP • LEVEL ${Math.floor(progress.totalXp / 1000) + 1}`}
+                    </span>
+                  </div>
+                  
+                  {/* Sign Out Button */}
+                  <button
+                    onClick={handleSignOut}
+                    className="p-2 sm:px-3 sm:py-2 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-xl border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer text-slate-500 flex items-center gap-1"
+                    title="Sign Out • အကောင့်ထွက်မည်"
+                  >
+                    <LogOut className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                    <span className="font-sans font-black text-[9.5px] leading-none uppercase tracking-wider">
+                      Out
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setAuthTab('user');
+                    setShowAuthModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-gradient-to-r from-brand-purple to-[#7a42c4] hover:brightness-105 text-white rounded-xl border-b-4 border-brand-purple-shadow flex items-center gap-1.5 font-sans font-black text-[10px] sm:text-xs transition-transform active:translate-y-0.5 cursor-pointer uppercase tracking-wider select-none shrink-0 shadow-xs"
+                >
+                  <User className="w-3.5 h-3.5 shrink-0" />
+                  Sign In • ဝင်ရောက်ရန်
+                </button>
+              )}
+            </div>
+
           </div>
         </div>
       </header>
 
       {/* Main Container Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[88px] sm:pb-32">
+      <main className="flex-1 overflow-y-auto max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[88px] sm:pb-32">
         
         {/* If no lesson is currently active: Display main student Dashboard */}
         {!activeLessonId ? (
@@ -1767,151 +2324,859 @@ export default function App() {
             {/* TAB CONTENT: 1. Lessons pathways */}
             {dashboardTab === 'lessons' && (
               <div className="max-w-4xl mx-auto space-y-6 min-h-[500px]">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border-2 border-gray-100">
-                  <div>
-                    <h3 className="font-sans font-black text-brand-dark text-base mb-0.5 uppercase tracking-tight">
-                      Syllabus Lessons • သင်ခန်းစာများ
-                    </h3>
-                    <p className="text-xs text-brand-muted font-sans font-semibold">
-                      Lessons {(currentPage - 1) * lessonsPerPage + 1} to {Math.min(currentPage * lessonsPerPage, totalLessons)} of {totalLessons}
-                    </p>
-                  </div>
 
-                  {/* Compact Pagination Top Control */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 self-start sm:self-auto select-none">
-                      <button
-                        onClick={() => {
-                          setCurrentPage((p) => Math.max(1, p - 1));
-                        }}
-                        disabled={currentPage === 1}
-                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-brand-dark disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center font-bold hover:bg-gray-50 active:translate-y-0.5 transition-all text-xs"
-                        title="Previous lessons"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
+                {selectedCourseTab !== 'resources' ? (() => {
+                  const activeCourse = courses.find(c => c.id === selectedCourseTab);
+                  if (!activeCourse) return <p className="text-center font-sans font-bold text-xs text-brand-muted py-10">Unknown Course selection.</p>;
 
-                      <div className="text-[11px] font-sans font-black text-brand-purple bg-brand-purple-light/55 px-3 py-1.5 rounded-lg whitespace-nowrap">
-                        PAGE {currentPage} / {totalPages}
-                      </div>
+                  const unlocked = isCourseUnlocked(activeCourse.id);
 
-                      <button
-                        onClick={() => {
-                          setCurrentPage((p) => Math.min(totalPages, p + 1));
-                        }}
-                        disabled={currentPage === totalPages}
-                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-brand-dark disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center font-bold hover:bg-gray-50 active:translate-y-0.5 transition-all text-xs"
-                        title="Next lessons"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  if (unlocked) {
+                    const courseResources = storeItems.filter(item => item.courseId === activeCourse.id);
+                    return (
+                      <>
+                        {/* Course Tab Navigation */}
+                        <div className="bg-white p-2 rounded-2xl border-2 border-gray-100 flex items-center gap-2 select-none shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => setCourseSubTab('lessons')}
+                            className={`flex-1 py-3 px-4 rounded-xl text-xs font-sans font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                              courseSubTab === 'lessons'
+                                ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow shadow-sm'
+                                : 'text-brand-muted hover:text-brand-dark hover:bg-slate-50'
+                            }`}
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            Study Syllabus Lessons (သင်ခန်းစာများ)
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => setCourseSubTab('resources')}
+                            className={`flex-1 py-3 px-4 rounded-xl text-xs font-sans font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                              courseSubTab === 'resources'
+                                ? 'bg-brand-purple text-white border-b-4 border-brand-purple-shadow shadow-sm'
+                                : 'text-brand-muted hover:text-brand-dark hover:bg-slate-50'
+                            }`}
+                          >
+                            <FileText className={`w-4 h-4 ${courseSubTab === 'resources' ? 'text-white' : 'text-brand-purple'}`} />
+                            Course eBooks & PDFs ({courseResources.length})
+                          </button>
+                        </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="lessons-catalog">
-                    {paginatedLessons.map((lesson) => {
-                      const isCompleted = progress.completedLessons.includes(lesson.id);
-                      const score = progress.quizHighScores[lesson.id] || 0;
+                        {courseSubTab === 'lessons' ? (
+                          <div className="space-y-6 animate-fade-in text-left">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border-2 border-gray-100">
+                              <div>
+                                <span className="text-[10px] text-brand-purple font-sans font-black uppercase tracking-wider block">Course: {activeCourse.name}</span>
+                                <h3 className="font-sans font-black text-brand-dark text-base mb-0.5 uppercase tracking-tight mt-0.5">
+                                  Syllabus Lessons • သင်ခန်းစာများ
+                                </h3>
+                                <p className="text-xs text-brand-muted font-sans font-semibold">
+                                  Lessons {(currentPage - 1) * lessonsPerPage + 1} to {Math.min(currentPage * lessonsPerPage, totalLessons)} of {totalLessons}
+                                </p>
+                              </div>
 
-                      return (
-                        <motion.div
-                          key={lesson.id}
-                          className="duo-card p-6 bg-white flex flex-col justify-between hover:shadow-md transition-all duration-200"
-                          whileHover={{ y: -2 }}
-                        >
-                          <div>
-                            <div className="flex justify-between items-start">
-                              <span className="text-[10px] font-sans text-white bg-brand-purple px-2.5 py-1 rounded-full border-b-2 border-brand-purple-shadow font-extrabold select-none">
-                                LESSON {lesson.id}
-                              </span>
-                              {isCompleted && (
-                                <span className="flex items-center gap-1 text-[10px] text-white bg-brand-green px-2.5 py-1 rounded-full font-black font-sans border-b-2 border-brand-green-shadow">
-                                  Complete • အောင်မြင်သည်
-                                </span>
+                              {/* Compact Pagination Top Control */}
+                              {totalPages > 1 && (
+                                <div className="flex items-center gap-1.5 self-center sm:self-auto select-none border-none bg-transparent p-0">
+                                  <button
+                                    onClick={() => {
+                                      setCurrentPage((p) => Math.max(1, p - 1));
+                                    }}
+                                    disabled={currentPage === 1}
+                                    className="w-7 h-7 text-brand-purple hover:text-brand-dark disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+                                    title="Previous page"
+                                  >
+                                    <ChevronLeft className="w-4 h-4" />
+                                  </button>
+
+                                  <div className="text-[11px] font-sans font-black tracking-wider text-brand-purple/90 uppercase whitespace-nowrap px-1">
+                                    {currentPage} / {totalPages}
+                                  </div>
+
+                                  <button
+                                    onClick={() => {
+                                      setCurrentPage((p) => Math.min(totalPages, p + 1));
+                                    }}
+                                    disabled={currentPage === totalPages}
+                                    className="w-7 h-7 text-brand-purple hover:text-brand-dark disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+                                    title="Next page"
+                                  >
+                                    <ChevronRight className="w-4 h-4" />
+                                  </button>
+                                </div>
                               )}
                             </div>
 
-                            <h4 className="text-sm font-sans font-black text-[#3c3c3c] mt-4 leading-tight">
-                              {lesson.titleEnglish}
-                            </h4>
-                            <p className="text-xs font-sans text-brand-green font-extrabold italic mt-1" style={{ wordBreak: 'break-word' }}>
-                              {lesson.titlePhonetic} ({lesson.titleThai})
-                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="lessons-catalog">
+                              {paginatedLessons.map((lesson) => {
+                                const isCompleted = progress.completedLessons.includes(lesson.id);
+                                const score = progress.quizHighScores[lesson.id] || 0;
 
-                            <p className="text-[11px] text-brand-muted font-sans mt-3 line-clamp-2 leading-relaxed font-bold">
-                              {lesson.descriptionMyanmar}
-                            </p>
-                          </div>
+                                return (
+                                  <motion.div
+                                    key={lesson.id}
+                                    className="duo-card p-6 bg-white flex flex-col justify-between hover:shadow-md transition-all duration-200"
+                                    whileHover={{ y: -2 }}
+                                  >
+                                    <div>
+                                      <div className="flex justify-between items-start">
+                                        <span className="text-[10px] font-sans text-white bg-brand-purple px-2.5 py-1 rounded-full border-b-2 border-brand-purple-shadow font-extrabold select-none">
+                                          LESSON {lesson.id}
+                                        </span>
+                                        {isCompleted && (
+                                          <span className="flex items-center gap-1 text-[10px] text-white bg-brand-green px-2.5 py-1 rounded-full font-black font-sans border-b-2 border-brand-green-shadow">
+                                            Complete • အောင်မြင်သည်
+                                          </span>
+                                        )}
+                                      </div>
 
-                          <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center bg-gray-50/50 -mx-6 -mb-6 p-4 rounded-b-2xl">
-                            <span className="text-[10px] font-sans text-brand-muted font-extrabold tracking-wider uppercase">
-                              SCORE: {score}%
-                            </span>
-                            <button
-                              onClick={() => {
-                                setActiveLessonId(lesson.id);
-                                setActiveTab('vocabulary');
-                                setCurrentGrammarPageIndex(0);
-                              }}
-                              className="duo-btn duo-btn-purple text-xs px-4 py-2.5 flex items-center gap-1.5 font-bold"
-                            >
-                              Study Lesson • လေ့လာမည်
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
+                                      <h4 className="text-sm font-sans font-black text-[#3c3c3c] mt-4 leading-tight">
+                                        {lesson.titleEnglish}
+                                      </h4>
+                                      <p className="text-xs font-sans text-brand-green font-extrabold italic mt-1" style={{ wordBreak: 'break-word' }}>
+                                        {lesson.titlePhonetic} ({lesson.titleThai})
+                                      </p>
+
+                                      <p className="text-[11px] text-brand-muted font-sans mt-3 line-clamp-2 leading-relaxed font-bold">
+                                        {lesson.descriptionMyanmar}
+                                      </p>
+                                    </div>
+
+                                    <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center bg-gray-50/50 -mx-6 -mb-6 p-4 rounded-b-2xl">
+                                      <span className="text-[10px] font-sans text-brand-muted font-extrabold tracking-wider uppercase">
+                                        SCORE: {score}%
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          setActiveLessonId(lesson.id);
+                                          setActiveTab('vocabulary');
+                                          setCurrentGrammarPageIndex(0);
+                                        }}
+                                        className="duo-btn duo-btn-purple text-xs px-4 py-2.5 flex items-center gap-1.5 font-bold"
+                                      >
+                                        Study Lesson • လေ့လာမည်
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Duolingo Modern Pagination Panel */}
+                            {totalPages > 1 && (
+                              <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 bg-white p-4 rounded-2xl border-2 border-gray-100/80">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCurrentPage((p) => Math.max(1, p - 1));
+                                    document.getElementById('lessons-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                                  }}
+                                  disabled={currentPage === 1}
+                                  className="duo-btn bg-white hover:bg-gray-50 border-2 border-gray-200 text-brand-dark disabled:opacity-40 disabled:pointer-events-none text-xs px-3.5 py-2 flex items-center gap-1 font-bold"
+                                >
+                                  <ChevronLeft className="w-4 h-4" />
+                                  Prev
+                                </button>
+                                
+                                <div className="flex items-center gap-1.5 overflow-x-auto px-2 max-w-[200px] sm:max-w-none">
+                                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                    <button
+                                      type="button"
+                                      key={page}
+                                      onClick={() => {
+                                        setCurrentPage(page);
+                                        document.getElementById('lessons-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                                      }}
+                                      className={`w-9 h-9 rounded-xl font-sans font-black text-xs flex items-center justify-center transition-all ${
+                                        currentPage === page
+                                          ? "bg-brand-purple text-white border-b-4 border-brand-purple-shadow"
+                                          : "bg-white border-2 border-gray-100 text-brand-dark hover:border-gray-200"
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCurrentPage((p) => Math.min(totalPages, p + 1));
+                                    document.getElementById('lessons-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                                  }}
+                                  disabled={currentPage === totalPages}
+                                  className="duo-btn bg-white hover:bg-gray-50 border-2 border-gray-200 text-brand-dark disabled:opacity-40 disabled:pointer-events-none text-xs px-3.5 py-2 flex items-center gap-1 font-bold"
+                                >
+                                  Next
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        </motion.div>
+                        ) : (
+                          <div className="space-y-6 animate-fade-in text-left">
+                            <div className="bg-white p-5 rounded-2xl border-2 border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                              <div>
+                                <span className="text-[10px] text-brand-purple font-sans font-black uppercase tracking-wider block">Course Resources</span>
+                                <h3 className="font-sans font-black text-brand-dark text-base mb-0.5 uppercase tracking-tight mt-0.5">
+                                  📕 Course eBooks &amp; PDF Downloads • စာအုပ်များနှင့် PDFs
+                                </h3>
+                                <p className="text-xs text-brand-muted font-sans font-semibold">
+                                  Course-specific companion workbooks, reference sheets, and curriculum materials.
+                                </p>
+                              </div>
+                            </div>
+
+                            {(() => {
+                              const hasDirectResources = activeCourse.resources && activeCourse.resources.length > 0;
+                              const hasStoreResources = courseResources.length > 0;
+
+                              if (!hasDirectResources && !hasStoreResources) {
+                                return (
+                                  <div className="bg-[#fcf8ff] rounded-3xl p-8 border-2 border-dashed border-brand-purple/10 text-center space-y-2">
+                                    <span className="text-2xl block">📚</span>
+                                    <h4 className="font-sans font-black text-sm text-[#3c3c3c]">No resources configured yet.</h4>
+                                    <p className="text-[10px] text-brand-muted font-sans font-semibold">
+                                      The administrator hasn't linked any custom eBooks or PDF sheets to this course group. Check general Study Store catalogs!
+                                    </p>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="space-y-8">
+                                  {/* Section A: Direct Companion eBook uploads */}
+                                  {hasDirectResources && (
+                                    <div className="space-y-4">
+                                      <h4 className="font-sans font-black text-xs text-brand-dark uppercase tracking-wider flex items-center gap-1.5 border-b pb-2 text-left">
+                                        <span>📕 Course Companion eBooks & Workbooks ({activeCourse.resources?.length || 0})</span>
+                                        <span className="text-[8px] bg-emerald-100 text-emerald-800 font-sans font-black px-1.5 py-0.2 rounded-lg uppercase">
+                                          Enrolled Materials
+                                        </span>
+                                      </h4>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {activeCourse.resources?.map((res: any) => {
+                                          const isFree = res.priceAmount === 0;
+                                          const itemOwned = isStoreItemUnlocked(res.id, res.priceAmount);
+                                          return (
+                                            <div
+                                              key={res.id}
+                                              className="duo-card p-6 bg-white flex flex-col justify-between hover:shadow-md transition-all duration-200 animate-fade-in border-2 border-slate-100"
+                                            >
+                                              <div className="space-y-4">
+                                                <div className="flex items-start justify-between">
+                                                  <div className="w-11 h-11 rounded-xl bg-brand-purple/5 border border-brand-purple/10 flex items-center justify-center text-2xl select-none">
+                                                    📕
+                                                  </div>
+                                                  <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border select-none ${
+                                                    isFree 
+                                                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                  }`}>
+                                                    {isFree ? "FREE DOWNLOAD" : "PREMIUM EBOOK"}
+                                                  </span>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                  <h4 className="font-sans font-black text-sm text-[#3c3c3c] leading-tight text-left">
+                                                    {res.name}
+                                                  </h4>
+                                                  {res.nameMm && (
+                                                    <p className="text-[11px] font-sans font-bold text-[#5a3194] text-left">
+                                                      {res.nameMm}
+                                                    </p>
+                                                  )}
+                                                  <p className="text-[11px] text-brand-muted font-sans font-medium leading-relaxed pt-1 text-left">
+                                                    Official direct study companion material provided directly for students attending <b>{activeCourse.name}</b>.
+                                                    {isFree ? " You have instant free download access." : " Purchase this course companion key to unlock direct access."}
+                                                  </p>
+                                                </div>
+                                              </div>
+
+                                              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between gap-3 bg-[#fafafc] -mx-6 -mb-6 p-4 rounded-b-2xl">
+                                                <div className="text-left font-sans select-none">
+                                                  <span className="text-[8px] text-brand-muted block font-extrabold uppercase leading-none">PRICING RATE</span>
+                                                  <span className="text-[11.5px] font-black text-brand-purple block mt-0.5">
+                                                    {isFree ? "FREE" : `${res.priceAmount.toLocaleString()} MMK`}
+                                                  </span>
+                                                </div>
+
+                                                {itemOwned ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      window.open(res.downloadUrl, '_blank');
+                                                      addSystemLog(currentUser || 'student', `Downloaded PDF companion resource: "${res.name}"`);
+                                                    }}
+                                                    className="px-3.5 py-2 bg-gradient-to-r from-[#00875a] to-[#00a36c] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#006644] flex items-center gap-1 shrink-0"
+                                                  >
+                                                    📥 Open / Download
+                                                  </button>
+                                                ) : (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const checkoutProduct = {
+                                                        id: res.id,
+                                                        name: res.name,
+                                                        nameMm: res.nameMm || '',
+                                                        priceAmount: res.priceAmount,
+                                                        currency: 'MMK' as const,
+                                                        itemType: 'e-book',
+                                                        duration: "Companion eBook Study Resource",
+                                                        description: `Direct premium supplementary eBook for ${activeCourse.name}`,
+                                                        descriptionMm: res.nameMm || '',
+                                                        instructor: activeCourse.instructor || "Kru Jane & Sayar Thura",
+                                                        includes: ["Permanent direct download URL", "Study exercises", "Vocabulary sheets"]
+                                                      };
+                                                      setGatewayCourse(checkoutProduct as any);
+                                                      setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                                      setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                                      setGatewayStep(1);
+                                                      setGatewayPaymentMethod('kbzpay');
+                                                      setGatewayOtp('');
+                                                      setGatewayTimer(180);
+                                                      setIsGatewayOpen(true);
+                                                    }}
+                                                    className="px-3.5 py-2 bg-gradient-to-r from-[#583092] to-[#7a42c4] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#3c1e66] flex items-center gap-1 shrink-0"
+                                                  >
+                                                    🔒 Unlock eBook
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Section B: General related bookstore cards */}
+                                  {hasStoreResources && (
+                                    <div className="space-y-4 pt-4">
+                                      <h4 className="font-sans font-black text-xs text-brand-dark uppercase tracking-wider flex items-center gap-1.5 border-b pb-2 text-left">
+                                        <span>🛍️ Bookstore Reference Sheets ({courseResources.length})</span>
+                                        <span className="text-[8px] bg-brand-purple/10 text-brand-purple font-sans font-black px-1.5 py-0.2 rounded-lg uppercase">
+                                          Store Catalog
+                                        </span>
+                                      </h4>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {courseResources.map((item) => {
+                                          const itemOwned = isStoreItemUnlocked(item.id, item.price);
+                                          return (
+                                            <div
+                                              key={item.id}
+                                              className="duo-card p-6 bg-white flex flex-col justify-between hover:shadow-md transition-all duration-200 animate-fade-in"
+                                            >
+                                      <div className="space-y-4">
+                                        <div className="flex items-start justify-between">
+                                          <div className="w-12 h-12 rounded-xl bg-brand-purple/5 border border-brand-purple/10 flex items-center justify-center text-2xl select-none">
+                                            📕
+                                          </div>
+                                          {item.popular && (
+                                            <span className="px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider bg-orange-500 text-white border-b-2 border-orange-700 select-none">
+                                              POPULAR
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="space-y-1">
+                                          <h4 className="font-sans font-black text-sm text-[#3c3c3c] leading-tight">
+                                            {item.name}
+                                          </h4>
+                                          <p className="text-[11px] font-sans font-bold text-brand-purple/80">
+                                            {item.nameMm}
+                                          </p>
+                                          <p className="text-[11.5px] text-brand-muted font-sans font-semibold leading-relaxed pt-1.5 line-clamp-3">
+                                            {item.description}
+                                          </p>
+                                          {item.descriptionMm && (
+                                            <p className="text-[10px] text-gray-500 font-sans font-semibold italic mt-1 leading-snug line-clamp-2">
+                                              {item.descriptionMm}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between gap-3 bg-gray-50/50 -mx-6 -mb-6 p-4 rounded-b-2xl">
+                                        <div className="text-left font-sans select-none">
+                                          <span className="text-[8px] text-brand-muted block font-extrabold uppercase leading-none">PRICING RATE</span>
+                                          <span className="text-[12px] font-black text-brand-purple block mt-0.5">
+                                            {item.price === 0 ? "FREE" : `${item.price.toLocaleString()} ${item.currency}`}
+                                          </span>
+                                        </div>
+
+                                        {itemOwned ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (item.pdfDownloadUrl) {
+                                                window.open(item.pdfDownloadUrl, '_blank');
+                                                addSystemLog('system', `Opened eBook resource downland link: "${item.name}"`);
+                                              } else {
+                                                const fileName = item.pdfFileName || `${item.id}_study_manual.pdf`;
+                                                const docTitle = item.name;
+                                                const docDesc = item.description;
+                                                
+                                                const lessonsInCourse = lessons.filter(l => (l.courseId || 'course-basic') === activeCourse.id);
+                                                const baseList = lessonsInCourse.flatMap(l => l.vocabularyBreakout || []).slice(0, 15);
+                                                const highlights = baseList.length > 0 
+                                                  ? baseList.map(v => ({ thai: v.thai, pronunciation: v.phonetic || '', myanmar: v.myanmar }))
+                                                  : [{ thai: "สวัสดี", pronunciation: "sa-wat-di", myanmar: "မင်္ဂလာပါ" }];
+                                                  
+                                                triggerPdfDownload(fileName, docTitle, docDesc, highlights);
+                                                addSystemLog('system', `Downloaded PDF companion: "${item.name}"`);
+                                              }
+                                            }}
+                                            className="px-3.5 py-2 bg-gradient-to-r from-[#00875a] to-[#00a36c] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#006644] flex items-center gap-1 shrink-0"
+                                          >
+                                            {item.pdfDownloadUrl ? "📥 Open Download URL" : "📥 Download PDF"}
+                                          </button>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const checkoutProduct = {
+                                                id: item.id,
+                                                name: item.name,
+                                                nameMm: item.nameMm,
+                                                priceAmount: item.price,
+                                                currency: item.currency,
+                                                duration: "Lifetime E-Book Study License",
+                                                description: item.description,
+                                                descriptionMm: item.descriptionMm || '',
+                                                instructor: "Kru Jane & Sayar Thura",
+                                                includes: ["Custom E-Book PDF Download", "Topic practice questions", "Vocabulary listings"]
+                                              };
+                                              setGatewayCourse(checkoutProduct);
+                                              setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                              setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                              setGatewayStep(1);
+                                              setGatewayPaymentMethod('kbzpay');
+                                              setGatewayOtp('');
+                                              setGatewayTimer(180);
+                                              setIsGatewayOpen(true);
+                                            }}
+                                            className="px-3.5 py-2 bg-gradient-to-r from-[#583092] to-[#7a42c4] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#3c1e66] flex items-center gap-1 shrink-0"
+                                          >
+                                            🔒 Buy E-Book
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
-                    })}
-                  </div>
+                    })()}
+                          </div>
+                        )}
+                      </>
+                    );
+                  } else {
+                    const courseCancelledOrder = orders.find(o => 
+                      o.username.toLowerCase() === (currentUser || "").toLowerCase() && 
+                      o.status === 'cancelled' &&
+                      (o.id === activeCourse.id || o.itemName.toLowerCase().includes(activeCourse.id.toLowerCase().replace('course-', '')))
+                    );
 
-                  {/* Duolingo Modern Pagination Panel */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 bg-white p-4 rounded-2xl border-2 border-gray-100/80">
-                      <button
-                        onClick={() => {
-                          setCurrentPage((p) => Math.max(1, p - 1));
-                          document.getElementById('lessons-catalog')?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        disabled={currentPage === 1}
-                        className="duo-btn bg-white hover:bg-gray-50 border-2 border-gray-200 text-brand-dark disabled:opacity-40 disabled:pointer-events-none text-xs px-3.5 py-2 flex items-center gap-1 font-bold"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        Prev
-                      </button>
-                      
-                      <div className="flex items-center gap-1.5 overflow-x-auto px-2 max-w-[200px] sm:max-w-none">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    return (
+                      <div className="bg-white rounded-3xl border-2 border-[#e5e5e5] p-6 sm:p-10 text-center space-y-3.5 shadow-xs max-w-2xl mx-auto motion-safe:animate-fade-inMac">
+                        {courseCancelledOrder ? (
+                          <div className="bg-rose-50 border-2 border-rose-200 p-5 rounded-2xl text-left space-y-3 shadow-3xs animate-fade-in text-slate-800">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-bold">
+                                <AlertTriangle className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <h4 className="font-sans font-black text-rose-800 text-sm uppercase leading-none tracking-wider">
+                                  PAYMENT DECLINED • ငွေပေးချေမှုငြင်းပယ်ခံရသည်
+                                </h4>
+                                <span className="text-[9.5px] font-sans font-bold text-rose-600 uppercase tracking-widest block mt-1">
+                                  Course: {activeCourse.name}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <p className="text-[11px] font-sans font-bold text-slate-700 leading-relaxed font-mono">
+                              We are sorry, but your previous payment transfer slip was reviewed and declined by Kru Jane / Sayar Thura. As a result, this premium class remains locked.
+                            </p>
+
+                            {courseCancelledOrder.adminNotes && (
+                              <div className="bg-white p-3 rounded-xl border border-rose-150/80 shadow-3xs space-y-1">
+                                <span className="block text-[8.5px] font-sans font-black text-rose-500 uppercase tracking-wider">
+                                  Admin Rejection Memo (အကြောင်းပြချက်):
+                                </span>
+                                <p className="text-[11.5px] font-sans font-black text-[#3c3c3c] leading-relaxed">
+                                  "{courseCancelledOrder.adminNotes}"
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="text-[9.5px] text-slate-500 font-bold leading-normal">
+                              💡 To unlock access, please click the button below to retry and upload your transaction receipt again. Make sure the screenshot clearly displays the date, time, and TXN code.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto border-b-4 border-amber-200">
+                            <Lock className="w-8 h-8" />
+                          </div>
+                        )}
+                        
+                        <div className="space-y-2">
+                          <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800">
+                            PREMIUM LOCKED • အဆင့်မြင့်တန်း
+                          </span>
+                          <h3 className="text-xl sm:text-2xl font-sans font-black text-[#3c3c3c] tracking-tight">
+                            {activeCourse.name}
+                          </h3>
+                          <p className="text-xs sm:text-sm text-brand-muted leading-relaxed font-sans max-w-md mx-auto font-medium">
+                            {activeCourse.description}
+                          </p>
+                          <p className="text-xs sm:text-sm text-[#583092] italic mt-1 leading-relaxed font-sans max-w-md mx-auto font-black">
+                            {activeCourse.descriptionMm || ""}
+                          </p>
+                        </div>
+
+                        <div className="p-5 bg-amber-50/70 rounded-2xl border border-amber-100 text-left space-y-3.5">
+                          <h4 className="font-sans font-black text-[10px] sm:text-xs text-[#583092] uppercase tracking-wider">
+                            WHAT'S INCLUDED IN THIS CLASS:
+                          </h4>
+                          <ul className="text-[11px] sm:text-xs font-sans font-black text-brand-dark/80 space-y-2.5">
+                            <li className="flex items-center gap-2">
+                              <Check className="w-4 h-4 text-brand-green shrink-0" />
+                              <span>Custom Video Lectures & Interactive Speech Exercises • ဗီဒီယို သင်ခန်းစာများ</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Check className="w-4 h-4 text-brand-green shrink-0" />
+                              <span>Instructor Profile: {activeCourse.instructor || "Jane & Thura"}</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Check className="w-4 h-4 text-brand-green shrink-0" />
+                              <span>Duration Period: {activeCourse.duration || "Self-paced"}</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Check className="w-4 h-4 text-brand-green shrink-0" />
+                              <span>Direct Q&A Forum with Kru Jane & Sayar Thura • ဆရာများနှင့်မေးမြန်းခြင်း</span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-200 gap-4">
+                          <div className="text-left select-none">
+                            <div className="text-[8px] sm:text-[10px] font-sans font-extrabold text-brand-muted uppercase tracking-wider">ONE-TIME LIFE-TIME ENROLLMENT</div>
+                            <div className="text-xl sm:text-2xl font-sans font-black text-brand-purple mt-0.5">
+                              {activeCourse.priceAmount.toLocaleString()} MMK
+                            </div>
+                          </div>
                           <button
-                            key={page}
                             onClick={() => {
-                              setCurrentPage(page);
-                              document.getElementById('lessons-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                              const courseProduct = {
+                                id: activeCourse.id,
+                                name: activeCourse.name,
+                                nameMm: activeCourse.nameMm || activeCourse.name,
+                                priceAmount: activeCourse.priceAmount,
+                                currency: "MMK" as const,
+                                duration: activeCourse.duration || "8 Weeks",
+                                description: activeCourse.description || "",
+                                descriptionMm: activeCourse.descriptionMm || "",
+                                instructor: activeCourse.instructor || "Kru Jane & Sayar Thura"
+                              };
+                              setGatewayCourse(courseProduct);
+                              setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                              setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                              setGatewayStep(1);
+                              setGatewayPaymentMethod('kbzpay');
+                              setGatewayOtp('');
+                              setGatewayTimer(180);
+                              setIsGatewayOpen(true);
                             }}
-                            className={`w-9 h-9 rounded-xl font-sans font-black text-xs flex items-center justify-center transition-all ${
-                              currentPage === page
-                                ? "bg-brand-purple text-white border-b-4 border-brand-purple-shadow"
-                                : "bg-white border-2 border-gray-100 text-brand-dark hover:border-gray-200"
-                            }`}
+                            className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-brand-purple to-brand-purple/90 text-white rounded-xl text-[11px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 flex items-center justify-center gap-1.5 border-b-4 border-brand-purple-shadow"
                           >
-                            {page}
+                            <Sparkles className="w-4 h-4" />
+                            🎓 Purchase & Unlock Course • ဝယ်ယူမည်
                           </button>
-                        ))}
+                        </div>
                       </div>
-
-                      <button
-                        onClick={() => {
-                          setCurrentPage((p) => Math.min(totalPages, p + 1));
-                          document.getElementById('lessons-catalog')?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        disabled={currentPage === totalPages}
-                        className="duo-btn bg-white hover:bg-gray-50 border-2 border-gray-200 text-brand-dark disabled:opacity-40 disabled:pointer-events-none text-xs px-3.5 py-2 flex items-center gap-1 font-bold"
-                      >
-                        Next
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+                    );
+                  }
+                })() : (
+                  <div className="bg-white rounded-3xl border-2 border-[#e5e5e5] p-6 sm:p-8 space-y-8 shadow-xs max-w-4xl mx-auto motion-safe:animate-fade-in">
+                    <div className="space-y-2 text-center">
+                      <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-[#583092]">
+                        📚 Dynamic Library & Learning PDF Hub • စာအုပ်ဆိုင်ရာ ပရိုဂရမ်
+                      </span>
+                      <h3 className="text-xl sm:text-2xl font-sans font-black text-[#3c3c3c] tracking-tight justify-center flex items-center gap-2">
+                        <span>Thai Library & Handbooks Hub</span>
+                      </h3>
+                      <p className="text-xs sm:text-sm text-brand-muted max-w-xl mx-auto font-medium font-sans leading-relaxed">
+                        Download high-quality vocabulary worksheets, practice keys, and reference handbooks directly for offline learning. Premium eBooks can be unlocked via instant local mobile checkout!
+                      </p>
                     </div>
-                  )}
+
+                    {(() => {
+                      const allStoreEbooks = storeItems.filter(item => item.type === 'e-book');
+                      const standaloneEbooks = allStoreEbooks.filter(item => !item.courseId);
+                      const courseLinkedEbooks = allStoreEbooks.filter(item => !!item.courseId);
+
+                      if (allStoreEbooks.length === 0) {
+                        return (
+                          <div className="p-8 bg-slate-50 rounded-2xl text-center border border-slate-150">
+                            <span className="text-2xl block mb-2">📁</span>
+                            <span className="text-xs text-brand-muted font-bold font-sans">No eBooks configured yet in store items. Add some in Store Manager!</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-8">
+                          {/* 1. STANDALONE EBOOKS & INDEPENDENT MANUALS */}
+                          {standaloneEbooks.length > 0 && (
+                            <div className="space-y-4">
+                              <h4 className="font-sans font-black text-xs text-brand-dark uppercase tracking-wider flex items-center gap-2 border-b-2 border-slate-100 pb-2 text-left">
+                                <span className="p-1 rounded-lg bg-indigo-50 text-indigo-600">📕</span>
+                                <span>General Reference Manuals & Independent Guides ({standaloneEbooks.length})</span>
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                                {standaloneEbooks.map((item) => {
+                                  const isFree = item.price === 0;
+                                  const itemOwned = isStoreItemUnlocked(item.id, item.price);
+
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="duo-card p-5 sm:p-6 bg-white border-2 border-slate-100 flex flex-col justify-between hover:shadow-md transition-all duration-200 animate-fade-in relative overflow-hidden"
+                                    >
+                                      {item.popular && (
+                                        <div className="absolute top-2 right-2 bg-orange-100 text-orange-700 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider select-none animate-pulse">
+                                          🔥 POPULAR
+                                        </div>
+                                      )}
+                                      <div className="space-y-3.5">
+                                        <div className="flex items-center justify-between">
+                                          <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider border select-none ${
+                                            isFree
+                                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                              : 'bg-brand-purple/10 text-[#583092] border-brand-purple/20'
+                                          }`}>
+                                            {isFree ? 'FREE PDF DOWNLOAD' : 'PREMIUM STUDY BOOK'}
+                                          </span>
+                                          <FileText className={`w-4 h-4 ${isFree ? 'text-emerald-600' : 'text-brand-purple'}`} />
+                                        </div>
+                                        <div>
+                                          <h4 className="font-sans font-black text-sm text-[#3c3c3c] leading-snug">
+                                            {item.name}
+                                          </h4>
+                                          <p className="text-[10px] sm:text-[11px] font-sans font-bold text-brand-purple mt-0.5">
+                                            {item.nameMm}
+                                          </p>
+                                          <p className="text-[11px] text-brand-muted font-sans font-medium mt-2 leading-relaxed">
+                                            {item.description}
+                                          </p>
+                                          {item.descriptionMm && (
+                                            <p className="text-[10.5px] text-slate-500 font-sans italic mt-1 leading-relaxed">
+                                              {item.descriptionMm}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center justify-between gap-3 pt-4 mt-5 border-t border-slate-100 -mx-5 -mb-5 p-4 bg-[#fafafc] rounded-b-2xl">
+                                        <div className="text-left font-sans select-none">
+                                          <span className="text-[7.5px] text-brand-muted block font-extrabold uppercase leading-none">Price Tag</span>
+                                          <span className="text-xs sm:text-sm font-black text-brand-purple block mt-0.5">
+                                            {isFree ? 'FREE' : `${item.price.toLocaleString()} ${item.currency}`}
+                                          </span>
+                                        </div>
+
+                                        {itemOwned ? (
+                                          <button
+                                            onClick={() => {
+                                              if (item.pdfDownloadUrl) {
+                                                window.open(item.pdfDownloadUrl, '_blank');
+                                                addSystemLog(currentUser || 'student', `Opened dynamic download link for eBook: "${item.name}"`);
+                                              } else {
+                                                triggerPdfDownload(
+                                                  item.pdfFileName || `${item.id}.pdf`,
+                                                  item.name,
+                                                  item.description,
+                                                  [
+                                                    { thai: "สวัสดี ครับ/ค่ะ", pronunciation: "sawàtdii khráp/khâ", myanmar: "မင်္ဂလာပါ (ကျား/မ)" },
+                                                    { thai: "ขอบคุณ ครับ/ค่ะ", pronunciation: "khɔ̀ɔp-khun khráp/khâ", myanmar: "ကျေးဇူးတင်ပါတယ်" },
+                                                    { thai: "สบายดีไหม", pronunciation: "sabaaj dii mǎi", myanmar: "နေကောင်းလား" },
+                                                    { thai: "ขอโทษ ครับ/ค่ะ", pronunciation: "khɔ̌ɔ-thôot khráp/khâ", myanmar: "တောင်းပန်ပါတယ်" },
+                                                    { thai: "เรียนภาษาไทย", pronunciation: "riian phaasǎathai", myanmar: "ထိုင်းစာ သင်ယူသည်" }
+                                                  ]
+                                                );
+                                                addSystemLog(currentUser || 'student', `Completed dynamic auto-generation download: "${item.name}"`);
+                                              }
+                                            }}
+                                            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-750 text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-emerald-800 flex items-center gap-1.5 shrink-0"
+                                          >
+                                            <Download className="w-3.5 h-3.5" />
+                                            📥 Download Free Guide
+                                          </button>
+                                        ) : (
+                                          <button
+                                            onClick={() => {
+                                              const bookProduct = {
+                                                id: item.id,
+                                                name: item.name,
+                                                nameMm: item.nameMm,
+                                                priceAmount: item.price,
+                                                currency: item.currency || 'MMK',
+                                                itemType: 'e-book',
+                                                duration: "Lifetime Study Access License",
+                                                description: item.description,
+                                                descriptionMm: item.descriptionMm,
+                                                instructor: "Kru Jane & Sayar Thura",
+                                                includes: ["Full Dynamic PDF eBook Download", "Offline Reading Support", "Grammar Revision Sheets", "Burmese Pronunciation Guide"]
+                                              };
+                                              setGatewayCourse(bookProduct as any);
+                                              setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                              setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                              setGatewayStep(1);
+                                              setGatewayPaymentMethod('kbzpay');
+                                              setGatewayOtp('');
+                                              setGatewayTimer(180);
+                                              setIsGatewayOpen(true);
+                                            }}
+                                            className="px-4 py-2 bg-gradient-to-r from-brand-purple to-brand-purple/95 text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-brand-purple-shadow flex items-center gap-1 shrink-0"
+                                          >
+                                            🔒 Unlock eBook
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. COURSE LINKED STUDY MANUALS */}
+                          {courseLinkedEbooks.length > 0 && (
+                            <div className="space-y-4 pt-4">
+                              <h4 className="font-sans font-black text-xs text-brand-dark uppercase tracking-wider flex items-center gap-2 border-b-2 border-slate-100 pb-2 text-left">
+                                <span className="p-1 rounded-lg bg-amber-50 text-amber-700">📚</span>
+                                <span>Course Companion eBooks & Specific Lesson PDFs ({courseLinkedEbooks.length})</span>
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                                {courseLinkedEbooks.map((item) => {
+                                  const isFree = item.price === 0;
+                                  const itemOwned = isStoreItemUnlocked(item.id, item.price);
+                                  const linkedCourse = courses.find(c => c.id === item.courseId);
+
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="duo-card p-5 sm:p-6 bg-white border-2 border-slate-100 flex flex-col justify-between hover:shadow-md transition-all duration-200 animate-fade-in relative overflow-hidden"
+                                    >
+                                      {item.popular && (
+                                        <div className="absolute top-2 right-2 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider select-none">
+                                          ★ FEATURED
+                                        </div>
+                                      )}
+                                      <div className="space-y-3.5">
+                                        <div className="flex items-center justify-between">
+                                          <span className="px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider bg-amber-50 text-amber-850 border border-amber-200 uppercase tracking-widest leading-none">
+                                            Linked: {linkedCourse ? linkedCourse.name : item.courseId}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <h4 className="font-sans font-black text-sm text-[#3c3c3c] leading-snug">
+                                            {item.name}
+                                          </h4>
+                                          <p className="text-[10px] sm:text-[11px] font-sans font-bold text-brand-purple mt-0.5">
+                                            {item.nameMm}
+                                          </p>
+                                          <p className="text-[11px] text-brand-muted font-sans font-medium mt-2 leading-relaxed">
+                                            {item.description}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center justify-between gap-3 pt-4 mt-5 border-t border-slate-100 -mx-5 -mb-5 p-4 bg-[#fafafc] rounded-b-2xl">
+                                        <div className="text-left font-sans select-none">
+                                          <span className="text-[7.5px] text-brand-muted block font-extrabold uppercase leading-none">Syllabus Access</span>
+                                          <span className="text-xs sm:text-sm font-black text-brand-purple block mt-0.5">
+                                            {isFree ? 'FREE' : `${item.price.toLocaleString()} ${item.currency}`}
+                                          </span>
+                                        </div>
+
+                                        {itemOwned ? (
+                                          <button
+                                            onClick={() => {
+                                              if (item.pdfDownloadUrl) {
+                                                window.open(item.pdfDownloadUrl, '_blank');
+                                                addSystemLog(currentUser || 'student', `Downloaded companion booklet: "${item.name}"`);
+                                              } else {
+                                                triggerPdfDownload(
+                                                  item.pdfFileName || `${item.id}.pdf`,
+                                                  item.name,
+                                                  item.description,
+                                                  [
+                                                    { thai: "สวัสดี ครับ", pronunciation: "sawàtdii khráp", myanmar: "မဂ်လာပါခင်ဗျာ" },
+                                                    { thai: "ขอบคุณ ครับ", pronunciation: "khɔ̀ɔp-khun khráp", myanmar: "ကျေးဇူးတင်ပါတယ်ခင်ဗျာ" },
+                                                    { thai: "โชคดี", pronunciation: "chôok-dii", myanmar: "ကံကောင်းပါစေ" }
+                                                  ]
+                                                );
+                                                addSystemLog(currentUser || 'student', `Auto generated dynamic Companion PDF download: "${item.name}"`);
+                                              }
+                                            }}
+                                            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-750 text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-emerald-800 flex items-center gap-1.5 shrink-0"
+                                          >
+                                            <Download className="w-3.5 h-3.5" />
+                                            📥 Download
+                                          </button>
+                                        ) : (
+                                          <button
+                                            onClick={() => {
+                                              const bookProduct = {
+                                                id: item.id,
+                                                name: item.name,
+                                                nameMm: item.nameMm,
+                                                priceAmount: item.price,
+                                                currency: item.currency || 'MMK',
+                                                itemType: 'e-book',
+                                                duration: "Linked Syllabus Learning Course Pack",
+                                                description: item.description,
+                                                descriptionMm: item.descriptionMm,
+                                                instructor: "Kru Jane & Sayar Thura",
+                                                includes: ["Full PDF Handbook Download Link", "Specific Course Exercises", "Vocabulary sheets"]
+                                              };
+                                              setGatewayCourse(bookProduct as any);
+                                              setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                              setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                              setGatewayStep(1);
+                                              setGatewayPaymentMethod('kbzpay');
+                                              setGatewayOtp('');
+                                              setGatewayTimer(180);
+                                              setIsGatewayOpen(true);
+                                            }}
+                                            className="px-4 py-2 bg-gradient-to-r from-brand-purple to-brand-purple/95 text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-brand-purple-shadow flex items-center gap-1 shrink-0"
+                                          >
+                                            🔒 Unlock eBook
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2876,8 +4141,79 @@ export default function App() {
                         </button>
                       </div>
                     ) : (
-                      <div className="bg-gray-50/70 p-3 rounded-xl border border-gray-100 text-[10px] font-sans font-bold text-brand-muted leading-relaxed">
-                        ✨ Local Session State has been synchronized. All orders and metrics are logged dynamically in local storage.
+                      <div className="space-y-4">
+                        <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-3 text-left">
+                          <span className="text-[9.5px] font-sans font-black text-brand-purple uppercase tracking-wider block">
+                            Account Profile Details • အချက်အလက်များပြင်ဆင်ရန်
+                          </span>
+                          
+                          <div className="space-y-2 text-[11px]">
+                            <div>
+                              <label className="block text-[9.5px] text-slate-500 font-bold mb-1">Full Name (အမည်):</label>
+                              <input 
+                                type="text"
+                                value={checkoutName}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setCheckoutName(val);
+                                  setRegisteredUsers(prev => {
+                                    const updated = prev.map(u => u.username.toLowerCase() === currentUser.toLowerCase() ? { ...u, fullName: val } : u);
+                                    localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
+                                    return updated;
+                                  });
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-150 rounded-lg font-semibold focus:outline-none focus:border-brand-purple text-xs text-slate-800"
+                                placeholder="e.g. Nay Min"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[9.5px] text-slate-500 font-bold mb-1">Phone Number (ဖုန်းနံပါတ်):</label>
+                              <input 
+                                type="text"
+                                value={gatewayPhone}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setGatewayPhone(val);
+                                  setRegisteredUsers(prev => {
+                                    const updated = prev.map(u => u.username.toLowerCase() === currentUser.toLowerCase() ? { ...u, phone: val } : u);
+                                    localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
+                                    return updated;
+                                  });
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-150 rounded-lg font-semibold focus:outline-none focus:border-brand-purple font-mono text-xs text-slate-800"
+                                placeholder="e.g. 09791234567"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[9.5px] text-slate-500 font-bold mb-1">Email (အီးမေးလ်):</label>
+                              <input 
+                                type="email"
+                                value={gatewayEmail}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setGatewayEmail(val);
+                                  setRegisteredUsers(prev => {
+                                    const updated = prev.map(u => u.username.toLowerCase() === currentUser.toLowerCase() ? { ...u, email: val } : u);
+                                    localStorage.setItem('thai_registered_users_list', JSON.stringify(updated));
+                                    return updated;
+                                  });
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-150 rounded-lg font-semibold focus:outline-none focus:border-brand-purple text-xs text-slate-800"
+                                placeholder="e.g. student@gmail.com"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="text-[8px] text-slate-400 font-bold leading-normal">
+                            ✨ These profile details will automatically auto-fill your course checkout form.
+                          </div>
+                        </div>
+
+                        <div className="bg-gray-50/70 p-3 rounded-xl border border-gray-100 text-[10px] font-sans font-bold text-brand-muted leading-relaxed">
+                          ✨ Local Session State has been synchronized. All orders and metrics are logged dynamically in local storage.
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2999,7 +4335,7 @@ export default function App() {
 
                   {isCourseStoreExpanded && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-1 animate-fade-in">
-                      {PREMIUM_COURSES.map((course) => {
+                      {courses.map((course) => {
                         const calculatedThb = Math.round(course.priceAmount / 70); // Simulated approximate THB rate
                         return (
                           <div 
@@ -3124,7 +4460,7 @@ export default function App() {
 
                   {/* Grid of Store Items */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {STORE_ITEMS.map((item) => {
+                    {storeItems.map((item) => {
                       return (
                         <div key={item.id} className="bg-gray-50/40 hover:bg-gray-50/80 p-4 rounded-xl border border-gray-200/90 flex flex-col justify-between space-y-4 transition-all relative">
                           {item.popular && (
@@ -3324,10 +4660,34 @@ export default function App() {
 
                 {/* 3. STUDENT LEDGER/ORDERS HISTORY PREVIEW */}
                 <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4">
-                  <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 pb-2 border-b border-gray-100">
-                    <ShoppingBag className="w-4 h-4 text-brand-purple shrink-0" />
-                    📜 Personal Purchase Ledger & Order Compliance ({currentUser ? orders.filter(o => o.username.toLowerCase() === currentUser.toLowerCase()).length : 0})
-                  </h4>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
+                    <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5">
+                      <ShoppingBag className="w-4 h-4 text-brand-purple shrink-0" />
+                      📜 Personal Purchase Ledger & Order Compliance ({currentUser ? orders.filter(o => o.username.toLowerCase() === currentUser.toLowerCase()).length : 0})
+                    </h4>
+                    {isLoggedIn && orders.filter(o => o.username.toLowerCase() === (currentUser || '').toLowerCase()).length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => downloadOrdersAsJSON(orders.filter(o => o.username.toLowerCase() === (currentUser || '').toLowerCase()))}
+                          className="px-2.5 py-1.5 bg-gray-50 text-brand-dark hover:bg-brand-purple/5 border border-gray-200 hover:border-brand-purple rounded-xl text-[10px] sm:text-[10.5px] font-sans font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                          title="Download my purchase history as structured JSON"
+                        >
+                          <Download className="w-3.5 h-3.5 text-brand-purple" />
+                          Download JSON
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadOrdersAsCSV(orders.filter(o => o.username.toLowerCase() === (currentUser || '').toLowerCase()))}
+                          className="px-2.5 py-1.5 bg-gray-50 text-brand-dark hover:bg-brand-purple/5 border border-gray-200 hover:border-brand-purple rounded-xl text-[10px] sm:text-[10.5px] font-sans font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                          title="Download my purchase history as a CSV spreadsheet"
+                        >
+                          <Download className="w-3.5 h-3.5 text-[#00875a]" />
+                          Download CSV
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {!isLoggedIn ? (
                     <div className="text-center py-6 text-xs text-brand-muted font-sans font-bold">
@@ -3356,27 +4716,37 @@ export default function App() {
                             orders
                               .filter(o => o.username.toLowerCase() === currentUser.toLowerCase())
                               .map((ord) => (
-                                <tr key={ord.id} className="hover:bg-gray-50/50">
-                                  <td className="py-3 px-3 font-mono font-black text-brand-purple">{ord.id}</td>
+                                <tr 
+                                  key={ord.id} 
+                                  onClick={() => setSelectedDetailOrder(ord)}
+                                  className="hover:bg-brand-purple/5 transition-all cursor-pointer group"
+                                  title="Click to view order payment details & admin notes"
+                                >
+                                  <td className="py-3 px-3 font-mono font-black text-brand-purple group-hover:underline">{ord.id}</td>
                                   <td className="py-3 px-3 font-bold text-brand-dark text-[11px]">{ord.itemName}</td>
                                   <td className="py-3 px-3 text-brand-muted font-bold">{ord.orderDate}</td>
                                   <td className="py-3 px-3 font-mono font-black text-brand-dark">
                                     {ord.priceAmount.toLocaleString()} {ord.currency}
                                   </td>
                                   <td className="py-3 px-3 text-right">
-                                    {ord.status === 'pending' ? (
-                                      <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                                        Pending Admin
-                                      </span>
-                                    ) : ord.status === 'completed' ? (
-                                      <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-green-50 text-green-700 border border-green-200">
-                                        Approved / Sent
-                                      </span>
-                                    ) : (
-                                      <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-red-50 text-red-700 border border-red-200">
-                                        Cancelled
-                                      </span>
-                                    )}
+                                    <div className="flex items-center justify-end gap-2">
+                                      {ord.status === 'pending' ? (
+                                        <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                          Pending Admin
+                                        </span>
+                                      ) : ord.status === 'completed' ? (
+                                        <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-green-50 text-green-700 border border-green-200">
+                                          Approved / Sent
+                                        </span>
+                                      ) : (
+                                        <span className="inline-block px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-red-50 text-red-700 border border-red-200">
+                                          Cancelled
+                                        </span>
+                                      )}
+                                      <button className="px-2 py-0.5 text-[9px] font-bold text-brand-purple bg-brand-purple/10 rounded group-hover:bg-brand-purple group-hover:text-white transition-colors cursor-pointer">
+                                        View
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -3445,6 +4815,28 @@ export default function App() {
                         <Users className="w-3.5 h-3.5" />
                         Student Directory ({registeredUsers.length})
                       </button>
+                      <button
+                        onClick={() => setAdminHubTab('courses')}
+                        className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          adminHubTab === 'courses'
+                            ? 'bg-brand-purple text-white shadow-sm shadow-brand-purple-shadow'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Course Manager ({courses.length})
+                      </button>
+                      <button
+                        onClick={() => setAdminHubTab('store')}
+                        className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-[10.5px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          adminHubTab === 'store'
+                            ? 'bg-brand-purple text-white shadow-sm shadow-brand-purple-shadow'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        Study Store ({storeItems.length})
+                      </button>
                     </div>
                   </div>
 
@@ -3462,40 +4854,67 @@ export default function App() {
                             </p>
                           </div>
 
-                          <button
-                            onClick={() => {
-                              if (window.confirm("Restore demo mock transactions?")) {
-                                const initialOrders: PurchaseOrder[] = [
-                                  {
-                                    id: "ORD-99321",
-                                    username: "ko_nay_min",
-                                    itemName: "🗣️ 1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
-                                    itemType: "tutoring",
-                                    priceAmount: 45000,
-                                    currency: "MMK",
-                                    status: "completed",
-                                    orderDate: "2026-06-10"
-                                  },
-                                  {
-                                    id: "ORD-99322",
-                                    username: "ma_khine",
-                                    itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
-                                    itemType: "e-book",
-                                    priceAmount: 25000,
-                                    currency: "MMK",
-                                    status: "pending",
-                                    orderDate: "2026-06-13"
-                                  }
-                                ];
-                                setOrders(initialOrders);
-                                addSystemLog('admin', 'Seeded demo simulated purchase orders ledger');
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-sans font-black text-brand-dark rounded-lg cursor-pointer flex items-center gap-1 hover:brightness-95 transition-all text-[10px]"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5 mr-0.5 text-brand-muted" />
-                            SEED DEFAULT ORDERS
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => downloadOrdersAsJSON(orders, `all_student_orders_ledger_${new Date().toISOString().split('T')[0]}.json`)}
+                              className="px-3 py-1.5 bg-white text-brand-dark hover:bg-brand-purple/5 border border-gray-200 hover:border-brand-purple rounded-xl text-[10px] sm:text-[10.5px] font-sans font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all shrink-0 shadow-3xs"
+                              title="Download all purchase orders as structured JSON"
+                            >
+                              <Download className="w-3.5 h-3.5 text-brand-purple" />
+                              Export JSON
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadOrdersAsCSV(orders, `all_student_orders_ledger_${new Date().toISOString().split('T')[0]}.csv`)}
+                              className="px-3 py-1.5 bg-white text-brand-dark hover:bg-brand-purple/5 border border-gray-200 hover:border-brand-purple rounded-xl text-[10px] sm:text-[10.5px] font-sans font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all shrink-0 shadow-3xs"
+                              title="Download all purchase orders as a CSV spreadsheet"
+                            >
+                              <Download className="w-3.5 h-3.5 text-[#00875a]" />
+                              Export CSV
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                if (window.confirm("Restore demo mock transactions?")) {
+                                  const initialOrders: PurchaseOrder[] = [
+                                    {
+                                      id: "ORD-99321",
+                                      username: "ko_nay_min",
+                                      itemName: "🗣️ 1-on-1 Practice Speaking Session with Kru Jane (1 Hour Zoom)",
+                                      itemType: "tutoring",
+                                      priceAmount: 45000,
+                                      currency: "MMK",
+                                      status: "completed",
+                                      orderDate: "2026-06-10",
+                                      studentPhone: "09-771234567",
+                                      studentEmail: "konaymin@gmail.com",
+                                      adminNotes: "Session scheduled with Kru Jane. Zoom link dispatched to student mail/viber pipeline."
+                                    },
+                                    {
+                                      id: "ORD-99322",
+                                      username: "ma_khine",
+                                      itemName: "📕 Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
+                                      itemType: "e-book",
+                                      priceAmount: 25000,
+                                      currency: "MMK",
+                                      status: "pending",
+                                      orderDate: "2026-06-13",
+                                      studentPhone: "09-445890123",
+                                      studentEmail: "makhineoo@viber-me.com",
+                                      evidenceImage: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='500' viewBox='0 0 300 500'><rect width='300' height='500' fill='%230056B3'/><rect x='15' y='15' width='270' height='470' rx='20' fill='white'/><circle cx='150' cy='80' r='30' fill='%2328A745'/><path d='M140 80 l7 7 l13 -13' fill='none' stroke='white' stroke-width='4'/><text x='150' y='135' font-family='sans-serif' font-size='16' font-weight='bold' fill='%2328A745' text-anchor='middle'>KPay Verification</text><text x='150' y='160' font-family='sans-serif' font-size='22' font-weight='bold' fill='%23333333' text-anchor='middle'>- 25,000 MMK</text><line x1='30' y1='185' x2='270' y2='185' stroke='%23EEEEEE' stroke-width='2'/><text x='35' y='210' font-family='sans-serif' font-size='11' fill='%23777777'>Transaction ID</text><text x='265' y='210' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>TXN7784013920</text><text x='35' y='245' font-family='sans-serif' font-size='11' fill='%23777777'>Sender</text><text x='265' y='245' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>Ma Khine</text><text x='35' y='280' font-family='sans-serif' font-size='11' fill='%23777777'>Recipient</text><text x='265' y='280' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>Kru Jane Thai School</text><text x='35' y='315' font-family='sans-serif' font-size='11' fill='%23777777'>Date &amp; Time</text><text x='265' y='315' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23333333' text-anchor='end'>2026-06-13 14:15</text><line x1='30' y1='345' x2='270' y2='345' stroke='%23EEEEEE' stroke-width='2'/><rect x='30' y='370' width='240' height='70' rx='10' fill='%23F8F9FA'/><text x='150' y='398' font-family='sans-serif' font-size='11' font-weight='bold' fill='%23666666' text-anchor='middle'>Payment Channel: KBZPay Myanmar</text><text x='150' y='418' font-family='sans-serif' font-size='10' fill='%23999999' text-anchor='middle'>Reference: KBZ-PRINT-THAI</text></svg>"
+                                    }
+                                  ];
+                                  setOrders(initialOrders);
+                                  addSystemLog('admin', 'Seeded demo simulated purchase orders ledger');
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-sans font-black text-brand-dark rounded-lg cursor-pointer flex items-center gap-1 hover:brightness-95 transition-all text-[10px]"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 mr-0.5 text-brand-muted" />
+                              SEED DEFAULT ORDERS
+                            </button>
+                          </div>
                         </div>
 
                         <div className="overflow-x-auto border border-gray-100 rounded-xl bg-gray-50/25">
@@ -3520,8 +4939,13 @@ export default function App() {
                                 </tr>
                               ) : (
                                 orders.map((ord) => (
-                                  <tr key={ord.id} className="hover:bg-amber-50/10 transition-all">
-                                    <td className="py-3 px-3 font-mono font-black text-brand-purple">{ord.id}</td>
+                                  <tr 
+                                    key={ord.id} 
+                                    onClick={() => setSelectedDetailOrder(ord)}
+                                    className="hover:bg-amber-50/10 cursor-pointer transition-all group"
+                                    title="Click to view full order details, screenshot slip, and write notes"
+                                  >
+                                    <td className="py-3 px-3 font-mono font-black text-brand-purple group-hover:underline">{ord.id}</td>
                                     <td className="py-3 px-3 font-bold text-brand-dark">{ord.username}</td>
                                     <td className="py-3 px-3 font-semibold text-brand-dark text-[11px]">{ord.itemName}</td>
                                     <td className="py-3 px-3 text-brand-muted font-bold">{ord.orderDate}</td>
@@ -3543,34 +4967,42 @@ export default function App() {
                                         </span>
                                       )}
                                     </td>
-                                    <td className="py-3 px-3 text-right">
-                                      {ord.status === 'pending' && (
-                                        <div className="flex gap-1 justify-end">
-                                          <button
-                                            onClick={() => {
-                                              setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'completed' } : o));
-                                              addSystemLog('admin', `Approved purchase of "${ord.itemName}" by "${ord.username}"`);
-                                            }}
-                                            className="px-2.5 py-1 bg-brand-green text-white text-[9.5px] font-black uppercase rounded-lg hover:opacity-90 cursor-pointer shadow-3xs"
-                                            title="Mark order as Completed"
-                                          >
-                                            Approve
-                                          </button>
-                                          <button
-                                            onClick={() => {
-                                              setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'cancelled' } : o));
-                                              addSystemLog('admin', `Denied and Cancelled order "${ord.id}"`);
-                                            }}
-                                            className="px-2.5 py-1 bg-red-500 text-white text-[9.5px] font-black uppercase rounded-lg hover:opacity-90 cursor-pointer shadow-3xs"
-                                            title="Reject order"
-                                          >
-                                            Cancel
-                                          </button>
-                                        </div>
-                                      )}
-                                      {ord.status !== 'pending' && (
-                                        <span className="text-[10px] text-brand-muted italic font-bold">Processed</span>
-                                      )}
+                                    <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex gap-1 justify-end items-center">
+                                        <button
+                                          onClick={() => setSelectedDetailOrder(ord)}
+                                          className="px-2 py-1 bg-brand-purple/10 text-brand-purple font-sans font-bold text-[9.5px] uppercase rounded-lg hover:bg-brand-purple hover:text-white transition-all cursor-pointer"
+                                        >
+                                          Details
+                                        </button>
+                                        {ord.status === 'pending' && (
+                                          <>
+                                            <button
+                                              onClick={() => {
+                                                setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'completed' } : o));
+                                                addSystemLog('admin', `Approved purchase of "${ord.itemName}" by "${ord.username}"`);
+                                              }}
+                                              className="px-2.5 py-1 bg-brand-green text-white text-[9.5px] font-black uppercase rounded-lg hover:opacity-90 cursor-pointer shadow-3xs"
+                                              title="Mark order as Completed"
+                                            >
+                                              Approve
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setOrders(prev => prev.map(o => o.id === ord.id ? { ...o, status: 'cancelled' } : o));
+                                                addSystemLog('admin', `Denied and Cancelled order "${ord.id}"`);
+                                              }}
+                                              className="px-2.5 py-1 bg-red-500 text-white text-[9.5px] font-black uppercase rounded-lg hover:opacity-90 cursor-pointer shadow-3xs"
+                                              title="Reject order"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </>
+                                        )}
+                                        {ord.status !== 'pending' && (
+                                          <span className="text-[10px] text-brand-muted italic font-bold">Processed</span>
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
                                 ))
@@ -3678,9 +5110,9 @@ export default function App() {
                                     const confirmReset = window.confirm("Are you sure you want to reset user table? (Will reset to standard entries)");
                                     if (confirmReset) {
                                       const initialUsers: RegisteredUser[] = [
-                                        { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12" },
-                                        { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01" },
-                                        { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10" },
+                                        { username: "ko_nay_min", password: "password123", role: "student", xp: 1250, dateJoined: "2026-05-12", fullName: "Ko Nay Min", phone: "09-771234567", email: "naymin@gmail.com" },
+                                        { username: "ma_khine", password: "password123", role: "student", xp: 820, dateJoined: "2026-06-01", fullName: "Ma Khine Oo", phone: "09-445890123", email: "makhineoo@viber-me.com" },
+                                        { username: "phyo_wai", password: "password123", role: "student", xp: 450, dateJoined: "2026-06-10", fullName: "Phyo Wai Tun", phone: "09-221345566", email: "phyowai@gmail.com" },
                                         { username: "admin_thura", password: "adminpassword", role: "admin", xp: 5000, dateJoined: "2026-06-05" }
                                       ];
                                       setRegisteredUsers(initialUsers);
@@ -3713,6 +5145,9 @@ export default function App() {
                                       </div>
                                       <div className="text-[10px] text-brand-muted font-sans space-y-0.5 font-semibold">
                                         <p>Password: <code className="bg-gray-50 text-brand-dark px-1 py-0.5 rounded font-mono font-bold text-brand-dark">{usr.password || 'password123'}</code></p>
+                                        {usr.fullName && <p>Full Name: <span className="text-brand-dark font-extrabold">{usr.fullName}</span></p>}
+                                        {usr.phone && <p>Phone: <span className="text-brand-dark font-mono font-bold">{usr.phone}</span></p>}
+                                        {usr.email && <p>Email: <span className="text-slate-600 font-medium">{usr.email}</span></p>}
                                         <p>Progress: <span className="text-brand-purple font-black font-mono">{usr.role === 'admin' ? '—' : `${usr.xp} XP (LVL ${Math.floor(usr.xp / 1000) + 1})`}</span></p>
                                         <p>Joined: <span className="text-gray-500 font-mono font-bold">{usr.dateJoined}</span></p>
                                       </div>
@@ -3739,6 +5174,1007 @@ export default function App() {
                                 ))}
                               </div>
                             </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-SECTION 3: COURSE MANAGER */}
+                    {adminHubTab === 'courses' && (
+                      <div className="space-y-6 animate-fade-in" id="admin-courses-tab-view">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left">
+                          {/* Course List Panel */}
+                          <div className="lg:col-span-5 bg-gray-50/70 p-4 sm:p-5 rounded-2xl border border-gray-150 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-xs font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1.5">
+                                <BookOpen className="w-4 h-4 shrink-0 text-brand-purple" />
+                                Course Catalog ({courses.length})
+                              </h5>
+                              <div className="relative">
+                                <select
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'course') {
+                                      setCourseIsNew(true);
+                                      setCourseNewIdStr('');
+                                      setCourseFormName('');
+                                      setCourseFormNameMm('');
+                                      setCourseFormPrice(35000);
+                                      setCourseFormDuration('6 Weeks (Self-paced)');
+                                      setCourseFormDescription('');
+                                      setCourseFormDescriptionMm('');
+                                      setCourseFormInstructor('Kru Jane & Sayar Thura');
+                                      
+                                      setTimeout(() => {
+                                        const el = document.getElementById("admin-course-form-panel");
+                                        if (el) {
+                                          el.scrollIntoView({ behavior: 'smooth' });
+                                        }
+                                      }, 50);
+                                    } else if (val === 'resource') {
+                                      if (courseIsNew) {
+                                        setCourseIsNew(false);
+                                        setAdminSelectedCourseId('course-basic');
+                                      }
+                                      setEditingResourceId(null);
+                                      setResourceFormName('');
+                                      setResourceFormNameMm('');
+                                      setResourceFormUrl('');
+                                      setResourceFormPrice(0);
+                                      setResourceFormType('free');
+                                      
+                                      setTimeout(() => {
+                                        const el = document.getElementById("admin-resource-form-section");
+                                        if (el) {
+                                          el.scrollIntoView({ behavior: 'smooth' });
+                                          const input = el.querySelector('input');
+                                          if (input) input.focus();
+                                        }
+                                      }, 150);
+                                    }
+                                    e.target.value = '';
+                                  }}
+                                  className="px-2 py-1.5 bg-brand-purple hover:bg-brand-purple/95 text-white text-[9px] font-black uppercase rounded-lg hover:brightness-105 active:translate-y-0.5 cursor-pointer outline-none border-t-0 border-r-0 border-l-0 border-b-4 border-brand-purple-shadow shadow-3xs font-sans text-center"
+                                  defaultValue=""
+                                >
+                                  <option value="" disabled className="bg-white text-slate-800 text-[10px] font-sans font-bold">➕ CREATE...</option>
+                                  <option value="course" className="bg-white text-slate-800 text-[10px] font-sans font-semibold text-left">📚 Course</option>
+                                  <option value="resource" className="bg-white text-[#583092] text-[10px] font-sans font-semibold text-left">📕 eBook Resource</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <p className="text-[10px] text-brand-muted font-sans font-semibold leading-relaxed">
+                              Configure core premium language tracks that students can enroll in or purchase dynamically from their screens.
+                            </p>
+
+                            <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                              {courses.map((course) => {
+                                const isSelected = !courseIsNew && adminSelectedCourseId === course.id;
+                                return (
+                                  <div
+                                    key={course.id}
+                                    onClick={() => {
+                                      setCourseIsNew(false);
+                                      setAdminSelectedCourseId(course.id);
+                                      setCourseFormName(course.name);
+                                      setCourseFormNameMm(course.nameMm);
+                                      setCourseFormPrice(course.priceAmount);
+                                      setCourseFormDuration(course.duration);
+                                      setCourseFormDescription(course.description || '');
+                                      setCourseFormDescriptionMm(course.descriptionMm || '');
+                                      setCourseFormInstructor(course.instructor || '');
+                                    }}
+                                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-3xs ${
+                                      isSelected
+                                        ? 'bg-brand-purple/5 border-brand-purple'
+                                        : 'bg-white border-gray-150 hover:border-gray-250'
+                                    }`}
+                                  >
+                                    <div className="space-y-1">
+                                      <h6 className="font-sans font-black text-brand-dark text-[11px] leading-snug">
+                                        {course.name}
+                                      </h6>
+                                      <p className="text-[9px] text-[#583092] font-semibold italic">
+                                        {course.nameMm}
+                                      </p>
+                                      <div className="text-[9px] text-brand-muted font-sans font-bold flex flex-wrap gap-x-2">
+                                        <span>⏱️ {course.duration}</span>
+                                        <span>•</span>
+                                        <span className="text-brand-purple font-mono">{course.priceAmount.toLocaleString()} MMK</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (course.id === 'course-basic') {
+                                            alert("The foundational Course (course-basic) is required for system routing and cannot be deleted.");
+                                            return;
+                                          }
+                                          const confirmDel = window.confirm(`Permanently delete the course "${course.name}"? All lessons assigned to it will fallback to Basic Course.`);
+                                          if (confirmDel) {
+                                            const updated = courses.filter(c => c.id !== course.id);
+                                            setCourses(updated);
+                                            addSystemLog('admin', `Permanently deleted course "${course.name}"`);
+                                            
+                                            // Reassign lessons
+                                            setLessons(prev => prev.map(l => l.courseId === course.id ? { ...l, courseId: 'course-basic' } : l));
+                                            
+                                            if (adminSelectedCourseId === course.id) {
+                                              setAdminSelectedCourseId('course-basic');
+                                              setCourseIsNew(false);
+                                            }
+                                            if (selectedCourseTab === course.id) {
+                                              setSelectedCourseTab('course-basic');
+                                            }
+                                          }
+                                        }}
+                                        className="p-2 bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-red-100"
+                                        title="Delete Course"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Course Form Editor Panel */}
+                          <div id="admin-course-form-panel" className="lg:col-span-7 bg-white p-4 sm:p-5 rounded-2xl border-2 border-gray-100 space-y-4 scroll-mt-20">
+                            <h5 className="text-xs font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1.5 border-b pb-2 text-brand-purple">
+                              <Pencil className="w-4 h-4 text-brand-purple" />
+                              {courseIsNew ? "Create New Language Course" : `Edit Course Details`}
+                            </h5>
+                            
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                if (!courseFormName.trim() || !courseFormDuration.trim() || !courseFormInstructor.trim()) {
+                                  alert("Please fill in all core course fields before publishing.");
+                                  return;
+                                }
+
+                                if (courseIsNew) {
+                                  const rawId = courseNewIdStr.trim();
+                                  if (!rawId) {
+                                    alert("Course ID is required.");
+                                    return;
+                                  }
+                                  const cleanId = rawId.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+                                  if (!cleanId.startsWith("course-")) {
+                                    alert("Highly recommended to prefix course IDs with 'course-' (e.g. course-fluent-thai).");
+                                  }
+                                  if (courses.some(c => c.id === cleanId)) {
+                                    alert("This Course ID is already taken. Choose a unique keyword.");
+                                    return;
+                                  }
+
+                                  const created: Course = {
+                                    id: cleanId,
+                                    name: courseFormName.trim(),
+                                    nameMm: courseFormNameMm.trim() || courseFormName.trim(),
+                                    priceAmount: Number(courseFormPrice) || 0,
+                                    currency: 'MMK',
+                                    duration: courseFormDuration.trim(),
+                                    description: courseFormDescription.trim(),
+                                    descriptionMm: courseFormDescriptionMm.trim(),
+                                    instructor: courseFormInstructor.trim()
+                                  };
+
+                                  const updated = [...courses, created];
+                                  setCourses(updated);
+                                  setAdminSelectedCourseId(cleanId);
+                                  setCourseIsNew(false);
+                                  addSystemLog('admin', `Created a brand new Language Course: "${created.name}"`);
+                                  alert("Course successfully published to students!");
+                                } else {
+                                  const updated = courses.map(c => {
+                                    if (c.id === adminSelectedCourseId) {
+                                      return {
+                                        ...c,
+                                        name: courseFormName.trim(),
+                                        nameMm: courseFormNameMm.trim() || courseFormName.trim(),
+                                        priceAmount: Number(courseFormPrice) || 0,
+                                        duration: courseFormDuration.trim(),
+                                        description: courseFormDescription.trim(),
+                                        descriptionMm: courseFormDescriptionMm.trim(),
+                                        instructor: courseFormInstructor.trim()
+                                      };
+                                    }
+                                    return c;
+                                  });
+                                  setCourses(updated);
+                                  addSystemLog('admin', `Updated details for Course: "${courseFormName}"`);
+                                  alert("Changes synced successfully!");
+                                }
+                              }}
+                              className="grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+                            >
+                              {courseIsNew && (
+                                <div className="sm:col-span-2 space-y-1 text-left">
+                                  <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                    Course ID Key (Unique identifier - No spaces, lowercase only)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. course-advanced-grammar"
+                                    value={courseNewIdStr}
+                                    onChange={(e) => setCourseNewIdStr(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold font-sans text-brand-purple focus:border-brand-purple focus:outline-none transition-all placeholder-gray-300"
+                                    required
+                                  />
+                                </div>
+                              )}
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Course Display Name (English)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Advanced Thai Writing Skills"
+                                  value={courseFormName}
+                                  onChange={(e) => setCourseFormName(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all placeholder-gray-300"
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-[#583092] uppercase tracking-wider">
+                                  အတန်းအမည် (မြန်မာအသံထွက် / စာသား)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. ထိုင်းစာ ရေးသားခြင်း လက်တွေ့အဆင့်မြင့်တန်း"
+                                  value={courseFormNameMm}
+                                  onChange={(e) => setCourseFormNameMm(e.target.value)}
+                                  className="w-full px-3 py-2 bg-[#fdfbfe] border border-[#f0ebf7] rounded-xl text-xs font-sans font-extrabold text-[#583092] focus:border-brand-purple focus:outline-none transition-all placeholder-gray-300"
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Price Amount (MMK)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={courseFormPrice}
+                                  onChange={(e) => setCourseFormPrice(Number(e.target.value))}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono font-black text-brand-purple focus:border-brand-purple focus:outline-none transition-all"
+                                  min={0}
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Duration Period
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 6 Weeks (Self-paced)"
+                                  value={courseFormDuration}
+                                  onChange={(e) => setCourseFormDuration(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left sm:col-span-2">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Active Instructor(s)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Kru Jane & Sayar Thura"
+                                  value={courseFormInstructor}
+                                  onChange={(e) => setCourseFormInstructor(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left sm:col-span-2">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Syllabus Outline Description (English)
+                                </label>
+                                <textarea
+                                  placeholder="Provide descriptive details of topic items coverage..."
+                                  value={courseFormDescription}
+                                  onChange={(e) => setCourseFormDescription(e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left sm:col-span-2">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  သင်တန်း အတိုချုံး ဖော်ပြချက် (မြန်မာဘာသာ)
+                                </label>
+                                <textarea
+                                  placeholder="ကျောင်းသားများ မြင်တွေ့ရမည့် မြန်မာဘာသာ အတန်းဖော်ပြချက်..."
+                                  value={courseFormDescriptionMm}
+                                  onChange={(e) => setCourseFormDescriptionMm(e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2 pt-2 text-left">
+                                <button
+                                  type="submit"
+                                  className="w-full py-3 bg-brand-purple hover:bg-brand-purple/95 text-white border-b-4 border-brand-purple-shadow text-[11px] font-sans font-black tracking-wider uppercase rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs"
+                                >
+                                  <CheckSquare className="w-4 h-4 shrink-0" />
+                                  {courseIsNew ? "Publish Language Course" : "Sync Course Details"}
+                                </button>
+                              </div>
+                            </form>
+
+                            {!courseIsNew && (() => {
+                              const activeCourse = courses.find(c => c.id === adminSelectedCourseId);
+                              return (
+                                <div className="border-t border-gray-150 pt-5 mt-6 text-left space-y-4">
+                                  <div className="p-4 bg-slate-50/70 border border-slate-200/85 rounded-2xl space-y-3">
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                      <h6 className="text-[11px] font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1.5">
+                                        <span>📕 Course Companion eBooks & Resource Links ({activeCourse?.resources?.length || 0})</span>
+                                      </h6>
+                                      <span className="text-[8.5px] bg-brand-purple/10 text-brand-purple font-sans font-black px-2 py-0.5 rounded-lg uppercase">
+                                        Course Material Panel
+                                      </span>
+                                    </div>
+
+                                    <p className="text-[9.5px] text-brand-muted leading-relaxed font-sans font-semibold">
+                                      Include high quality PDF workbooks, vocabulary handbooks, letters manuals, or worksheet links specifically for students studying <b>{courseFormName}</b>. Give students two options: download directly or purchase separate premium eBooks before unlocking!
+                                    </p>
+
+                                    {/* List current Resources */}
+                                    <div className="space-y-2">
+                                      {(!activeCourse?.resources || activeCourse.resources.length === 0) ? (
+                                        <div className="text-center py-4 bg-white border border-gray-150/65 rounded-xl text-[10px] text-brand-muted font-bold font-sans">
+                                          No companion eBooks configured yet for this course. Add one below!
+                                        </div>
+                                      ) : (
+                                        <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-1">
+                                          {activeCourse.resources.map((res: any) => {
+                                            return (
+                                              <div key={res.id} className="bg-white border border-gray-150 p-2.5 rounded-xl flex items-center justify-between gap-3 shadow-3xs text-[10.5px]">
+                                                <div className="space-y-0.5">
+                                                  <div className="font-sans font-black text-slate-800 leading-snug flex items-center gap-1.5 flex-wrap">
+                                                    <span>📘 {res.name}</span>
+                                                    <span className={`text-[8px] font-sans font-black px-1.5 py-0.2 rounded uppercase ${
+                                                      res.priceAmount === 0 
+                                                        ? 'bg-emerald-50 text-emerald-600' 
+                                                        : 'bg-amber-50 text-amber-700 border border-amber-150/20'
+                                                    }`}>
+                                                      {res.priceAmount === 0 ? "FREE DOWNLOAD" : `PREMIUM: ${res.priceAmount.toLocaleString()} MMK`}
+                                                    </span>
+                                                  </div>
+                                                  {res.nameMm && <p className="text-[9.5px] text-[#583092] font-semibold italic">{res.nameMm}</p>}
+                                                  <p className="text-[9px] text-[#0073e6] truncate font-mono max-w-[280px]" title={res.downloadUrl}>🔗 {res.downloadUrl}</p>
+                                                </div>
+                                                
+                                                <div className="flex gap-1 shrink-0">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      setEditingResourceId(res.id);
+                                                      setResourceFormName(res.name);
+                                                      setResourceFormNameMm(res.nameMm || '');
+                                                      setResourceFormUrl(res.downloadUrl);
+                                                      setResourceFormPrice(res.priceAmount);
+                                                      setResourceFormType(res.priceAmount > 0 ? 'premium' : 'free');
+                                                    }}
+                                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-lg cursor-pointer transition-colors border-none"
+                                                    title="Edit Resource"
+                                                  >
+                                                    <Pencil className="w-3 h-3" />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const confirmDel = window.confirm(`Permanently remove eBook resource "${res.name}"?`);
+                                                      if (confirmDel) {
+                                                        const updatedCourses = courses.map(c => {
+                                                          if (c.id === adminSelectedCourseId) {
+                                                            return {
+                                                              ...c,
+                                                              resources: (c.resources || []).filter((r: any) => r.id !== res.id)
+                                                            };
+                                                          }
+                                                          return c;
+                                                        });
+                                                        setCourses(updatedCourses);
+                                                        addSystemLog('admin', `Removed resource eBook "${res.name}" from ${courseFormName}`);
+                                                        if (editingResourceId === res.id) {
+                                                          setEditingResourceId(null);
+                                                          setResourceFormName('');
+                                                          setResourceFormNameMm('');
+                                                          setResourceFormUrl('');
+                                                          setResourceFormPrice(0);
+                                                          setResourceFormType('free');
+                                                        }
+                                                      }
+                                                    }}
+                                                    className="p-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg cursor-pointer transition-colors border-none font-sans font-black flex items-center justify-center"
+                                                    title="Delete Resource"
+                                                  >
+                                                    <Trash2 className="w-3 h-3" />
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Form card to add/edit eBook resource */}
+                                    <div id="admin-resource-form-section" className="p-3 bg-white border border-gray-150 rounded-xl space-y-3 shadow-3xs scroll-mt-20">
+                                      <span className="text-[9.5px] font-sans font-black text-brand-purple uppercase tracking-wider block">
+                                        {editingResourceId ? "✏️ Edit eBook Resource Details" : "➕ Add eBook / Companion PDF Resource"}
+                                      </span>
+                                      
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <div className="space-y-0.5 text-left">
+                                          <label className="text-[8.5px] font-sans font-black text-brand-dark uppercase tracking-wide">
+                                            eBook Name (English)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            placeholder="e.g. Workbook Volume 1"
+                                            value={resourceFormName}
+                                            onChange={(e) => setResourceFormName(e.target.value)}
+                                            className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[11px] font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all placeholder-gray-300"
+                                          />
+                                        </div>
+
+                                        <div className="space-y-0.5 text-left">
+                                          <label className="text-[8.5px] font-sans font-black text-[#583092] uppercase tracking-wide">
+                                            စာအုပ်အမည် (မြန်မာအသံထွက် / စာသား)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            placeholder="e.g. ထိုင်းစာ ရေးပုံရေးနည်း လေ့ကျင့်ခန်းစာအုပ်"
+                                            value={resourceFormNameMm}
+                                            onChange={(e) => setResourceFormNameMm(e.target.value)}
+                                            className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[11px] font-sans font-bold text-[#583092] focus:border-brand-purple focus:outline-none transition-all placeholder-gray-300"
+                                          />
+                                        </div>
+
+                                        <div className="sm:col-span-2 space-y-0.5 text-left">
+                                          <label className="text-[8.5px] font-sans font-black text-brand-dark uppercase tracking-wide flex items-center gap-1">
+                                            <span>🔗 eBook Download URL (Direct PDF Link or Google Drive Link)</span>
+                                          </label>
+                                          <input
+                                            type="url"
+                                            placeholder="e.g. https://drive.google.com/file/d/... or PDF download link"
+                                            value={resourceFormUrl}
+                                            onChange={(e) => setResourceFormUrl(e.target.value)}
+                                            className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[11px] font-mono text-brand-dark focus:border-brand-purple focus:outline-none transition-all placeholder-gray-300"
+                                          />
+                                        </div>
+
+                                        <div className="space-y-0.5 text-left">
+                                          <label className="text-[8.5px] font-sans font-black text-brand-dark uppercase tracking-wide">
+                                            Access Model Option
+                                          </label>
+                                          <select
+                                            value={resourceFormType}
+                                            onChange={(e) => {
+                                              const type = e.target.value as 'free' | 'premium';
+                                              setResourceFormType(type);
+                                              if (type === 'free') {
+                                                setResourceFormPrice(0);
+                                              } else if (resourceFormPrice === 0) {
+                                                setResourceFormPrice(5000);
+                                              }
+                                            }}
+                                            className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-[11px] font-sans font-bold text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                          >
+                                            <option value="free">🆓 Free Direct Download for Enrolled Students</option>
+                                            <option value="premium">💳 Premium Purchase Required (paid resource)</option>
+                                          </select>
+                                        </div>
+
+                                        <div className="space-y-0.5 text-left">
+                                          <label className="text-[8.5px] font-sans font-black text-brand-dark uppercase tracking-wide">
+                                            Purchase Price (MMK)
+                                          </label>
+                                          <input
+                                            type="number"
+                                            value={resourceFormPrice}
+                                            onChange={(e) => setResourceFormPrice(Number(e.target.value))}
+                                            disabled={resourceFormType === 'free'}
+                                            className={`w-full px-2.5 py-1.5 border rounded-lg text-[11px] font-mono font-black focus:outline-none transition-all ${
+                                              resourceFormType === 'free' 
+                                                ? 'bg-slate-50 border-gray-150 text-slate-400 cursor-not-allowed' 
+                                                : 'bg-white border-gray-200 text-brand-purple focus:border-brand-purple'
+                                            }`}
+                                            min={0}
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Action buttons */}
+                                      <div className="flex gap-2 pt-1.5 border-t border-gray-100">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (!resourceFormName.trim() || !resourceFormUrl.trim()) {
+                                              alert("Please enter both the eBook Name and Resource Download URL.");
+                                              return;
+                                            }
+                                            
+                                            const resourceId = editingResourceId || `res-${Date.now()}`;
+                                            const updatedRes = {
+                                              id: resourceId,
+                                              name: resourceFormName.trim(),
+                                              nameMm: resourceFormNameMm.trim() || undefined,
+                                              downloadUrl: resourceFormUrl.trim(),
+                                              priceAmount: resourceFormType === 'free' ? 0 : (resourceFormPrice || 0),
+                                              currency: 'MMK' as const
+                                            };
+
+                                            const updatedCourses = courses.map(c => {
+                                              if (c.id === adminSelectedCourseId) {
+                                                const currentResources = c.resources || [];
+                                                const resourcesExist = currentResources.some(r => r.id === resourceId);
+                                                
+                                                let nextResources;
+                                                if (resourcesExist) {
+                                                  nextResources = currentResources.map(r => r.id === resourceId ? updatedRes : r);
+                                                } else {
+                                                  nextResources = [...currentResources, updatedRes];
+                                                }
+                                                
+                                                return {
+                                                  ...c,
+                                                  resources: nextResources
+                                                };
+                                              }
+                                              return c;
+                                            });
+
+                                            setCourses(updatedCourses);
+                                            addSystemLog('admin', `${editingResourceId ? "Updated" : "Added"} eBook resource "${updatedRes.name}" on course: "${courseFormName}"`);
+                                            
+                                            // Reset form
+                                            setEditingResourceId(null);
+                                            setResourceFormName('');
+                                            setResourceFormNameMm('');
+                                            setResourceFormUrl('');
+                                            setResourceFormPrice(0);
+                                            setResourceFormType('free');
+                                            alert("eBook Resource synced successfully!");
+                                          }}
+                                          className="flex-1 py-1.5 bg-slate-900 border-none hover:bg-slate-800 text-white font-sans font-black text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                                        >
+                                          {editingResourceId ? "💾 Save eBook Changes" : "💾 Add Resource eBook"}
+                                        </button>
+
+                                        {editingResourceId && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEditingResourceId(null);
+                                              setResourceFormName('');
+                                              setResourceFormNameMm('');
+                                              setResourceFormUrl('');
+                                              setResourceFormPrice(0);
+                                              setResourceFormType('free');
+                                            }}
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-705 font-sans font-black text-[10px] uppercase tracking-wider rounded-lg transition-all border-none cursor-pointer"
+                                          >
+                                            Cancel
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-SECTION 4: STUDY STORE MANAGER */}
+                    {adminHubTab === 'store' && (
+                      <div className="space-y-6 animate-fade-in" id="admin-store-tab-view">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left">
+                          {/* Store Item List Panel */}
+                          <div className="lg:col-span-5 bg-gray-50/70 p-4 sm:p-5 rounded-2xl border border-gray-150 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-xs font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                                <ShoppingBag className="w-4 h-4 shrink-0 text-brand-purple" />
+                                Store Catalog ({storeItems.length})
+                              </h5>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setStoreIsNew(true);
+                                  setStoreNewIdStr('');
+                                  setStoreFormName('');
+                                  setStoreFormNameMm('');
+                                  setStoreFormType('e-book');
+                                  setStoreFormDescription('');
+                                  setStoreFormDescriptionMm('');
+                                  setStoreFormPrice(25000);
+                                  setStoreFormCurrency('MMK');
+                                  setStoreFormPopular(false);
+                                  setStoreFormCourseId('');
+                                  setStoreFormPdfFileName('');
+                                  setStoreFormPdfDownloadUrl('');
+                                }}
+                                className="px-2.5 py-1 bg-brand-purple hover:bg-brand-purple/95 text-white text-[9px] font-black uppercase rounded-lg hover:brightness-105 active:translate-y-0.5 cursor-pointer flex items-center gap-1 shadow-3xs font-sans"
+                              >
+                                <Plus className="w-3 h-3" />
+                                CREATE NEW
+                              </button>
+                            </div>
+
+                            <p className="text-[10px] text-brand-muted font-sans font-semibold leading-relaxed">
+                              Configure premium eBook resources, practice guides, zoom speak tutoring, or VIP system packages that students can purchase.
+                            </p>
+
+                            <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                              {storeItems.map((item) => {
+                                const isSelected = !storeIsNew && adminSelectedStoreId === item.id;
+                                return (
+                                  <div
+                                    key={item.id}
+                                    onClick={() => {
+                                      setStoreIsNew(false);
+                                      setAdminSelectedStoreId(item.id);
+                                      setStoreFormName(item.name);
+                                      setStoreFormNameMm(item.nameMm);
+                                      setStoreFormType(item.type);
+                                      setStoreFormDescription(item.description || '');
+                                      setStoreFormDescriptionMm(item.descriptionMm || '');
+                                      setStoreFormPrice(item.price);
+                                      setStoreFormCurrency(item.currency);
+                                      setStoreFormPopular(!!item.popular);
+                                      setStoreFormCourseId(item.courseId || '');
+                                      setStoreFormPdfFileName(item.pdfFileName || '');
+                                      setStoreFormPdfDownloadUrl(item.pdfDownloadUrl || '');
+                                    }}
+                                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-3xs ${
+                                      isSelected
+                                        ? 'bg-brand-purple/5 border-brand-purple'
+                                        : 'bg-white border-gray-150 hover:border-gray-250'
+                                    }`}
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[13px]">
+                                          {item.type === 'e-book' && '📕'}
+                                          {item.type === 'tutoring' && '🗣️'}
+                                          {item.type === 'certificate' && '🎖️'}
+                                          {item.type === 'vip-package' && '⭐'}
+                                        </span>
+                                        <h6 className="font-sans font-black text-brand-dark text-[11px] leading-snug">
+                                          {item.name}
+                                        </h6>
+                                      </div>
+                                      <p className="text-[9px] text-[#583092] font-bold italic pl-4">
+                                        {item.nameMm}
+                                      </p>
+                                      <div className="text-[9px] text-brand-muted font-sans font-bold flex flex-wrap gap-x-2 pl-4">
+                                        <span className="uppercase text-amber-700 font-extrabold">{item.type}</span>
+                                        <span>•</span>
+                                        <span className="text-brand-purple font-mono">{item.price.toLocaleString()} {item.currency}</span>
+                                        {item.popular && (
+                                          <>
+                                            <span>•</span>
+                                            <span className="text-orange-600 font-extrabold">POPULAR</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const confirmDel = window.confirm(`Permanently delete the study product "${item.name}" from your catalog store?`);
+                                          if (confirmDel) {
+                                            const updated = storeItems.filter(s => s.id !== item.id);
+                                            setStoreItems(updated);
+                                            addSystemLog('admin', `Permanently deleted product/resource "${item.name}"`);
+                                            
+                                            if (adminSelectedStoreId === item.id) {
+                                              if (updated.length > 0) {
+                                                setAdminSelectedStoreId(updated[0].id);
+                                              } else {
+                                                setAdminSelectedStoreId('');
+                                              }
+                                              setStoreIsNew(false);
+                                            }
+                                          }
+                                        }}
+                                        className="p-2 bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-red-100 placeholder-transparent"
+                                        title="Delete Product"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Store Item Form Editor Panel */}
+                          <div className="lg:col-span-7 bg-white p-4 sm:p-5 rounded-2xl border-2 border-gray-100 space-y-4">
+                            <h5 className="text-xs font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1.5 border-b pb-2 text-brand-purple font-sans">
+                              <Pencil className="w-4 h-4 text-brand-purple" />
+                              {storeIsNew ? "Upload & Create New eBook / Product" : `Edit Study Store product`}
+                            </h5>
+                            
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                if (!storeFormName.trim() || !storeFormDescription.trim()) {
+                                  alert("Please fill in name and description outline before publishing.");
+                                  return;
+                                }
+
+                                if (storeIsNew) {
+                                  const rawId = storeNewIdStr.trim();
+                                  if (!rawId) {
+                                    alert("Product ID is required.");
+                                    return;
+                                  }
+                                  const cleanId = rawId.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+                                  if (storeItems.some(i => i.id === cleanId)) {
+                                    alert(`Duplicate ID Error: "${cleanId}" is already taken.`);
+                                    return;
+                                  }
+                                  
+                                  const newItem: StoreItem = {
+                                    id: cleanId,
+                                    name: storeFormName.trim(),
+                                    nameMm: storeFormNameMm.trim() || storeFormName.trim(),
+                                    type: storeFormType,
+                                    description: storeFormDescription.trim(),
+                                    descriptionMm: storeFormDescriptionMm.trim(),
+                                    price: storeFormPrice,
+                                    currency: storeFormCurrency,
+                                    popular: storeFormPopular,
+                                    courseId: storeFormCourseId || undefined,
+                                    pdfFileName: storeFormPdfFileName.trim() || undefined,
+                                    pdfDownloadUrl: storeFormPdfDownloadUrl.trim() || undefined
+                                  };
+
+                                  const updated = [...storeItems, newItem];
+                                  setStoreItems(updated);
+                                  addSystemLog('admin', `Uploaded new eBook / Resource: "${newItem.name}" (${newItem.price} ${newItem.currency})`);
+                                  
+                                  setStoreIsNew(false);
+                                  setAdminSelectedStoreId(cleanId);
+                                  alert(`Successfully published resource item "${newItem.name}"!`);
+                                } else {
+                                  // Edit Mode
+                                  const updated = storeItems.map(item => {
+                                    if (item.id === adminSelectedStoreId) {
+                                      return {
+                                        ...item,
+                                        name: storeFormName.trim(),
+                                        nameMm: storeFormNameMm.trim() || storeFormName.trim(),
+                                        type: storeFormType,
+                                        description: storeFormDescription.trim(),
+                                        descriptionMm: storeFormDescriptionMm.trim(),
+                                        price: storeFormPrice,
+                                        currency: storeFormCurrency,
+                                        popular: storeFormPopular,
+                                        courseId: storeFormCourseId || undefined,
+                                        pdfFileName: storeFormPdfFileName.trim() || undefined,
+                                        pdfDownloadUrl: storeFormPdfDownloadUrl.trim() || undefined
+                                      };
+                                    }
+                                    return item;
+                                  });
+                                  setStoreItems(updated);
+                                  addSystemLog('admin', `Synced updates for product "${storeFormName}"`);
+                                  alert("Product information successfully updated!");
+                                }
+                              }}
+                              className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                            >
+                              {storeIsNew && (
+                                <div className="space-y-1 text-left sm:col-span-2">
+                                  <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                    Target Item URL/ID String (Must be unique, e.g. ebook-thai-advanced)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. ebook-travel-myanmar"
+                                    value={storeNewIdStr}
+                                    onChange={(e) => setStoreNewIdStr(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    required
+                                  />
+                                </div>
+                              )}
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Product Name (English / Romanized)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Everyday Thai Phrases E-Book v2"
+                                  value={storeFormName}
+                                  onChange={(e) => setStoreFormName(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  ကုန်ပစ္စည်းအမည် (မြန်မာဘာသာ)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. နေ့စဉ်သုံး ထိုင်းဝါကျများ အီးဘုခ်"
+                                  value={storeFormNameMm}
+                                  onChange={(e) => setStoreFormNameMm(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Resource Product Category
+                                </label>
+                                <select
+                                  value={storeFormType}
+                                  onChange={(e) => setStoreFormType(e.target.value as any)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                >
+                                  <option value="e-book">📕 E-Book (Digital Manual)</option>
+                                  <option value="tutoring">🗣️ Tutoring / Speaking Zoom Session</option>
+                                  <option value="certificate">🎖️ Verified Certificate Token</option>
+                                  <option value="vip-package">⭐ VIP System Premium Study Access</option>
+                                </select>
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Price Amount &amp; Currency Value
+                                </label>
+                                <div className="flex gap-1">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    placeholder="e.g. 15000"
+                                    value={storeFormPrice}
+                                    onChange={(e) => setStoreFormPrice(Number(e.target.value))}
+                                    className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                    required
+                                  />
+                                  <select
+                                    value={storeFormCurrency}
+                                    onChange={(e) => setStoreFormCurrency(e.target.value as any)}
+                                    className="px-2 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                  >
+                                    <option value="MMK">MMK (Kyat)</option>
+                                    <option value="XP">XP (Points)</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Link to Language Course (Course Filter)
+                                </label>
+                                <select
+                                  value={storeFormCourseId}
+                                  onChange={(e) => setStoreFormCourseId(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                >
+                                  <option value="">General / None (No Course Filter)</option>
+                                  {courses.map(course => (
+                                    <option key={course.id} value={course.id}>
+                                      📚 {course.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  eBook PDF File Name for Auto-Generator
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Basic_Reading_Manual.pdf"
+                                  value={storeFormPdfFileName}
+                                  onChange={(e) => setStoreFormPdfFileName(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider flex items-center gap-1">
+                                  <span>🔗 eBook Download / Web Resource URL</span>
+                                  <span className="text-[8px] bg-[#e1f5fe] text-[#0288d1] px-1 rounded font-bold uppercase select-none">Direct File / Remote Link</span>
+                                </label>
+                                <input
+                                  type="url"
+                                  placeholder="e.g. https://drive.google.com/file/d/..."
+                                  value={storeFormPdfDownloadUrl}
+                                  onChange={(e) => setStoreFormPdfDownloadUrl(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                />
+                              </div>
+
+                              <div className="space-y-2 text-left sm:col-span-2 py-1.5 px-3 bg-brand-purple/5 border border-brand-purple/10 rounded-xl flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                  <span className="block text-[10px] font-sans font-black text-brand-purple uppercase tracking-wider leading-none">
+                                    Feature as Best Seller / Popular?
+                                  </span>
+                                  <span className="block text-[9.5px] text-brand-muted font-sans font-semibold">
+                                    Places an eye-catching orange 'POPULAR' flag on the student store card.
+                                  </span>
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  checked={storeFormPopular}
+                                  onChange={(e) => setStoreFormPopular(e.target.checked)}
+                                  className="w-4 h-4 text-brand-purple rounded border-gray-300 focus:ring-brand-purple"
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left sm:col-span-2">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  Product Description (English Outline info)
+                                </label>
+                                <textarea
+                                  placeholder="Outline the content of this eBook resource (e.g. 120 vocabulary items with high-fidelity pronunciation guides)..."
+                                  value={storeFormDescription}
+                                  onChange={(e) => setStoreFormDescription(e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-1 text-left sm:col-span-2">
+                                <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                  ကုန်ပစ္စည်း အသေးစိတ် ရှင်းလင်းချက် (မြန်မာဘာသာ)
+                                </label>
+                                <textarea
+                                  placeholder="ကျောင်းသားများ မြင်တွေ့ရမည့် မြန်မာဘာသာ အီးဘုတ်အကြောင်းအရာ ရှင်းလင်းချက်..."
+                                  value={storeFormDescriptionMm}
+                                  onChange={(e) => setStoreFormDescriptionMm(e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold font-sans text-brand-dark focus:border-brand-purple focus:outline-none transition-all"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2 pt-2 text-left">
+                                <button
+                                  type="submit"
+                                  className="w-full py-3 bg-brand-purple hover:bg-brand-purple/95 text-white border-b-4 border-brand-purple-shadow text-[11px] font-sans font-black tracking-wider uppercase rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs font-sans"
+                                >
+                                  <CheckSquare className="w-4 h-4 shrink-0" />
+                                  {storeIsNew ? "Publish Product to Store" : "Sync Product Changes"}
+                                </button>
+                              </div>
+                            </form>
                           </div>
                         </div>
                       </div>
@@ -4280,6 +6716,7 @@ export default function App() {
                           const nextId = lessons.length > 0 ? Math.max(...lessons.map(l => l.id)) + 1 : 1;
                           const newLesson: Lesson = {
                             id: nextId,
+                            courseId: adminCurriculumCourseFilter !== 'all' ? adminCurriculumCourseFilter : 'course-basic',
                             titleThai: "บทเรียนใหม่",
                             titlePhonetic: "Bot-riian mai",
                             titleEnglish: "New Custom Lesson " + nextId,
@@ -4598,6 +7035,33 @@ export default function App() {
                     )}
                   </div>
 
+                  {/* Course dropdown filter above select lesson to edit */}
+                  <div className="p-3 bg-brand-purple/[0.03] rounded-xl border border-brand-purple/15 flex flex-col sm:flex-row items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                      <label className="text-[10px] font-sans font-black text-brand-purple uppercase tracking-wider shrink-0 flex items-center gap-1">
+                        Filter Lessons by Course:
+                      </label>
+                      <select
+                        value={adminCurriculumCourseFilter}
+                        onChange={(e) => {
+                          setAdminCurriculumCourseFilter(e.target.value);
+                          setAdminSelectedLessonId(null);
+                        }}
+                        className="bg-white border-2 border-brand-purple/20 px-3 py-1.5 rounded-lg text-xs font-black font-sans text-brand-purple focus:border-brand-purple focus:outline-none cursor-pointer"
+                      >
+                        <option value="all">⚡ ALL COURSES (သင်တန်းအားလုံး)</option>
+                        {courses.map(c => (
+                          <option key={c.id} value={c.id}>
+                            🎓 {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="text-[9.5px] font-sans font-semibold text-brand-muted sm:ml-auto">
+                      Only displays lessons matching the selected course filter above.
+                    </div>
+                  </div>
+
                   {/* Lesson selection query dropdown */}
                   <div className="flex flex-col sm:flex-row items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-150">
                     <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -4613,11 +7077,17 @@ export default function App() {
                         className="bg-white border-2 border-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer"
                       >
                         <option value="">-- Choose a Lesson --</option>
-                        {lessons.map(l => (
-                          <option key={l.id} value={l.id}>
-                            Lesson {l.id}: {l.titleEnglish} ({l.titleThai})
-                          </option>
-                        ))}
+                        {lessons
+                          .filter(l => {
+                            if (adminCurriculumCourseFilter === 'all') return true;
+                            const lessonCourseId = l.courseId || 'course-basic';
+                            return lessonCourseId === adminCurriculumCourseFilter;
+                          })
+                          .map(l => (
+                            <option key={l.id} value={l.id}>
+                              Lesson {l.id}: {l.titleEnglish} ({l.titleThai})
+                            </option>
+                          ))}
                       </select>
                     </div>
 
@@ -4728,6 +7198,20 @@ export default function App() {
                                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
                                   />
                                 </div>
+                                <div className="space-y-1.5 md:col-span-2">
+                                  <label className="block text-[10px] font-sans font-black text-brand-purple uppercase tracking-wider">Assigned Language Course</label>
+                                  <select
+                                    value={selectedLesson.courseId || 'course-basic'}
+                                    onChange={(e) => updateLessonField(selectedLesson.id, 'courseId', e.target.value)}
+                                    className="w-full px-3 py-2 border-2 border-brand-purple/20 rounded-lg text-xs font-black font-sans text-brand-purple focus:border-brand-purple focus:outline-none cursor-pointer bg-white"
+                                  >
+                                    {courses.map(c => (
+                                      <option key={c.id} value={c.id}>
+                                        🎓 {c.name} ({c.id})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
                               </div>
 
                               <div className="space-y-1.5">
@@ -4805,7 +7289,7 @@ export default function App() {
                                       required
                                     />
                                   </div>
-                                  
+
                                   <div className="space-y-1">
                                     <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Phonetic</label>
                                     <input
@@ -5067,6 +7551,24 @@ export default function App() {
                                 </div>
 
                                 <div className="space-y-4 max-h-[500px] overflow-y-auto p-1 bg-gray-50/50 rounded-xl border p-2">
+                                  {/* Dialogue Video Practice URL (Optional) whole lesson practice input before any dialogue cards */}
+                                  <div className="bg-white p-3.5 rounded-xl border border-brand-purple/20 hover:border-brand-purple/40 transition-colors space-y-2 shadow-2xs">
+                                    <label className="block text-[10px] font-sans font-black text-brand-purple uppercase tracking-wider flex items-center gap-1.5">
+                                      <span>🎥 Dialogue Video Practice URL (Optional)</span>
+                                      <span className="text-[8px] bg-brand-purple-light text-brand-purple px-1.5 py-0.5 rounded font-bold uppercase select-none">Whole Lesson Practice</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={selectedLesson.wholeDialogueVideoUrl || ''}
+                                      onChange={(e) => updateLessonField(selectedLesson.id, 'wholeDialogueVideoUrl', e.target.value)}
+                                      placeholder="e.g. YouTube embed URL (https://www.youtube.com/embed/...)"
+                                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none placeholder-gray-400"
+                                    />
+                                    <p className="text-[8.5px] font-sans text-brand-muted font-medium">
+                                      Provide a video URL (e.g. YouTube iframe embed version) to play a full conversational practice sequence of the active dialogue.
+                                    </p>
+                                  </div>
+
                                   {currentDialogue.length === 0 ? (
                                     <p className="text-center py-6 text-xs text-brand-muted font-bold font-sans">No dialogue lines configured. Click Add above!</p>
                                   ) : (
@@ -5173,6 +7675,27 @@ export default function App() {
                                               }}
                                               className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none"
                                             />
+                                          </div>
+
+                                          <div className="space-y-1 sm:col-span-5 border-t border-gray-100 pt-2 mt-1">
+                                            <label className="block text-[9px] font-sans font-black text-brand-purple uppercase flex items-center gap-1.5">
+                                              <span>📹 Line Speaker Video URL (Optional)</span>
+                                              <span className="text-[8px] bg-brand-purple-light text-brand-purple px-1 py-0.2 rounded font-bold uppercase select-none">Dual-Speaker Line Video</span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={dl.videoUrl || ''}
+                                              onChange={(e) => {
+                                                const updated = [...currentDialogue];
+                                                updated[index].videoUrl = e.target.value || undefined;
+                                                setLessons(prev => prev.map(l => l.id === selectedLesson.id ? { ...l, dialogue: updated } : l));
+                                              }}
+                                              placeholder="e.g. video URL (direct .mp4 link)"
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-semibold bg-white focus:border-brand-purple focus:outline-none placeholder-gray-400"
+                                            />
+                                            <p className="text-[8px] font-sans text-brand-muted mt-0.5 font-medium leading-none">
+                                              Specify a custom speaker-specific loop or demonstration video for this dialogue line.
+                                            </p>
                                           </div>
                                         </div>
                                       </div>
@@ -5779,6 +8302,7 @@ export default function App() {
                   masteredWords={progress.masteredWords}
                   audioSpeedIndex={audioSpeedIndex}
                   setAudioSpeedIndex={setAudioSpeedIndex}
+                  wholeDialogueVideoUrl={activeLesson.wholeDialogueVideoUrl}
                 />
               )}
 
@@ -5949,8 +8473,24 @@ export default function App() {
             setCurrentUser={setCurrentUser}
             setIsLoggedIn={setIsLoggedIn}
             addSystemLog={addSystemLog}
+            orders={orders}
             setOrders={setOrders}
             setIsCourseStoreExpanded={setIsCourseStoreExpanded}
+          />
+        )}
+
+        {selectedDetailOrder && (
+          <OrderDetailModal
+            order={selectedDetailOrder}
+            onClose={() => setSelectedDetailOrder(null)}
+            isAdmin={isAdmin}
+            onUpdateOrder={(updatedOrder) => {
+              setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+              setSelectedDetailOrder(updatedOrder);
+            }}
+            addSystemLog={addSystemLog}
+            storeItems={storeItems}
+            triggerPdfDownload={triggerPdfDownload}
           />
         )}
 
@@ -6200,7 +8740,7 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1">
-                      {PREMIUM_COURSES.map((course) => (
+                      {courses.filter(c => c.id !== 'course-basic').map((course) => (
                         <div
                           key={course.id}
                           className="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 hover:border-brand-purple/25 transition-all text-left flex flex-col justify-between gap-2"

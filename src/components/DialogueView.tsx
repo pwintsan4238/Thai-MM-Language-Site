@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DialogueLine, WordBreakdown } from '../types';
-import { Play, Volume2, Volume1, Volume, HelpCircle, CheckCircle, ChevronRight, Mic, Sparkles } from 'lucide-react';
+import { Play, Volume2, Volume1, Volume, HelpCircle, CheckCircle, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface DialogueViewProps {
@@ -9,14 +9,70 @@ interface DialogueViewProps {
   masteredWords: string[];
   audioSpeedIndex: number;
   setAudioSpeedIndex: React.Dispatch<React.SetStateAction<number>>;
+  wholeDialogueVideoUrl?: string;
 }
 
-export default function DialogueView({ dialogue, onWordMastered, masteredWords, audioSpeedIndex, setAudioSpeedIndex }: DialogueViewProps) {
+export default function DialogueView({ dialogue, onWordMastered, masteredWords, audioSpeedIndex, setAudioSpeedIndex, wholeDialogueVideoUrl }: DialogueViewProps) {
   const [selectedWord, setSelectedWord] = useState<WordBreakdown | null>(null);
   const [activeSpeechLine, setActiveSpeechLine] = useState<number | null>(null);
-  const [recordingLineIndex, setRecordingLineIndex] = useState<number | null>(null);
-  const [simulatedScore, setSimulatedScore] = useState<number | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
+
+  // Detect available video structures
+  const hasWholeVideo = !!wholeDialogueVideoUrl;
+  const hasLineVideos = dialogue.some(line => !!line.videoUrl);
+  
+  // Default to whole video if available, otherwise fallback
+  const [videoMode, setVideoMode] = useState<'whole' | 'lines' | 'none'>(
+    hasWholeVideo ? 'whole' : (hasLineVideos ? 'lines' : 'none')
+  );
+
+  // Video parsing helper handles YouTube converting and native HTML5 MP4 videos cleanly
+  const renderVideoElement = (url: string, title: string = "Video Player", containerClass: string = "w-full") => {
+    if (!url) return null;
+    const isYoutube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('/embed/');
+    if (isYoutube) {
+      let embedUrl = url;
+      try {
+        if (url.includes('watch?v=')) {
+          const urlObj = new URL(url);
+          const videoId = urlObj.searchParams.get('v');
+          if (videoId) {
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+          }
+        } else if (url.includes('youtu.be/')) {
+          const parts = url.split('youtu.be/');
+          if (parts[1]) {
+            const videoId = parts[1].split('?')[0];
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed parsing video URL, using raw:', url, e);
+      }
+      return (
+        <div className={`relative aspect-video ${containerClass} overflow-hidden bg-black shadow-inner border border-brand-purple/10 rounded-xl`}>
+          <iframe
+            src={embedUrl}
+            title={title}
+            className="absolute inset-0 w-full h-full border-none rounded-xl"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      );
+    } else {
+      return (
+        <div className={`relative aspect-video ${containerClass} overflow-hidden bg-black border border-brand-purple/10 rounded-xl`}>
+          <video
+            src={url}
+            controls
+            playsInline
+            preload="none"
+            className="absolute inset-0 w-full h-full object-cover rounded-xl bg-black"
+          />
+        </div>
+      );
+    }
+  };
 
   // Use Web Speech API for Pronunciation
   const speakThai = (text: string, index?: number) => {
@@ -45,25 +101,24 @@ export default function DialogueView({ dialogue, onWordMastered, masteredWords, 
     window.speechSynthesis.speak(utterance);
   };
 
-  // Simulate Speak and Repeat Practice (Pronunciation Assessment)
-  const handleMicPractice = (index: number) => {
-    setRecordingLineIndex(index);
-    setIsRecording(true);
-    setSimulatedScore(null);
-
-    // Simulate microphone audio response
-    setTimeout(() => {
-      setIsRecording(false);
-      // Give a random encouraging high score between 75 and 98
-      const score = Math.floor(Math.random() * (98 - 75 + 1)) + 75;
-      setSimulatedScore(score);
-    }, 2800);
-  };
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Dialogue Left/Mid Column (Interactive conversation flow) */}
       <div className="lg:col-span-2 space-y-6">
+        {/* Mobile Video Widget */}
+        {wholeDialogueVideoUrl && (
+          <div className="lg:hidden duo-card p-4 bg-white border-2 border-brand-purple/20 shadow-xs space-y-3">
+            <h4 className="font-sans font-black text-brand-dark text-xs flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-sans font-black uppercase tracking-wider text-brand-purple">
+                <span className="text-sm">📺</span>
+                <span>Full Practice Video • သင်ခန်းစာဗီဒီယို</span>
+              </span>
+              <span className="text-[9px] bg-brand-purple-light text-brand-purple px-2 py-0.5 rounded-full font-bold">Full Video Practice</span>
+            </h4>
+            {renderVideoElement(wholeDialogueVideoUrl, "Dialogue Lesson Full Practice Session Mobile")}
+          </div>
+        )}
+
         <div className="duo-card p-6 bg-white">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 border-b border-brand-border pb-4">
             <h3 className="font-sans font-black text-brand-dark text-lg flex items-center gap-2">
@@ -74,6 +129,49 @@ export default function DialogueView({ dialogue, onWordMastered, masteredWords, 
               Tap any word for translation • စကားလုံးကိုနှိပ်ဂရုစိုက်ပါ
             </span>
           </div>
+
+          {/* Dynamic Video Selector Segmented Control when both exist */}
+          {hasWholeVideo && hasLineVideos && (
+            <div className="flex bg-gray-50 p-1.5 rounded-xl border border-gray-100 max-w-md mb-6 justify-between items-center text-xs font-sans">
+              <span className="text-[10px] uppercase font-black text-brand-muted tracking-wider px-2 shrink-0">🎥 Practice Mode</span>
+              <div className="flex bg-white shadow-3xs p-0.5 rounded-lg border border-gray-100 gap-1 flex-1 max-w-xs justify-end ml-auto">
+                <button
+                  onClick={() => setVideoMode('whole')}
+                  className={`px-3 py-1 text-[10px] font-sans font-black rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+                    videoMode === 'whole'
+                      ? 'bg-brand-purple text-white shadow-2xs'
+                      : 'text-brand-muted hover:text-brand-dark'
+                  }`}
+                >
+                  📺 Whole Video
+                </button>
+                <button
+                  onClick={() => setVideoMode('lines')}
+                  className={`px-3 py-1 text-[10px] font-sans font-black rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+                    videoMode === 'lines'
+                      ? 'bg-brand-purple text-white shadow-2xs'
+                      : 'text-brand-muted hover:text-brand-dark'
+                  }`}
+                >
+                  👥 Lines Video
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* If they have whole video and selected whole video, show inline player at top of dialogues */}
+          {hasWholeVideo && videoMode === 'whole' && (
+            <div className="mb-6 bg-brand-purple/5 p-4 rounded-2xl border-2 border-brand-purple/15 animate-fade-in space-y-3">
+              <div className="flex items-center justify-between text-[10px] font-sans font-black text-brand-purple uppercase tracking-wider">
+                <span>🎬 CONVERSATION BROADCAST VIDEO</span>
+                <span className="bg-[#efefef] text-brand-dark px-1.5 py-0.5 rounded text-[8px] border font-bold">Dialogue Video</span>
+              </div>
+              {renderVideoElement(wholeDialogueVideoUrl, "Dialogue Lesson Full Practice Session Top")}
+              <p className="text-[9px] text-brand-muted font-sans font-medium text-center leading-normal">
+                Listen to the full conversational dialogue in context. Pause then repeat back line-by-line below to master natural rhythm!
+              </p>
+            </div>
+          )}
 
           <div className="space-y-6" id="dialogue-chat-flow">
             {dialogue.map((line, idx) => {
@@ -213,38 +311,21 @@ export default function DialogueView({ dialogue, onWordMastered, masteredWords, 
                       {line.myanmar}
                     </div>
 
-                    {/* Speaking practice indicator */}
-                    <div className="mt-4 pt-3 border-t border-brand-border flex items-center justify-between">
-                      <button
-                        onClick={() => handleMicPractice(idx)}
-                        className="flex items-center gap-1.5 text-xs font-sans font-extrabold text-brand-purple hover:text-[#58cc02] transition-colors"
-                      >
-                        <Mic className="w-4 h-4" />
-                        Speak & Repeat • အသံထွက်လေ့ကျင့်မည်
-                      </button>
+                    {/* Integrated dual-speaker video loop (only shown if in 'lines' mode or if no whole video exists to avoid clutter) */}
+                    {line.videoUrl && (videoMode === 'lines' || !hasWholeVideo) && (
+                      <div className="mt-4 rounded-xl overflow-hidden border-2 border-brand-purple/10 bg-black/5 p-1 max-w-full sm:max-w-xs shadow-3xs animate-fade-in w-full">
+                        {renderVideoElement(line.videoUrl, `Speaker ${line.speaker} Line Video`)}
+                        <div className="px-2 py-1 flex items-center justify-between text-[9px] font-sans font-black text-brand-muted uppercase tracking-wider">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-purple animate-ping shrink-0" />
+                            <span>Speaker {line.speaker} • ဗီဒီယို</span>
+                          </span>
+                          <span className="text-brand-purple font-extrabold font-mono text-[8px]">Dialogue Video</span>
+                        </div>
+                      </div>
+                    )}
 
-                      <AnimatePresence>
-                        {recordingLineIndex === idx && (
-                          <div className="flex items-center gap-1 text-[10px] font-mono">
-                            {isRecording ? (
-                              <span className="text-brand-purple flex items-center gap-1.5 animate-pulse bg-brand-purple-light px-2.5 py-1 rounded-full border border-brand-purple/20">
-                                <span className="w-1.5 h-1.5 bg-brand-purple rounded-full animate-ping" />
-                                Listening...
-                              </span>
-                            ) : simulatedScore !== null ? (
-                              <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full border-2 font-black ${
-                                simulatedScore >= 80 
-                                  ? 'text-brand-green bg-brand-green-light border-brand-green' 
-                                  : 'text-brand-purple bg-brand-purple-light border-brand-purple'
-                              }`}>
-                                <Sparkles className="w-3.5 h-3.5 fill-current" />
-                                Score: {simulatedScore}%
-                              </span>
-                            ) : null}
-                          </div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+
                   </div>
                 </div>
               );
@@ -254,7 +335,25 @@ export default function DialogueView({ dialogue, onWordMastered, masteredWords, 
       </div>
 
       {/* Vocabulary breakout details card (Right Column) - Hidden on mobile, persistent on desktop */}
-      <div className="hidden lg:block space-y-6">
+      <div className="hidden lg:block space-y-6 bg-transparent">
+        {wholeDialogueVideoUrl && (
+          <div className="duo-card p-5 bg-white border-2 border-brand-purple/20 shadow-xs space-y-3">
+            <h4 className="font-sans font-black text-brand-dark text-xs flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-sans font-black uppercase tracking-wider text-brand-purple">
+                <span className="text-sm">📺</span>
+                <span>Full Practice Video • သင်ခန်းစာဗီဒီယို</span>
+              </span>
+              <span className="text-[9px] bg-brand-purple-light text-brand-purple px-2 py-0.5 rounded-full font-bold">Full Video Practice</span>
+            </h4>
+            {renderVideoElement(wholeDialogueVideoUrl, "Dialogue Lesson Full Practice Session Desktop")}
+            <div className="bg-brand-purple/5 p-3 rounded-xl border border-brand-purple/10">
+              <p className="text-[10px] font-sans text-brand-purple font-bold leading-normal">
+                💡 Full practice track enabled! Watch native actors speak, then select words in bubbles below to analyze meanings and parts of speech.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="duo-card p-6 bg-white sticky top-20">
           <h4 className="text-xs font-sans text-brand-muted uppercase tracking-widest mb-4 font-extrabold border-b border-brand-border pb-2">
             Constituent Parser • စကားလုံးခွဲခြမ်းစိတ်ဖြာချက်

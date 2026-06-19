@@ -15,6 +15,7 @@ export interface DialogueLine {
   english: string;
   myanmar: string;
   words: WordBreakdown[];
+  videoUrl?: string; // Optional Speaker line preview video (GIF, MP4 or YouTube)
 }
 
 export interface GrammarNote {
@@ -43,6 +44,7 @@ export interface QuizQuestion {
 
 export interface Lesson {
   id: number;
+  courseId?: string; // Links lesson to specific course (e.g. 'course-basic', 'course-business', 'course-workspace')
   titleThai: string;
   titlePhonetic: string;
   titleEnglish: string;
@@ -50,6 +52,7 @@ export interface Lesson {
   descriptionEnglish: string;
   descriptionMyanmar: string;
   dialogue: DialogueLine[];
+  wholeDialogueVideoUrl?: string; // Optional Lesson-wide full video for whole dialogue practice
   grammarNotes: GrammarNote[];
   quiz: QuizQuestion[];
 }
@@ -71,6 +74,9 @@ export interface RegisteredUser {
   dateJoined: string;
   lessonsDone?: number; // total completed lessons count
   streakCount?: number;
+  fullName?: string;
+  phone?: string;
+  email?: string;
 }
 
 export interface PurchaseOrder {
@@ -82,6 +88,19 @@ export interface PurchaseOrder {
   currency: 'MMK' | 'THB' | 'XP';
   status: 'pending' | 'completed' | 'cancelled';
   orderDate: string;
+  evidenceImage?: string;
+  adminNotes?: string;
+  studentPhone?: string;
+  studentEmail?: string;
+}
+
+export interface CourseResource {
+  id: string;
+  name: string;
+  nameMm?: string;
+  downloadUrl: string;
+  priceAmount: number; // 0 for free download, > 0 for premium purchase
+  currency: 'MMK';
 }
 
 export interface Course {
@@ -94,5 +113,22 @@ export interface Course {
   description: string;
   descriptionMm: string;
   instructor: string;
+  resources?: CourseResource[];
 }
+
+export interface StoreItem {
+  id: string;
+  name: string;
+  nameMm: string;
+  type: 'e-book' | 'tutoring' | 'certificate' | 'vip-package';
+  description: string;
+  descriptionMm: string;
+  price: number;
+  currency: 'MMK' | 'XP';
+  popular?: boolean;
+  courseId?: string; // Optional links to filter lessons by course
+  pdfFileName?: string; // Optional pdf filename for download
+  pdfDownloadUrl?: string; // Optional direct website or PDF download resource URL
+}
+
 
