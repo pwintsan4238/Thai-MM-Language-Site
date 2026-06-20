@@ -17,3 +17,338 @@ export function isSingleSentenceEnglish(text: string | null | undefined): boolea
   
   return sentences.length <= 1;
 }
+
+const wordLookup: Record<string, string> = {
+  "sa-wat-dee": "ဆာဝါဒီ",
+  "sawasdee": "ဆာဝါဒီ",
+  "sa-baai-dee": "ဆာဘိုင်ဒီ",
+  "khrap": "ခရတ်",
+  "khrap!": "ခရတ်!",
+  "khráp": "ခရတ်",
+  "kha": "ခ",
+  "kha!": "ခ!",
+  "khá": "ခ",
+  "khâ": "ခ",
+  "khop-khun": "ခေါပ်ခွန်",
+  "khoop-khun": "ခေါပ်ခွန်",
+  "koob-koon": "ခေါပ်ခွန်",
+  "yin-dee": "ရင်ဒီ",
+  "shinn": "ရှင်",
+  "shin": "ရှင်",
+};
+
+const syllableLookup: Record<string, string> = {
+  "khun": "ခွန်",
+  "chue": "ချူး",
+  "chʉ̂u": "ချူ",
+  "a-rai": "အာရိုင်",
+  "arai": "အာရိုင်",
+  "phom": "ဖုမ်း",
+  "phǒm": "ဖုမ်",
+  "min": "မင်း",
+  "Min": "မင်း",
+  "maa": "မာ",
+  "jaak": "ကျတ်",
+  "caak": "ကျာက်",
+  "nai": "နိုင်",
+  "nǎi": "နိုင်",
+  "yin": "ရင်",
+  "dee": "ဒီ",
+  "dii": "ဒီ",
+  "ree": "ရီ",
+  "rue": "ရူး",
+  "rʉ̌ʉ": "လူး",
+  "yang": "ယန်း",
+  "jaŋ": "ရမ်း",
+  "wat": "ဝါတ်",
+  "sa": "ဆာ",
+  "baai": "ဘိုင်",
+  "khop": "ခေါပ်",
+  "khòop": "ခေါပ်",
+  "khoop": "ခေါပ်",
+  "khoob": "ခေါပ်",
+  "koob": "ခေါပ်",
+  "koon": "ခွန်",
+  "châj": "ချိုင်",
+  "chai": "ချိုင်",
+  "khǐan": "ခီရန်",
+  "khian": "ခီရန်",
+  "raaj": "ရိုင်",
+  "raaj-ŋaan": "ရိုင်ငါန်",
+  "ŋaan": "ငါန်",
+  "sòŋ": "စုမ်း",
+  "song": "စုမ်း",
+  "aa": "อာ",
+  "caan": "ကျန်",
+  "sèt": "စက်",
+  "set": "စက်",
+  "rîap": "ရီယပ်",
+  "riap": "ရီယပ်",
+  "rɔ́ɔj": "ရွိုင်း",
+  "roi": "ရွိုင်း",
+  "lɛ́ɛw": "လည်ဝါး",
+  "laew": "လဲဝ်",
+  "mʉ̂a": "မောက်",
+  "mua": "မောက်",
+  "waan": "ဝမ်",
+  "paj": "ပိုင်",
+  "pai": "ပိုင်",
+  "thîaw": "ထျောင်",
+  "thiaw": "ထျောင်",
+  "thá": "သာ",
+  "tha": "သာ",
+  "lee": "လေ",
+  "kàp": "ကပ်",
+  "kap": "ကပ်",
+  "phʉ̂an": "ဖွန်း",
+  "phuan": "ဖွန်း",
+  "sà": "ဆာ",
+  "nùk": "နွတ်",
+  "nuk": "နွတ်",
+  "mâak": "မတ်",
+  "maak": "မတ်",
+  "mɛ̂ɛ": "မဲ",
+  "mae": "မဲ",
+  "kam": "ကမ်",
+  "laŋ": "လန်း",
+  "lang": "လန်း",
+  "tham": "သမ်",
+  "khâaw": "ခေါင်",
+  "khaaw": "ခေါင်",
+  "jùu": "ယူ",
+  "yuu": "ယူ",
+  "naj": "နိုင်",
+  "khrua": "ခုရူဝါ",
+  "bplàaw": "ပလောင်",
+  "bplaaw": "ပလောင်",
+  "triam": "တရီယမ်",
+  "tôm": "တုန်",
+  "tom": "တုန်",
+  "jam": "ယမ်း",
+  "yam": "ယမ်း",
+  "kûŋ": "ကုန်း",
+  "kung": "ကုန်း",
+  "kaan": "ကန်",
+  "rian": "ရီယန်",
+  "phaa": "ဖာ",
+  "sá": "သာ",
+  "šaa": "သာ",
+  "khʉʉ": "ခု",
+  "khua": "ခု",
+  "khwaam": "ခွမ်",
+  "sùk": "စုက်",
+  "suk": "စုက်",
+  "khɔ̌ɔŋ": "ခေါင်",
+  "khoong": "ခေါင်",
+  "rák": "ရက်",
+  "rak": "ရက်",
+  "tâŋ": "တန်း",
+  "tang": "တန်း",
+  "caj": "ကျိုင်",
+  "cai": "ကျိုင်",
+  "ciŋ": "ကျင်",
+  "cing": "ကျင်",
+  "prà": "ပရာ",
+  "pra": "ပရာ",
+  "jòot": "ယုတ်",
+  "joot": "ယုတ်",
+  "ləəj": "လေဲ",
+  "loei": "လေဲ",
+  "khɔ̌ɔ": "ခေါ",
+  "kho": "ခေါ",
+  "hâj": "ဟိုင်",
+  "hai": "ဟိုင်",
+  "rúu": "ရူး",
+  "ruu": "ရူး",
+  "ná": "ဏ",
+  "na": "ဏ",
+};
+
+function cleanDiacritics(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[ʉʉ̌ʉ̂ʉ̀ʉ́ʉ̄]/gi, "ue")
+    .replace(/[ɔɔ̌ɔ̂ɔ̀ɔ́ɔ̄]/gi, "o")
+    .replace(/[ɛɛ̌ɛ̂ɛ̀ɛ́ɛ̄]/gi, "ae")
+    .replace(/[̌̂̀́̄]/gi, "");
+}
+
+function fallbackSyllable(s: string): string {
+  let remainder = s;
+  let onset = "";
+  
+  const onsets = [
+    "khrap", "khr", "khw", "bp", "dt", "kl", "kr", "pl", "pr", "tr", "sh", "ch", "kh", "ph", "th",
+    "k", "p", "t", "s", "m", "n", "l", "r", "y", "w", "b", "d", "f", "h", "g", "c", "j"
+  ];
+  
+  for (const o of onsets) {
+    if (s.startsWith(o)) {
+      onset = o;
+      remainder = s.slice(o.length);
+      break;
+    }
+  }
+  
+  let myanmarOnset = "";
+  switch (onset) {
+    case "khrap": return "ခရတ်";
+    case "khr": myanmarOnset = "ခရ"; break;
+    case "khw": myanmarOnset = "ခွ"; break;
+    case "bp": myanmarOnset = "ပ"; break;
+    case "dt": myanmarOnset = "တ"; break;
+    case "kl": myanmarOnset = "ကလ"; break;
+    case "kr": myanmarOnset = "ကရ"; break;
+    case "pl": myanmarOnset = "ပလ"; break;
+    case "pr": myanmarOnset = "ပရ"; break;
+    case "tr": myanmarOnset = "တရ"; break;
+    case "sh": myanmarOnset = "ရှ"; break;
+    case "ch": myanmarOnset = "ချ"; break;
+    case "kh": myanmarOnset = "ခ"; break;
+    case "ph": myanmarOnset = "ဖ"; break;
+    case "th": myanmarOnset = "သ"; break;
+    case "k": myanmarOnset = "က"; break;
+    case "p": myanmarOnset = "ပ"; break;
+    case "t": myanmarOnset = "တ"; break;
+    case "s": myanmarOnset = "ဆ"; break;
+    case "m": myanmarOnset = "မ"; break;
+    case "n": myanmarOnset = "န"; break;
+    case "l": myanmarOnset = "လ"; break;
+    case "r": myanmarOnset = "ရ"; break;
+    case "y": case "j": myanmarOnset = "ယ"; break;
+    case "w": myanmarOnset = "ဝ"; break;
+    case "b": myanmarOnset = "ဘ"; break;
+    case "d": myanmarOnset = "ဒ"; break;
+    case "f": myanmarOnset = "ဖ"; break;
+    case "h": myanmarOnset = "ဟ"; break;
+    case "g": myanmarOnset = "ဂ"; break;
+    case "c": myanmarOnset = "စ"; break;
+    default: myanmarOnset = ""; break;
+  }
+  
+  if (remainder === "") {
+    return myanmarOnset || s;
+  }
+  
+  let myanmarVowel = "";
+  if (remainder === "a" || remainder === "aa" || remainder === "ar") {
+    myanmarVowel = "ာ";
+  } else if (remainder === "at" || remainder === "ap" || remainder === "ak") {
+    const finalSym = remainder === "at" ? "တ်" : remainder === "ap" ? "ပ်" : "က်";
+    myanmarVowel = finalSym;
+  } else if (remainder === "an") {
+    myanmarVowel = "န်";
+  } else if (remainder === "ang") {
+    myanmarVowel = "န်း";
+  } else if (remainder === "am") {
+    myanmarVowel = "မ်";
+  } else if (remainder === "ai" || remainder === "ay" || remainder === "aj") {
+    myanmarVowel = "ိုင်";
+  } else if (remainder === "ao" || remainder === "aw" || remainder === "aaw") {
+    myanmarVowel = "ောင်";
+  } else if (remainder === "ia") {
+    myanmarVowel = "ီယာ";
+  } else if (remainder === "ian") {
+    myanmarVowel = "ီယန်";
+  } else if (remainder === "ua") {
+    myanmarVowel = "ူဝါ";
+  } else if (remainder === "uan") {
+    myanmarVowel = "ွန်";
+  } else if (remainder === "ee" || remainder === "ii" || remainder === "i") {
+    myanmarVowel = "ီ";
+  } else if (remainder === "ing") {
+    myanmarVowel = "င်း";
+  } else if (remainder === "ik") {
+    myanmarVowel = "ိတ်";
+  } else if (remainder === "ip") {
+    myanmarVowel = "ိပ်";
+  } else if (remainder === "it") {
+    myanmarVowel = "ိတ်";
+  } else if (remainder === "im") {
+    myanmarVowel = "ိမ်";
+  } else if (remainder === "in") {
+    myanmarVowel = "င်";
+  } else if (remainder === "oo" || remainder === "uu" || remainder === "u") {
+    myanmarVowel = "ူ";
+  } else if (remainder === "ung") {
+    myanmarVowel = "ုန်း";
+  } else if (remainder === "uk") {
+    myanmarVowel = "ုတ်";
+  } else if (remainder === "up") {
+    myanmarVowel = "ုပ်";
+  } else if (remainder === "ut") {
+    myanmarVowel = "ုတ်";
+  } else if (remainder === "e" || remainder === "ee") {
+    myanmarVowel = "ေ";
+  } else if (remainder === "et") {
+    myanmarVowel = "က်";
+  } else if (remainder === "eng") {
+    myanmarVowel = "င်";
+  } else if (remainder === "o" || remainder === "oo") {
+    myanmarVowel = "ို";
+  } else if (remainder === "ok") {
+    myanmarVowel = "ောက်";
+  } else if (remainder === "ong") {
+    myanmarVowel = "ုန်း";
+  } else if (remainder === "ae") {
+    myanmarVowel = "ဲ";
+  } else if (remainder === "aen") {
+    myanmarVowel = "ဲန်";
+  } else if (remainder === "aet") {
+    myanmarVowel = "ဲတ်";
+  } else if (remainder === "aep") {
+    myanmarVowel = "ဲပ်";
+  } else if (remainder === "aek") {
+    myanmarVowel = "ဲက်";
+  } else if (remainder === "ue" || remainder === "eu") {
+    myanmarVowel = "ူ";
+  } else if (remainder === "uen") {
+    myanmarVowel = "ွန်";
+  } else {
+    myanmarVowel = remainder;
+  }
+  
+  if (myanmarVowel.startsWith("ေ")) {
+    return "ေ" + myanmarOnset + myanmarVowel.slice(1);
+  } else {
+    return myanmarOnset + myanmarVowel;
+  }
+}
+
+export function getMyanmarPhonetic(phoneticString: string | null | undefined): string {
+  if (!phoneticString) return "";
+  
+  const words = phoneticString.trim().split(/\s+/);
+  
+  const convertedWords = words.map(word => {
+    const match = word.match(/^([a-zA-Zʉɔɛ̌̂̀́̄\-]+)([^a-zA-Zʉɔɛ̌̂̀́̄]*)$/);
+    if (!match) return word;
+    const base = match[1];
+    const punctuation = match[2];
+    
+    const lowerBase = base.toLowerCase();
+    if (wordLookup[lowerBase]) {
+      return wordLookup[lowerBase] + punctuation;
+    }
+    
+    const syllables = base.split(/-/);
+    const convertedSyllables = syllables.map(s => {
+      const lowerSyl = s.toLowerCase();
+      if (syllableLookup[lowerSyl]) {
+        return syllableLookup[lowerSyl];
+      }
+      
+      const cleanSyl = cleanDiacritics(s).toLowerCase();
+      if (syllableLookup[cleanSyl]) {
+        return syllableLookup[cleanSyl];
+      }
+      
+      return fallbackSyllable(cleanSyl);
+    });
+    
+    return convertedSyllables.join("") + punctuation;
+  });
+  
+  return convertedWords.join(" ");
+}

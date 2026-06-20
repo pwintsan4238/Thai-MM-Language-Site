@@ -5,7 +5,7 @@ import { orientationData as initialOrientationData, OrientationArticle } from '.
 import { pdfVocabulary } from './data/pdfVocabulary';
 import { ProgressState, Lesson, WordBreakdown, DialogueLine, GrammarNote, QuizQuestion, RegisteredUser, PurchaseOrder, Course, StoreItem } from './types';
 import ProgressCard from './components/ProgressCard';
-import DialogueView from './components/DialogueView';
+import SentenceView from './components/SentenceView';
 import VocabularyView from './components/VocabularyView';
 import QuizView from './components/QuizView';
 import AlphabetGuide from './components/AlphabetGuide';
@@ -57,7 +57,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { isSingleSentenceEnglish } from './utils/sentenceUtils';
+import { isSingleSentenceEnglish, getMyanmarPhonetic } from './utils/sentenceUtils';
 import { autoFillWord } from './utils/dictionary';
 
 const adjustHexBrightness = (hex: string, percent: number): string => {
@@ -2530,53 +2530,58 @@ startxref
             </div>
 
             {/* Middle: Integrated 4 Course Selection Tabs (Combined with Header Group) */}
-            <div className="flex items-center justify-start lg:justify-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-205 select-none overflow-x-auto scrollbar-none gap-2 w-full lg:w-auto max-w-full flex-nowrap shrink-0">
-              {courses.map((course) => {
-                const isSelected = selectedCourseTab === course.id && dashboardTab === 'lessons';
-                let icon = "⭐️";
-                if (course.id === 'course-basic') icon = "⭐️";
-                else if (course.id === 'course-business') icon = "💎";
-                else if (course.id === 'course-workspace') icon = "💼";
+            <div className="relative w-full lg:w-auto overflow-hidden shrink-0">
+              <div className="flex items-center justify-start lg:justify-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-205 select-none overflow-x-auto scrollbar-none gap-2 w-full lg:w-auto max-w-full flex-nowrap shrink-0 pr-1.5">
+                {courses.map((course) => {
+                  const isSelected = selectedCourseTab === course.id && dashboardTab === 'lessons';
+                  let icon = "⭐️";
+                  if (course.id === 'course-basic') icon = "⭐️";
+                  else if (course.id === 'course-business') icon = "💎";
+                  else if (course.id === 'course-workspace') icon = "💼";
 
-                const displayName = course.id === 'course-basic' ? "Basic Course" :
-                                    course.id === 'course-business' ? "Advanced" :
-                                    course.id === 'course-workspace' ? "Workplace" :
-                                    course.name;
+                  const displayName = course.id === 'course-basic' ? "Basic Course" :
+                                      course.id === 'course-business' ? "Advanced" :
+                                      course.id === 'course-workspace' ? "Workplace" :
+                                      course.name;
 
-                return (
-                  <button
-                    key={course.id}
-                    onClick={() => {
-                      setSelectedCourseTab(course.id);
-                      setDashboardTab('lessons');
-                    }}
-                    className={`px-6 sm:px-5 py-2.5 sm:py-2.5 rounded-xl font-sans font-black text-[11px] sm:text-[11.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0 min-h-[40px] sm:min-h-[38px] ${
-                      isSelected
-                        ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                    }`}
-                    title={course.name}
-                  >
-                    <span className="text-[11px] sm:text-[11.5px] leading-none">{icon}</span>
-                    <span>{displayName}</span>
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => {
-                  setSelectedCourseTab('resources');
-                  setDashboardTab('lessons');
-                }}
-                className={`px-6 sm:px-5 py-2.5 sm:py-2.5 rounded-xl font-sans font-black text-[11px] sm:text-[11.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0 min-h-[40px] sm:min-h-[38px] ${
-                  selectedCourseTab === 'resources' && dashboardTab === 'lessons'
-                    ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-                title="Syllabus Resources & Document Material PDFs"
-              >
-                <span className="text-[11px] sm:text-[11.5px] leading-none">📚</span>
-                <span>Resources</span>
-              </button>
+                  return (
+                    <button
+                      key={course.id}
+                      onClick={() => {
+                        setSelectedCourseTab(course.id);
+                        setDashboardTab('lessons');
+                      }}
+                      className={`px-6 sm:px-5 py-2.5 sm:py-2.5 rounded-xl font-sans font-black text-[11px] sm:text-[11.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0 min-h-[40px] sm:min-h-[38px] ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                      }`}
+                      title={course.name}
+                    >
+                      <span className="text-[11px] sm:text-[11.5px] leading-none">{icon}</span>
+                      <span>{displayName}</span>
+                      {course.id === 'course-business' && (
+                        <span className="lg:hidden font-sans font-extrabold text-[12px] opacity-90">&gt;</span>
+                      )}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => {
+                    setSelectedCourseTab('resources');
+                    setDashboardTab('lessons');
+                  }}
+                  className={`px-6 sm:px-5 py-2.5 sm:py-2.5 rounded-xl font-sans font-black text-[11px] sm:text-[11.5px] transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0 min-h-[40px] sm:min-h-[38px] ${
+                    selectedCourseTab === 'resources' && dashboardTab === 'lessons'
+                      ? 'bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white shadow-xs border-b-2 border-brand-purple-shadow'
+                      : 'text-slate-600 hover:text-slate-950 hover:bg-white/70'
+                  }`}
+                  title="Syllabus Resources & Document Material PDFs"
+                >
+                  <span className="text-[11px] sm:text-[11.5px] leading-none">📚</span>
+                  <span>Resources</span>
+                </button>
+              </div>
             </div>
 
             {/* Right Group: User Profile Controls for Desktop */}
@@ -2798,7 +2803,7 @@ startxref
                                         {lesson.titleEnglish}
                                       </h4>
                                       <p className="text-xs font-sans text-brand-green font-extrabold italic mt-1" style={{ wordBreak: 'break-word' }}>
-                                        {lesson.titlePhonetic} ({lesson.titleThai})
+                                        {lesson.titlePhonetic} = {getMyanmarPhonetic(lesson.titlePhonetic)} ({lesson.titleThai})
                                       </p>
 
                                       <p className="text-[11px] text-brand-muted font-sans mt-3 line-clamp-2 leading-relaxed font-bold">
@@ -3633,7 +3638,7 @@ startxref
                                           {hl.termThai && (
                                             <span className="text-brand-purple text-base font-black mr-1">{hl.termThai}</span>
                                           )}
-                                          <span className="text-brand-green italic font-black">({hl.termPhonetic})</span>
+                                          <span className="text-brand-green italic font-black">({hl.termPhonetic} = {getMyanmarPhonetic(hl.termPhonetic)})</span>
                                         </div>
                                         <div className="text-[11px] font-sans mt-2 font-bold text-brand-dark leading-snug">
                                           {hl.meaningEnglish} • <span className="text-brand-muted">{hl.meaningMyanmar}</span>
@@ -3856,7 +3861,7 @@ startxref
                                                 <div className="font-sans font-black text-brand-dark text-sm leading-tight flex items-baseline gap-1.5 flex-wrap">
                                                   <span className="text-brand-purple text-[15px]">{ex.thai}</span>
                                                   <span className="text-[10px] text-brand-green font-extrabold italic bg-brand-green-light px-2 py-0.5 rounded-full">
-                                                    ({ex.phonetic})
+                                                    ({ex.phonetic} = {getMyanmarPhonetic(ex.phonetic)})
                                                   </span>
                                                 </div>
                                                 <div className="text-[11px] text-brand-muted font-sans font-bold leading-normal mt-2">
@@ -7597,348 +7602,8 @@ startxref
 
 
 
-                {/* CSV Excel Database Import Sync Hub */}
-                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-                    <div>
-                      <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 text-brand-purple">
-                        <FileText className="w-4 h-4 shrink-0 text-brand-purple" />
-                        📂 CSV & Excel Data Import Hub • သင်ခန်းစာများ ဖိုင်ဖြင့်ထည့်သွင်းရန်
-                      </h4>
-                      <p className="text-[10px] font-sans font-semibold text-brand-muted mt-1 leading-relaxed">
-                        Import vocabulary rows, dialogue lines, grammar rules, quizzes, or whole lessons in bulk with standard Excel CSV files. All changes persist instantly to students.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setIsCsvImportExpanded(!isCsvImportExpanded)}
-                      className="px-3 py-1.5 border-2 border-brand-purple/20 bg-[#fbfaff] hover:bg-brand-purple/10 text-brand-purple rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      {isCsvImportExpanded ? "COLLAPSE PANEL • ပိတ်ပါ" : "EXPAND IMPORT ENGINE • ဖွင့်ပါ"}
-                    </button>
-                  </div>
 
-                  {isCsvImportExpanded && (
-                    <div className="space-y-6 animate-fade-in shadow-xs">
-                      {/* Step 1: Download Templates */}
-                      <div className="bg-amber-50/25 border border-amber-200/55 p-4 rounded-xl space-y-3.5">
-                        <h5 className="text-[11px] font-sans font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
-                          📊 STEP 1: DOWNLOAD EXCEL / CSV TEMPLATES • စံနမူနာ ဒေါင်းလုဒ် ရယူရန်
-                        </h5>
-                        <p className="text-[10.5px] font-sans font-medium text-brand-dark leading-relaxed">
-                          Click any button below to download the official structural CSV template. Open in Microsoft Excel or Google Sheets, fill in your lesson data, click export/save as CSV, and upload in Step 2.
-                        </p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <button
-                            onClick={() => downloadCsvTemplate('vocabulary')}
-                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
-                          >
-                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
-                            Vocabulary Template (.csv)
-                          </button>
-                          <button
-                            onClick={() => downloadCsvTemplate('dialogue')}
-                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
-                          >
-                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
-                            Dialogue Lines Template (.csv)
-                          </button>
-                          <button
-                            onClick={() => downloadCsvTemplate('grammar')}
-                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
-                          >
-                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
-                            Grammar Notes Template (.csv)
-                          </button>
-                          <button
-                            onClick={() => downloadCsvTemplate('quiz')}
-                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
-                          >
-                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
-                            Quiz Questions Template (.csv)
-                          </button>
-                          <button
-                            onClick={() => downloadCsvTemplate('lessons')}
-                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
-                          >
-                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
-                            Lessons Metadata Template (.csv)
-                          </button>
-                        </div>
-                      </div>
 
-                      {/* Step 2: Upload Configurator */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 bg-gray-50 p-4.5 border border-gray-150 rounded-xl">
-                        <div className="space-y-1.5">
-                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
-                            1. Select Import Content type
-                          </label>
-                          <select
-                            value={csvImportType}
-                            onChange={(e) => {
-                              const type = e.target.value as any;
-                              setCsvImportType(type);
-                              setCsvFile(null);
-                              setCsvParsedData([]);
-                              setCsvErrors([]);
-                              setCsvFileName('');
-                            }}
-                            className="w-full bg-white border-2 border-gray-200 px-3.5 py-2 rounded-xl text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer"
-                          >
-                            <option value="vocabulary">Vocabulary List • ဝေါဟာရအသစ်များ</option>
-                            <option value="dialogue">Dialogue Conversational Lines • စကားပြောများ</option>
-                            <option value="grammar">Grammar Notes & Examples • သဒ္ဒါစည်းမျဉ်း</option>
-                            <option value="quiz">Quiz Questions & Choices • ပဟေဠိများ</option>
-                            <option value="lessons">Bulk Syllabus Lessons (Metadata) • သင်ခန်းစာအသစ်များ</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
-                            2. SELECT TARGET LESSON
-                          </label>
-                          <select
-                            disabled={csvImportType === 'lessons'}
-                            value={csvImportTargetLesson}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setCsvImportTargetLesson(val === 'all' ? 'all' : Number(val));
-                            }}
-                            className="w-full bg-white border-2 border-gray-200 px-3.5 py-2 rounded-xl text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          >
-                            <option value="all">-- Active Selected Lesson ({adminSelectedLessonId || 'None'}) --</option>
-                            {lessons.map(l => (
-                              <option key={l.id} value={l.id}>
-                                Lesson {l.id}: {l.titleEnglish}
-                              </option>
-                            ))}
-                          </select>
-                          {csvImportType === 'lessons' && (
-                            <p className="text-[9px] text-brand-muted font-bold block pt-1">
-                              * Entire curriculum directory mode
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
-                            3. CHOOSE FILE • ဖိုင်ရွေးချယ်ရန်
-                          </label>
-                          <div
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                              setIsCsvDragOver(true);
-                            }}
-                            onDragLeave={() => setIsCsvDragOver(false)}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              setIsCsvDragOver(false);
-                              const file = e.dataTransfer.files?.[0];
-                              if (file) {
-                                processCsvFile(file);
-                              }
-                            }}
-                            className={`border-2 border-dashed rounded-xl px-4 py-2 flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                              isCsvDragOver ? 'border-brand-purple bg-brand-purple/5' : 'border-gray-300 bg-white hover:border-gray-400'
-                            }`}
-                            onClick={() => {
-                              const input = document.getElementById('csv-file-selector-input');
-                              if (input) input.click();
-                            }}
-                          >
-                            <input
-                              type="file"
-                              id="csv-file-selector-input"
-                              accept=".csv"
-                              onChange={handleCsvFileSelection}
-                              className="hidden"
-                            />
-                            <Upload className="w-4 h-4 text-gray-400 mb-1 animate-bounce" />
-                            <span className="text-[10px] font-sans font-black text-brand-dark text-center truncate max-w-full">
-                              {csvFileName ? `✓ ${csvFileName}` : "Click/Drag CSV here"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Step 3: Parse Status Preview & Merging */}
-                      {csvFile && (
-                        <div className="bg-white border-2 border-brand-purple/20 rounded-xl p-4.5 space-y-4 shadow-3xs animate-fade-in text-brand-dark">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                            <div>
-                              <h6 className="text-[11px] font-sans font-black uppercase tracking-wider flex items-center gap-1.5">
-                                <CheckCircle className="w-4 h-4 text-brand-purple" />
-                                CSV PARSED PREVIEW DETAILS • သွင်းယူမည့် ဒေတာ အကျဉ်းချုပ်
-                              </h6>
-                              <p className="text-[9.5px] font-sans font-medium text-brand-muted mt-0.5">
-                                Verify that column headers and structures align before finalizing the synchronization update.
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {csvErrors.length === 0 ? (
-                                <span className="bg-brand-green-light border border-brand-green/30 text-brand-green font-mono font-black text-[9.5px] px-3 py-1 rounded-full uppercase">
-                                  ✓ Valid Format
-                                </span>
-                              ) : (
-                                <span className="bg-red-50 border border-red-200 text-red-600 font-mono font-black text-[9.5px] px-3 py-1 rounded-full uppercase">
-                                  ⚠ {csvErrors.length} Warning(s)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {csvErrors.length > 0 && (
-                            <div className="bg-red-50 border border-red-150 p-3.5 rounded-xl text-[10.5px] font-sans font-semibold text-red-700 space-y-1.5 max-h-[150px] overflow-y-auto">
-                              <p className="font-sans font-black">Warning Warnings found in lines/headers structure:</p>
-                              <ul className="list-disc pl-4 space-y-0.5">
-                                {csvErrors.map((err, idx) => (
-                                  <li key={idx}>{err}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono font-bold text-brand-muted">
-                                Content Type: <strong className="text-brand-dark font-black uppercase">{csvImportType}</strong>
-                              </span>
-                              <span className="text-[10px] font-mono font-bold text-brand-muted">
-                                Row Count: <strong className="text-brand-dark font-black">{csvParsedData.length} records found</strong>
-                              </span>
-                            </div>
-
-                            <div className="max-h-[180px] overflow-y-auto border border-gray-150 rounded-xl overflow-x-auto">
-                              <table className="w-full text-[10px] text-left border-collapse font-sans">
-                                <thead>
-                                  <tr className="bg-gray-100/80 border-b border-gray-200 text-brand-dark font-black tracking-wide uppercase select-none">
-                                    <th className="p-2 border-r border-gray-200">#</th>
-                                    {csvImportType === 'vocabulary' && (
-                                      <>
-                                        <th className="p-2 border-r border-gray-200">Thai Word</th>
-                                        <th className="p-2 border-r border-gray-200">Phonetic</th>
-                                        <th className="p-2 border-r border-gray-200">English</th>
-                                        <th className="p-2">Myanmar</th>
-                                      </>
-                                    )}
-                                    {csvImportType === 'dialogue' && (
-                                      <>
-                                        <th className="p-2 border-r border-gray-200">Speaker</th>
-                                        <th className="p-2 border-r border-gray-200">Thai Sentence</th>
-                                        <th className="p-2 border-r border-gray-200">English</th>
-                                        <th className="p-2">Myanmar</th>
-                                      </>
-                                    )}
-                                    {csvImportType === 'grammar' && (
-                                      <>
-                                        <th className="p-2 border-r border-gray-200">Title</th>
-                                        <th className="p-2 border-r border-gray-200">Title (MM)</th>
-                                        <th className="p-2 border-r border-gray-200">Explanation</th>
-                                        <th className="p-2">Example Count</th>
-                                      </>
-                                    )}
-                                    {csvImportType === 'quiz' && (
-                                      <>
-                                        <th className="p-2 border-r border-gray-200">Type</th>
-                                        <th className="p-2 border-r border-gray-200">Prompt</th>
-                                        <th className="p-2 border-r border-gray-200">Options</th>
-                                        <th className="p-2">Correct Answer</th>
-                                      </>
-                                    )}
-                                    {csvImportType === 'lessons' && (
-                                      <>
-                                        <th className="p-2 border-r border-gray-200">ID</th>
-                                        <th className="p-2 border-r border-gray-200">English Title</th>
-                                        <th className="p-2 border-r border-gray-200">Myanmar Title</th>
-                                        <th className="p-2">Description</th>
-                                      </>
-                                    )}
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-white/50 text-brand-dark font-semibold">
-                                  {csvParsedData.slice(0, 5).map((row, idx) => (
-                                    <tr key={idx} className="border-b border-gray-100 hover:bg-brand-purple/5 transition-colors">
-                                      <td className="p-2 border-r border-gray-200 font-mono text-brand-muted text-center">{idx + 1}</td>
-                                      {csvImportType === 'vocabulary' && (
-                                        <>
-                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold text-xs">{row.thai}</td>
-                                          <td className="p-2 border-r border-gray-200 italic font-mono text-brand-green">{row.phonetic}</td>
-                                          <td className="p-2 border-r border-gray-200">{row.english}</td>
-                                          <td className="p-2">{row.myanmar}</td>
-                                        </>
-                                      )}
-                                      {csvImportType === 'dialogue' && (
-                                        <>
-                                          <td className="p-2 border-r border-gray-200 font-mono text-center font-black">{row.speaker}</td>
-                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold text-xs">{row.thai}</td>
-                                          <td className="p-2 border-r border-gray-200">{row.english}</td>
-                                          <td className="p-2">{row.myanmar}</td>
-                                        </>
-                                      )}
-                                      {csvImportType === 'grammar' && (
-                                        <>
-                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold">{row.title}</td>
-                                          <td className="p-2 border-r border-gray-200">{row.titleMyanmar}</td>
-                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.explanation}</td>
-                                          <td className="p-2 font-mono text-center">{row.examples?.length || 0} examples</td>
-                                        </>
-                                      )}
-                                      {csvImportType === 'quiz' && (
-                                        <>
-                                          <td className="p-2 border-r border-gray-200 font-mono text-[9px] uppercase">{row.type}</td>
-                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.prompt}</td>
-                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.options?.join(' | ')}</td>
-                                          <td className="p-2 text-brand-green font-bold">{row.correctAnswer}</td>
-                                        </>
-                                      )}
-                                      {csvImportType === 'lessons' && (
-                                        <>
-                                          <td className="p-2 border-r border-gray-200 font-mono font-bold text-center">{row.id}</td>
-                                          <td className="p-2 border-r border-gray-200">{row.titleEnglish}</td>
-                                          <td className="p-2 border-r border-gray-200">{row.titleMyanmar}</td>
-                                          <td className="p-2 truncate max-w-xs">{row.descriptionEnglish}</td>
-                                        </>
-                                      )}
-                                    </tr>
-                                  ))}
-                                  {csvParsedData.length > 5 && (
-                                    <tr className="bg-gray-50/50">
-                                      <td colSpan={10} className="p-2 text-center text-brand-muted font-mono italic">
-                                        ... and {csvParsedData.length - 5} more rows parsed and ready ...
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            <div className="pt-3 flex gap-3">
-                              <button
-                                type="button"
-                                onClick={submitCsvImport}
-                                className="flex-1 duo-btn duo-btn-purple text-xs font-black py-3 select-none uppercase tracking-wide flex items-center justify-center gap-1.5"
-                              >
-                                <CheckSquare className="w-4 h-4" />
-                                IMPORT NOW • ဒေတာထည့်သွင်းပါ
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCsvFile(null);
-                                  setCsvParsedData([]);
-                                  setCsvErrors([]);
-                                  setCsvFileName('');
-                                }}
-                                className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-sans font-black text-xs transition-colors cursor-pointer"
-                              >
-                                Clear File
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
 
                 {/* Curriculum & Lesson Database Manager */}
                 <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-6" id="admin-curriculum-manager">
@@ -9400,6 +9065,349 @@ startxref
                   })()}
                 </div>
 
+                {/* CSV Excel Database Import Sync Hub */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                    <div>
+                      <h4 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wide flex items-center gap-1.5 text-brand-purple">
+                        <FileText className="w-4 h-4 shrink-0 text-brand-purple" />
+                        📂 CSV & Excel Data Import Hub • သင်ခန်းစာများ ဖိုင်ဖြင့်ထည့်သွင်းရန်
+                      </h4>
+                      <p className="text-[10px] font-sans font-semibold text-brand-muted mt-1 leading-relaxed">
+                        Import vocabulary rows, dialogue lines, grammar rules, quizzes, or whole lessons in bulk with standard Excel CSV files. All changes persist instantly to students.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsCsvImportExpanded(!isCsvImportExpanded)}
+                      className="px-3 py-1.5 border-2 border-brand-purple/20 bg-[#fbfaff] hover:bg-brand-purple/10 text-brand-purple rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      {isCsvImportExpanded ? "COLLAPSE PANEL • ပိတ်ပါ" : "EXPAND IMPORT ENGINE • ဖွင့်ပါ"}
+                    </button>
+                  </div>
+
+                  {isCsvImportExpanded && (
+                    <div className="space-y-6 animate-fade-in shadow-xs">
+                      {/* Step 1: Download Templates */}
+                      <div className="bg-amber-50/25 border border-amber-200/55 p-4 rounded-xl space-y-3.5">
+                        <h5 className="text-[11px] font-sans font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                          📊 STEP 1: DOWNLOAD EXCEL / CSV TEMPLATES • စံနမူနာ ဒေါင်းလုဒ် ရယူရန်
+                        </h5>
+                        <p className="text-[10.5px] font-sans font-medium text-brand-dark leading-relaxed">
+                          Click any button below to download the official structural CSV template. Open in Microsoft Excel or Google Sheets, fill in your lesson data, click export/save as CSV, and upload in Step 2.
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <button
+                            onClick={() => downloadCsvTemplate('vocabulary')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Vocabulary Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('dialogue')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Dialogue Lines Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('grammar')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Grammar Notes Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('quiz')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Quiz Questions Template (.csv)
+                          </button>
+                          <button
+                            onClick={() => downloadCsvTemplate('lessons')}
+                            className="bg-white hover:bg-gray-50 border border-gray-200 text-brand-dark text-[10.5px] font-black font-sans px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                          >
+                            <Download className="w-3.5 h-3.5 text-brand-purple animate-pulse" />
+                            Lessons Metadata Template (.csv)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Upload Configurator */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 bg-gray-50 p-4.5 border border-gray-150 rounded-xl">
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                            1. Select Import Content type
+                          </label>
+                          <select
+                            value={csvImportType}
+                            onChange={(e) => {
+                              const type = e.target.value as any;
+                              setCsvImportType(type);
+                              setCsvFile(null);
+                              setCsvParsedData([]);
+                              setCsvErrors([]);
+                              setCsvFileName('');
+                            }}
+                            className="w-full bg-white border-2 border-gray-200 px-3.5 py-2 rounded-xl text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer"
+                          >
+                            <option value="vocabulary">Vocabulary List • ဝေါဟာရအသစ်များ</option>
+                            <option value="dialogue">Dialogue Conversational Lines • စကားပြောများ</option>
+                            <option value="grammar">Grammar Notes & Examples • သဒ္ဒါစည်းမျဉ်း</option>
+                            <option value="quiz">Quiz Questions & Choices • ပဟေဠိများ</option>
+                            <option value="lessons">Bulk Syllabus Lessons (Metadata) • သင်ခန်းစာအသစ်များ</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                            2. SELECT TARGET LESSON
+                          </label>
+                          <select
+                            disabled={csvImportType === 'lessons'}
+                            value={csvImportTargetLesson}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCsvImportTargetLesson(val === 'all' ? 'all' : Number(val));
+                            }}
+                            className="w-full bg-white border-2 border-gray-200 px-3.5 py-2 rounded-xl text-xs font-bold font-sans text-[#3c3c3c] focus:border-brand-purple focus:outline-none cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            <option value="all">-- Active Selected Lesson ({adminSelectedLessonId || 'None'}) --</option>
+                            {lessons.map(l => (
+                              <option key={l.id} value={l.id}>
+                                Lesson {l.id}: {l.titleEnglish}
+                              </option>
+                            ))}
+                          </select>
+                          {csvImportType === 'lessons' && (
+                            <p className="text-[9px] text-brand-muted font-bold block pt-1">
+                              * Entire curriculum directory mode
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                            3. CHOOSE FILE • ဖိုင်ရွေးချယ်ရန်
+                          </label>
+                          <div
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setIsCsvDragOver(true);
+                            }}
+                            onDragLeave={() => setIsCsvDragOver(false)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setIsCsvDragOver(false);
+                              const file = e.dataTransfer.files?.[0];
+                              if (file) {
+                                processCsvFile(file);
+                              }
+                            }}
+                            className={`border-2 border-dashed rounded-xl px-4 py-2 flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                              isCsvDragOver ? 'border-brand-purple bg-brand-purple/5' : 'border-gray-300 bg-white hover:border-gray-400'
+                            }`}
+                            onClick={() => {
+                              const input = document.getElementById('csv-file-selector-input');
+                              if (input) input.click();
+                            }}
+                          >
+                            <input
+                              type="file"
+                              id="csv-file-selector-input"
+                              accept=".csv"
+                              onChange={handleCsvFileSelection}
+                              className="hidden"
+                            />
+                            <Upload className="w-4 h-4 text-gray-400 mb-1 animate-bounce" />
+                            <span className="text-[10px] font-sans font-black text-brand-dark text-center truncate max-w-full">
+                              {csvFileName ? `✓ ${csvFileName}` : "Click/Drag CSV here"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: Parse Status Preview & Merging */}
+                      {csvFile && (
+                        <div className="bg-white border-2 border-brand-purple/20 rounded-xl p-4.5 space-y-4 shadow-3xs animate-fade-in text-brand-dark">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                            <div>
+                              <h6 className="text-[11px] font-sans font-black uppercase tracking-wider flex items-center gap-1.5">
+                                <CheckCircle className="w-4 h-4 text-brand-purple" />
+                                CSV PARSED PREVIEW DETAILS • သွင်းယူမည့် ဒေတာ အကျဉ်းချုပ်
+                              </h6>
+                              <p className="text-[9.5px] font-sans font-medium text-brand-muted mt-0.5">
+                                Verify that column headers and structures align before finalizing the synchronization update.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {csvErrors.length === 0 ? (
+                                <span className="bg-brand-green-light border border-brand-green/30 text-brand-green font-mono font-black text-[9.5px] px-3 py-1 rounded-full uppercase">
+                                  ✓ Valid Format
+                                </span>
+                              ) : (
+                                <span className="bg-red-50 border border-red-200 text-red-600 font-mono font-black text-[9.5px] px-3 py-1 rounded-full uppercase">
+                                  ⚠ {csvErrors.length} Warning(s)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {csvErrors.length > 0 && (
+                            <div className="bg-red-50 border border-red-150 p-3.5 rounded-xl text-[10.5px] font-sans font-semibold text-red-700 space-y-1.5 max-h-[150px] overflow-y-auto">
+                              <p className="font-sans font-black">Warning Warnings found in lines/headers structure:</p>
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                {csvErrors.map((err, idx) => (
+                                  <li key={idx}>{err}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-bold text-brand-muted">
+                                Content Type: <strong className="text-brand-dark font-black uppercase">{csvImportType}</strong>
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-brand-muted">
+                                Row Count: <strong className="text-brand-dark font-black">{csvParsedData.length} records found</strong>
+                              </span>
+                            </div>
+
+                            <div className="max-h-[180px] overflow-y-auto border border-gray-150 rounded-xl overflow-x-auto">
+                              <table className="w-full text-[10px] text-left border-collapse font-sans">
+                                <thead>
+                                  <tr className="bg-gray-100/80 border-b border-gray-200 text-brand-dark font-black tracking-wide uppercase select-none">
+                                    <th className="p-2 border-r border-gray-200">#</th>
+                                    {csvImportType === 'vocabulary' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Thai Word</th>
+                                        <th className="p-2 border-r border-gray-200">Phonetic</th>
+                                        <th className="p-2 border-r border-gray-200">English</th>
+                                        <th className="p-2">Myanmar</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'dialogue' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Speaker</th>
+                                        <th className="p-2 border-r border-gray-200">Thai Sentence</th>
+                                        <th className="p-2 border-r border-gray-200">English</th>
+                                        <th className="p-2">Myanmar</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'grammar' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Title</th>
+                                        <th className="p-2 border-r border-gray-200">Title (MM)</th>
+                                        <th className="p-2 border-r border-gray-200">Explanation</th>
+                                        <th className="p-2">Example Count</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'quiz' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">Type</th>
+                                        <th className="p-2 border-r border-gray-200">Prompt</th>
+                                        <th className="p-2 border-r border-gray-200">Options</th>
+                                        <th className="p-2">Correct Answer</th>
+                                      </>
+                                    )}
+                                    {csvImportType === 'lessons' && (
+                                      <>
+                                        <th className="p-2 border-r border-gray-200">ID</th>
+                                        <th className="p-2 border-r border-gray-200">English Title</th>
+                                        <th className="p-2 border-r border-gray-200">Myanmar Title</th>
+                                        <th className="p-2">Description</th>
+                                      </>
+                                    )}
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white/50 text-brand-dark font-semibold">
+                                  {csvParsedData.slice(0, 5).map((row, idx) => (
+                                    <tr key={idx} className="border-b border-gray-100 hover:bg-brand-purple/5 transition-colors">
+                                      <td className="p-2 border-r border-gray-200 font-mono text-brand-muted text-center">{idx + 1}</td>
+                                      {csvImportType === 'vocabulary' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold text-xs">{row.thai}</td>
+                                          <td className="p-2 border-r border-gray-200 italic font-mono text-brand-green">{row.phonetic}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.english}</td>
+                                          <td className="p-2">{row.myanmar}</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'dialogue' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 font-mono text-center font-black">{row.speaker}</td>
+                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold text-xs">{row.thai}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.english}</td>
+                                          <td className="p-2">{row.myanmar}</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'grammar' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 text-brand-purple font-bold">{row.title}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.titleMyanmar}</td>
+                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.explanation}</td>
+                                          <td className="p-2 font-mono text-center">{row.examples?.length || 0} examples</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'quiz' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 font-mono text-[9px] uppercase">{row.type}</td>
+                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.prompt}</td>
+                                          <td className="p-2 border-r border-gray-200 truncate max-w-xs">{row.options?.join(' | ')}</td>
+                                          <td className="p-2 text-brand-green font-bold">{row.correctAnswer}</td>
+                                        </>
+                                      )}
+                                      {csvImportType === 'lessons' && (
+                                        <>
+                                          <td className="p-2 border-r border-gray-200 font-mono font-bold text-center">{row.id}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.titleEnglish}</td>
+                                          <td className="p-2 border-r border-gray-200">{row.titleMyanmar}</td>
+                                          <td className="p-2 truncate max-w-xs">{row.descriptionEnglish}</td>
+                                        </>
+                                      )}
+                                    </tr>
+                                  ))}
+                                  {csvParsedData.length > 5 && (
+                                    <tr className="bg-gray-50/50">
+                                      <td colSpan={10} className="p-2 text-center text-brand-muted font-mono italic">
+                                        ... and {csvParsedData.length - 5} more rows parsed and ready ...
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div className="pt-3 flex gap-3">
+                              <button
+                                type="button"
+                                onClick={submitCsvImport}
+                                className="flex-1 duo-btn duo-btn-purple text-xs font-black py-3 select-none uppercase tracking-wide flex items-center justify-center gap-1.5"
+                              >
+                                <CheckSquare className="w-4 h-4" />
+                                IMPORT NOW • ဒေတာထည့်သွင်းပါ
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCsvFile(null);
+                                  setCsvParsedData([]);
+                                  setCsvErrors([]);
+                                  setCsvFileName('');
+                                }}
+                                className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-sans font-black text-xs transition-colors cursor-pointer"
+                              >
+                                Clear File
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Audit Logs feed */}
                 <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-gray-100 space-y-4">
                   <div className="flex items-center justify-between gap-4 pb-2 border-b border-gray-100">
@@ -9457,7 +9465,7 @@ startxref
                 </div>
                 <h2 className="text-xl md:text-2xl font-sans font-black text-[#3c3c3c] tracking-tight mt-2 flex flex-wrap items-baseline gap-2">
                   <span>{activeLesson?.titleEnglish}</span>
-                  <span className="text-sm font-extrabold text-brand-green italic">({activeLesson?.titleThai} - {activeLesson?.titlePhonetic})</span>
+                  <span className="text-sm font-extrabold text-brand-green italic">({activeLesson?.titleThai} - {activeLesson?.titlePhonetic} = {getMyanmarPhonetic(activeLesson?.titlePhonetic)})</span>
                 </h2>
               </div>
 
@@ -9539,13 +9547,15 @@ startxref
               )}
 
               {activeTab === 'sentence' && activeLesson && (
-                <DialogueView
-                  dialogue={activeLesson.dialogue}
+                <SentenceView
+                  sentences={(activeLesson.dialogue && activeLesson.dialogue.length > 0)
+                    ? activeLesson.dialogue
+                    : (lessonsData.find(l => l.id === activeLesson.id)?.dialogue || [])
+                  }
                   onWordMastered={handleToggleMasteredWord}
                   masteredWords={progress.masteredWords}
                   audioSpeedIndex={audioSpeedIndex}
                   setAudioSpeedIndex={setAudioSpeedIndex}
-                  wholeDialogueVideoUrl={activeLesson.wholeDialogueVideoUrl}
                 />
               )}
 
@@ -9658,7 +9668,7 @@ startxref
                                         </button>
                                       </div>
                                     </div>
-                                    <div className="text-xs font-sans text-brand-green font-extrabold italic mt-0.5">{ex.phonetic}</div>
+                                    <div className="text-xs font-sans text-brand-green font-extrabold italic mt-0.5">{ex.phonetic} = {getMyanmarPhonetic(ex.phonetic)}</div>
                                   </div>
                                   <div className="mt-3">
                                     <div className="text-xs text-brand-muted font-sans font-bold">{ex.english}</div>

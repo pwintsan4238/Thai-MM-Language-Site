@@ -22,6 +22,7 @@ import {
   ConsonantInfo, 
   VowelInfo 
 } from '../data/alphabet';
+import { getMyanmarPhonetic } from '../utils/sentenceUtils';
 
 interface AlphabetGuideProps {
   speakText: (text: string) => void;
@@ -883,7 +884,7 @@ export default function AlphabetGuide({ speakText }: AlphabetGuideProps) {
                         <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-150-dark shadow-3xs">
                           <div className="min-w-0">
                             <span className="text-lg font-sans font-black text-brand-dark mr-1">{selectedVowel.exampleThai}</span>
-                            <span className="text-xs font-mono text-[#58cc02] font-semibold">({selectedVowel.examplePhonetic})</span>
+                            <span className="text-xs font-mono text-[#58cc02] font-semibold">({selectedVowel.examplePhonetic} = {getMyanmarPhonetic(selectedVowel.examplePhonetic)})</span>
                             <div className="text-[11px] font-sans font-bold text-brand-muted mt-1 leading-tight">
                               {selectedVowel.exampleEnglish} • <span className="text-brand-dark">{selectedVowel.exampleMyanmar}</span>
                             </div>
@@ -1065,7 +1066,7 @@ export default function AlphabetGuide({ speakText }: AlphabetGuideProps) {
                       <div className="flex items-center justify-between bg-white p-3 border border-gray-150-dark rounded-xl shadow-3xs">
                         <div className="min-w-0">
                           <span className="text-lg font-sans font-extrabold text-brand-dark">{item.exampleThai}</span>
-                          <span className="text-xs font-mono text-[#58cc02] font-bold ml-1">({item.examplePhonetic})</span>
+                          <span className="text-xs font-mono text-[#58cc02] font-bold ml-1">({item.examplePhonetic} = {getMyanmarPhonetic(item.examplePhonetic)})</span>
                           <div className="text-[11px] font-sans font-semibold text-brand-muted mt-1 leading-tight">
                             {item.exampleEnglish} • <span className="text-brand-dark">{item.exampleMyanmar}</span>
                           </div>

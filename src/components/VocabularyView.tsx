@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { WordBreakdown } from '../types';
+import { getMyanmarPhonetic } from '../utils/sentenceUtils';
 import { pdfVocabulary } from '../data/pdfVocabulary';
 import { Volume2, Volume1, Volume, HelpCircle, CheckCircle, Award, RefreshCw, Smile, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -213,7 +214,7 @@ export default function VocabularyView({
                             {w.thai}
                           </div>
                           <div className={`text-xs font-mono mt-0.5 font-bold ${isSelected ? 'text-purple-200' : 'text-[#58cc02]'}`}>
-                            ({w.phonetic})
+                            ({w.phonetic} = {getMyanmarPhonetic(w.phonetic)})
                           </div>
                           <div className={`text-xs font-sans mt-2 font-bold truncate ${isSelected ? 'text-white' : 'text-brand-dark'}`}>
                             {w.myanmar}
@@ -258,7 +259,7 @@ export default function VocabularyView({
                     <div className="duo-card p-4.5 border-brand-purple/10 bg-brand-purple-light/20 flex justify-between items-center rounded-2xl">
                       <div>
                         <div className="text-3xl font-sans font-black text-brand-purple uppercase">{selectedWord.thai}</div>
-                        <div className="text-xs font-mono text-[#58cc02] font-black tracking-wide mt-1">({selectedWord.phonetic})</div>
+                        <div className="text-xs font-mono text-[#58cc02] font-black tracking-wide mt-1">({selectedWord.phonetic} = {getMyanmarPhonetic(selectedWord.phonetic)})</div>
                       </div>
 
                       <button
@@ -353,7 +354,7 @@ export default function VocabularyView({
                 <div className="duo-card bg-brand-purple-light/25 border-brand-purple/20 p-6 text-center mb-6 flex flex-col items-center">
                   <h4 className="text-3xl font-sans font-black text-brand-purple">{quizQuestions[currentQuizIdx].word.thai}</h4>
                   <div className="text-xs font-mono text-[#58cc02] font-black tracking-wide mt-1.5 bg-white/70 px-3 py-0.5 rounded-full select-none">
-                    ({quizQuestions[currentQuizIdx].word.phonetic})
+                    ({quizQuestions[currentQuizIdx].word.phonetic} = {getMyanmarPhonetic(quizQuestions[currentQuizIdx].word.phonetic)})
                   </div>
                   
                   <button

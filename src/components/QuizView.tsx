@@ -3,7 +3,7 @@ import { DialogueLine, QuizQuestion } from '../types';
 import { Check, X, Award, HelpCircle, ArrowRight, Volume2, Volume1, Volume, RefreshCw, BookOpen, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { isSingleSentenceEnglish } from '../utils/sentenceUtils';
-import DialogueView from './DialogueView';
+import SentenceView from './SentenceView';
 
 interface QuizViewProps {
   questions: QuizQuestion[];
@@ -103,7 +103,7 @@ export default function QuizView({
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
-              Dialogue Study • စကားပြောလေ့လာရန်
+              Sentence Study • ဝါကျလေ့လာရန်
             </button>
             <button
               onClick={() => setActiveScreen('exam')}
@@ -119,7 +119,7 @@ export default function QuizView({
           </div>
 
           <span className="text-[10px] hidden sm:block font-sans text-brand-muted font-bold uppercase tracking-wider bg-gray-50 px-3 py-1 rounded-full border border-gray-150">
-            Phase: {activeScreen === 'talk' ? "Conversation" : "Quiz"}
+            Phase: {activeScreen === 'talk' ? "Sentence Study" : "Quiz"}
           </span>
         </div>
       )}
@@ -133,9 +133,9 @@ export default function QuizView({
             exit={{ opacity: 0, scale: 0.98 }}
             className="space-y-6"
           >
-            {/* Embedded Dialogue Practice Flow */}
-            <DialogueView
-              dialogue={dialogue}
+            {/* Embedded Sentence View Cards */}
+            <SentenceView
+              sentences={dialogue}
               onWordMastered={onWordMastered}
               masteredWords={masteredWords}
               audioSpeedIndex={audioSpeedIndex}
@@ -145,7 +145,7 @@ export default function QuizView({
             {/* CTA bar to start the quiz */}
             <div className="duo-card p-6 bg-gradient-to-br from-[#f2eefc]/40 to-transparent flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
               <div>
-                <h4 className="font-sans font-black text-[#583092] text-sm">Finished listening to conversation?</h4>
+                <h4 className="font-sans font-black text-[#583092] text-sm">Finished reviewing lesson sentences?</h4>
                 <p className="text-xs text-brand-muted font-sans font-bold mt-0.5">Transition directly into the syntax and definition testing module.</p>
               </div>
 
