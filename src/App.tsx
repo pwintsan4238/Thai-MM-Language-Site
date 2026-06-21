@@ -1543,8 +1543,8 @@ startxref
       sample = 'translate-thai-to-mm,What does "สวัสดี" mean?,สวัสดี,နေကောင်းလား|မင်္ဂလာပါ|ကျေးဇူးတင်ပါတယ်|သွားတော့မယ်,မင်္ဂလာပါ,Standard greeting context,Sawatdee သည် ထိုင်းနှုတ်ဆက်စကား မင်္ဂလာပါ ဖြစ်သည်။\n';
       filename = 'thai_quiz_template.csv';
     } else if (type === 'lessons') {
-      headers = 'id,titleThai,titlePhonetic,titleEnglish,titleMyanmar,descriptionEnglish,descriptionMyanmar\n';
-      sample = '51,บทเรียนทดสอบ,Bot-riian thot-sɔɔp,Advanced Testing Lesson,စမ်းသပ်သင်ခန်းစာ,An advanced lesson imported via Excel/CSV system,Excel/CSV စနစ်မှ တစ်ဆင့် ထည့်သွင်းထားသော သင်ခန်းစာဖြစ်သည်။\n';
+      headers = 'id,titleThai,titlePhonetic,titleEnglish,titleMyanmar,titleMyanmarPhonetic,descriptionEnglish,descriptionMyanmar\n';
+      sample = '51,บทเรียนทดสอบ,Bot-riian thot-sɔɔp,Advanced Testing Lesson,စမ်းသပ်သင်ခန်းစာ,စမ်း-သပ်-သင်-ခန်း-စာ,An advanced lesson imported via Excel/CSV system,Excel/CSV စနစ်မှ တစ်ဆင့် ထည့်သွင်းထားသော သင်ခန်းစာဖြစ်သည်။\n';
       filename = 'thai_lessons_metadata_template.csv';
     }
 
@@ -1676,6 +1676,7 @@ startxref
       const titlePhonetic = getVal('titlePhonetic');
       const titleEnglish = getVal('titleEnglish');
       const titleMyanmar = getVal('titleMyanmar');
+      const titleMyanmarPhonetic = getVal('titleMyanmarPhonetic') || getVal('myanPhonetic');
       const descriptionEnglish = getVal('descriptionEnglish');
       const descriptionMyanmar = getVal('descriptionMyanmar');
 
@@ -1693,6 +1694,7 @@ startxref
         titlePhonetic: titlePhonetic || "Bot-riian mai",
         titleEnglish,
         titleMyanmar: titleMyanmar || titleEnglish,
+        titleMyanmarPhonetic: titleMyanmarPhonetic || undefined,
         descriptionEnglish: descriptionEnglish || "",
         descriptionMyanmar: descriptionMyanmar || "",
         dialogue: [],
@@ -1728,6 +1730,7 @@ startxref
           titlePhonetic: importedLesson.titlePhonetic,
           titleEnglish: importedLesson.titleEnglish,
           titleMyanmar: importedLesson.titleMyanmar,
+          titleMyanmarPhonetic: importedLesson.titleMyanmarPhonetic,
           descriptionEnglish: importedLesson.descriptionEnglish,
           descriptionMyanmar: importedLesson.descriptionMyanmar
         };
@@ -1935,6 +1938,7 @@ startxref
         const titlePhonetic = getVal('titlePhonetic');
         const titleEnglish = getVal('titleEnglish');
         const titleMyanmar = getVal('titleMyanmar');
+        const titleMyanmarPhonetic = getVal('titleMyanmarPhonetic') || getVal('myanPhonetic');
         const descriptionEnglish = getVal('descriptionEnglish');
         const descriptionMyanmar = getVal('descriptionMyanmar');
 
@@ -1952,6 +1956,7 @@ startxref
           titlePhonetic: titlePhonetic || "Bot-riian mai",
           titleEnglish,
           titleMyanmar: titleMyanmar || titleEnglish,
+          titleMyanmarPhonetic: titleMyanmarPhonetic || undefined,
           descriptionEnglish: descriptionEnglish || "",
           descriptionMyanmar: descriptionMyanmar || "",
           dialogue: [],
@@ -1990,6 +1995,7 @@ startxref
             titlePhonetic: importedLesson.titlePhonetic,
             titleEnglish: importedLesson.titleEnglish,
             titleMyanmar: importedLesson.titleMyanmar,
+            titleMyanmarPhonetic: importedLesson.titleMyanmarPhonetic,
             descriptionEnglish: importedLesson.descriptionEnglish,
             descriptionMyanmar: importedLesson.descriptionMyanmar
           };
@@ -7954,7 +7960,12 @@ startxref
                                     <tr key={idx} className="hover:bg-brand-purple/5 transition-colors">
                                       <td className="p-2 border-r border-gray-200 font-mono font-extrabold text-brand-purple text-center">{row.id}</td>
                                       <td className="p-2 border-r border-gray-200 font-bold text-brand-dark">{row.titleEnglish}</td>
-                                      <td className="p-2 border-r border-gray-200 text-brand-dark">{row.titleMyanmar}</td>
+                                      <td className="p-2 border-r border-gray-200 text-brand-dark">
+                                        <span>{row.titleMyanmar}</span>
+                                        {row.titleMyanmarPhonetic && (
+                                          <span className="text-[9px] text-emerald-600 block leading-tight font-black">[{row.titleMyanmarPhonetic}]</span>
+                                        )}
+                                      </td>
                                       <td className="p-2 text-brand-muted font-mono">{row.titleThai} ({row.titlePhonetic})</td>
                                     </tr>
                                   ))}
@@ -8151,6 +8162,16 @@ startxref
                                     value={selectedLesson.titleMyanmar}
                                     onChange={(e) => updateLessonField(selectedLesson.id, 'titleMyanmar', e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">Myanmar Title Phonetic</label>
+                                  <input
+                                    type="text"
+                                    value={selectedLesson.titleMyanmarPhonetic || ''}
+                                    onChange={(e) => updateLessonField(selectedLesson.id, 'titleMyanmarPhonetic', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none"
+                                    placeholder="e.g. အသံထွက် ညွှန်းလှန်ချက်"
                                   />
                                 </div>
                                 <div className="space-y-1.5 md:col-span-2">
@@ -9442,7 +9463,12 @@ startxref
                                         <>
                                           <td className="p-2 border-r border-gray-200 font-mono font-bold text-center">{row.id}</td>
                                           <td className="p-2 border-r border-gray-200">{row.titleEnglish}</td>
-                                          <td className="p-2 border-r border-gray-200">{row.titleMyanmar}</td>
+                                          <td className="p-2 border-r border-gray-200">
+                                            <span>{row.titleMyanmar}</span>
+                                            {row.titleMyanmarPhonetic && (
+                                              <span className="text-[9px] text-emerald-600 block leading-tight font-black">[{row.titleMyanmarPhonetic}]</span>
+                                            )}
+                                          </td>
                                           <td className="p-2 truncate max-w-xs">{row.descriptionEnglish}</td>
                                         </>
                                       )}
@@ -9546,9 +9572,9 @@ startxref
                 <h2 className="text-xl md:text-2xl font-sans font-black text-[#3c3c3c] tracking-tight mt-2 flex flex-wrap items-baseline gap-2">
                   <span>{activeLesson?.titleEnglish}</span>
                   <span className="text-sm font-extrabold text-brand-green italic">({activeLesson?.titleThai} - {activeLesson?.titlePhonetic})</span>
-                  {activeLesson?.titlePhonetic && (
+                  {(activeLesson?.titleMyanmarPhonetic || activeLesson?.titlePhonetic) && (
                     <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs font-black px-2.5 py-0.5 rounded-full">
-                      အသံထွက်: {getMyanmarPhonetic(activeLesson.titlePhonetic)}
+                      အသံထွက်: {activeLesson?.titleMyanmarPhonetic || getMyanmarPhonetic(activeLesson.titlePhonetic || '')}
                     </span>
                   )}
                 </h2>

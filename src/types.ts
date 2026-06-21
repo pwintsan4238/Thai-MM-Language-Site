@@ -49,6 +49,7 @@ export interface Lesson {
   titlePhonetic: string;
   titleEnglish: string;
   titleMyanmar: string;
+  titleMyanmarPhonetic?: string;
   descriptionEnglish: string;
   descriptionMyanmar: string;
   dialogue: DialogueLine[];
