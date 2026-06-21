@@ -688,6 +688,7 @@ export default function App() {
   const [editingVocabPhonetic, setEditingVocabPhonetic] = useState<string>('');
   const [editingVocabEnglish, setEditingVocabEnglish] = useState<string>('');
   const [editingVocabMyanmar, setEditingVocabMyanmar] = useState<string>('');
+  const [editingVocabMyanmarPhonetic, setEditingVocabMyanmarPhonetic] = useState<string>('');
   const [editingVocabPos, setEditingVocabPos] = useState<string>('');
 
   // Admin New Account Creator State
@@ -971,6 +972,7 @@ export default function App() {
   const [newWordPhonetic, setNewWordPhonetic] = useState<string>('');
   const [newWordEnglish, setNewWordEnglish] = useState<string>('');
   const [newWordMyanmar, setNewWordMyanmar] = useState<string>('');
+  const [newWordMyanmarPhonetic, setNewWordMyanmarPhonetic] = useState<string>('');
   const [newWordPos, setNewWordPos] = useState<string>('Noun');
   const [newWordNotes, setNewWordNotes] = useState<string>('');
   const [notebookError, setNotebookError] = useState<string>('');
@@ -982,6 +984,7 @@ export default function App() {
   const [editWordPhonetic, setEditWordPhonetic] = useState<string>('');
   const [editWordEnglish, setEditWordEnglish] = useState<string>('');
   const [editWordMyanmar, setEditWordMyanmar] = useState<string>('');
+  const [editWordMyanmarPhonetic, setEditWordMyanmarPhonetic] = useState<string>('');
   const [editWordPos, setEditWordPos] = useState<string>('Noun');
   const [editWordNotes, setEditWordNotes] = useState<string>('');
 
@@ -2803,8 +2806,13 @@ startxref
                                         {lesson.titleEnglish}
                                       </h4>
                                       <p className="text-xs font-sans text-brand-green font-extrabold italic mt-1" style={{ wordBreak: 'break-word' }}>
-                                        {lesson.titlePhonetic} = {getMyanmarPhonetic(lesson.titlePhonetic)} ({lesson.titleThai})
+                                        {lesson.titlePhonetic} ({lesson.titleThai})
                                       </p>
+                                      {lesson.titlePhonetic && (
+                                        <p className="text-[10px] font-sans text-emerald-600 font-extrabold mt-0.5 select-none opacity-90">
+                                          အသံထွက်: {getMyanmarPhonetic(lesson.titlePhonetic)}
+                                        </p>
+                                      )}
 
                                       <p className="text-[11px] text-brand-muted font-sans mt-3 line-clamp-2 leading-relaxed font-bold">
                                         {lesson.descriptionMyanmar}
@@ -3638,7 +3646,10 @@ startxref
                                           {hl.termThai && (
                                             <span className="text-brand-purple text-base font-black mr-1">{hl.termThai}</span>
                                           )}
-                                          <span className="text-brand-green italic font-black">({hl.termPhonetic} = {getMyanmarPhonetic(hl.termPhonetic)})</span>
+                                          <span className="text-brand-green italic font-black">({hl.termPhonetic})</span>
+                                          {hl.termPhonetic && (
+                                            <span className="text-[10px] text-emerald-600 font-extrabold ml-1.5 font-sans">အသံထွက်: {getMyanmarPhonetic(hl.termPhonetic)}</span>
+                                          )}
                                         </div>
                                         <div className="text-[11px] font-sans mt-2 font-bold text-brand-dark leading-snug">
                                           {hl.meaningEnglish} • <span className="text-brand-muted">{hl.meaningMyanmar}</span>
@@ -3861,8 +3872,13 @@ startxref
                                                 <div className="font-sans font-black text-brand-dark text-sm leading-tight flex items-baseline gap-1.5 flex-wrap">
                                                   <span className="text-brand-purple text-[15px]">{ex.thai}</span>
                                                   <span className="text-[10px] text-brand-green font-extrabold italic bg-brand-green-light px-2 py-0.5 rounded-full">
-                                                    ({ex.phonetic} = {getMyanmarPhonetic(ex.phonetic)})
+                                                    ({ex.phonetic})
                                                   </span>
+                                                  {ex.phonetic && (
+                                                    <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                                                      အသံထွက်: {getMyanmarPhonetic(ex.phonetic)}
+                                                    </span>
+                                                  )}
                                                 </div>
                                                 <div className="text-[11px] text-brand-muted font-sans font-bold leading-normal mt-2">
                                                   {ex.english}
@@ -4072,6 +4088,19 @@ startxref
 
                           <div>
                             <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                              Myanmar Phonetic pronunciation (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="မြန်မာအသံထွက် ဥပမာ - မင်-ဂလာ-ပါ"
+                              value={newWordMyanmarPhonetic}
+                              onChange={(e) => setNewWordMyanmarPhonetic(e.target.value)}
+                              className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-bold font-sans focus:border-brand-purple focus:outline-none transition-colors"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
                               Part of Speech
                             </label>
                             <select
@@ -4108,6 +4137,7 @@ startxref
                               const cleanPhonetic = newWordPhonetic.trim();
                               const cleanEnglish = newWordEnglish.trim();
                               const cleanMyanmar = newWordMyanmar.trim();
+                              const cleanMyanmarPhonetic = newWordMyanmarPhonetic.trim();
                               if (!cleanThai && !cleanPhonetic && !cleanEnglish && !cleanMyanmar) {
                                 setNotebookError("Please enter at least one or two options in the form to generate words!");
                                 return;
@@ -4119,7 +4149,8 @@ startxref
                                 cleanEnglish,
                                 cleanMyanmar,
                                 newWordPos,
-                                lessons
+                                lessons,
+                                cleanMyanmarPhonetic
                               );
 
                               if (customWords.some(w => w.thai === completedWord.thai && !w.isArchived)) {
@@ -4140,6 +4171,7 @@ startxref
                               setNewWordPhonetic('');
                               setNewWordEnglish('');
                               setNewWordMyanmar('');
+                              setNewWordMyanmarPhonetic('');
                               setNewWordNotes('');
                               setNotebookError('');
                               setNotebookSuccess(`Successfully added "${completedWord.thai}"! (+5 XP gained)`);
@@ -4263,6 +4295,15 @@ startxref
                                       />
                                     </div>
                                     <div>
+                                      <input
+                                        type="text"
+                                        placeholder="Myanmar phonetic"
+                                        value={editWordMyanmarPhonetic}
+                                        onChange={(e) => setEditWordMyanmarPhonetic(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded text-xs font-bold font-sans text-brand-dark"
+                                      />
+                                    </div>
+                                    <div>
                                       <select
                                         value={editWordPos}
                                         onChange={(e) => setEditWordPos(e.target.value)}
@@ -4294,6 +4335,7 @@ startxref
                                                 phonetic: editWordPhonetic,
                                                 english: editWordEnglish,
                                                 myanmar: editWordMyanmar,
+                                                myanmarPhonetic: editWordMyanmarPhonetic.trim() || undefined,
                                                 partOfSpeech: editWordPos,
                                                 notes: editWordNotes.trim() || undefined
                                               };
@@ -4340,6 +4382,7 @@ startxref
                                                 setEditWordPhonetic(item.phonetic);
                                                 setEditWordEnglish(item.english);
                                                 setEditWordMyanmar(item.myanmar);
+                                                setEditWordMyanmarPhonetic(item.myanmarPhonetic || '');
                                                 setEditWordPos(item.partOfSpeech);
                                                 setEditWordNotes(item.notes || '');
                                               }}
@@ -4405,6 +4448,10 @@ startxref
                                         <p className="text-brand-purple italic leading-tight">
                                           <span className="text-brand-muted text-[10px] font-sans mr-2 uppercase tracking-wide">Myanmar:</span>
                                           {item.myanmar}
+                                        </p>
+                                        <p className="text-emerald-600 font-bold text-[10px] leading-tight">
+                                          <span className="text-brand-muted text-[10px] font-sans mr-2 uppercase tracking-wide">အသံထွက်:</span>
+                                          {item.myanmarPhonetic || getMyanmarPhonetic(item.phonetic)}
                                         </p>
                                       </div>
 
@@ -8167,6 +8214,7 @@ startxref
                                     const phonetic = (form.elements.namedItem('ph') as HTMLInputElement).value.trim();
                                     const english = (form.elements.namedItem('en') as HTMLInputElement).value.trim();
                                     const myanmar = (form.elements.namedItem('mm') as HTMLInputElement).value.trim();
+                                    const mPhonetic = (form.elements.namedItem('mpp') as HTMLInputElement).value.trim();
                                     const pos = (form.elements.namedItem('pos') as HTMLSelectElement).value;
 
                                     if (!thai || !myanmar) {
@@ -8174,14 +8222,21 @@ startxref
                                       return;
                                     }
 
-                                    const newWord: WordBreakdown = { thai, phonetic, english, myanmar, partOfSpeech: pos };
+                                    const newWord: WordBreakdown = { 
+                                      thai, 
+                                      phonetic, 
+                                      english, 
+                                      myanmar, 
+                                      myanmarPhonetic: mPhonetic || undefined, 
+                                      partOfSpeech: pos 
+                                    };
                                     const updated = [...currentVocab, newWord];
                                     handleSaveVocabList(selectedLesson.id, updated);
                                     form.reset();
                                   }}
-                                  className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-5 gap-3"
+                                  className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-6 gap-3"
                                 >
-                                  <div className="sm:col-span-5 border-b border-gray-200 pb-1.5 mb-1 flex items-center justify-between">
+                                  <div className="sm:col-span-6 border-b border-gray-200 pb-1.5 mb-1 flex items-center justify-between">
                                     <span className="text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
                                       ➕ Add Word to Lesson Vocabulary List
                                     </span>
@@ -8230,6 +8285,16 @@ startxref
                                   </div>
 
                                   <div className="space-y-1">
+                                    <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Myan Phonetic</label>
+                                    <input
+                                      name="mpp"
+                                      type="text"
+                                      placeholder="မင်-ဂလာ-ပါ"
+                                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none"
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1">
                                     <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Part of Speech</label>
                                     <select name="pos" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold bg-white cursor-pointer focus:border-brand-purple focus:outline-none">
                                       <option value="noun">noun (နာမ်)</option>
@@ -8244,7 +8309,7 @@ startxref
 
                                   <button
                                     type="submit"
-                                    className="sm:col-span-5 w-full bg-brand-purple text-white text-[11px] font-sans font-black py-2 rounded-lg mt-2 cursor-pointer hover:bg-brand-purple/90 transition-colors uppercase tracking-wider"
+                                    className="sm:col-span-6 w-full bg-brand-purple text-white text-[11px] font-sans font-black py-2 rounded-lg mt-2 cursor-pointer hover:bg-brand-purple/90 transition-colors uppercase tracking-wider"
                                   >
                                     ➕ ADD WORD TO LESSON {selectedLesson.id}
                                   </button>
@@ -8280,7 +8345,7 @@ startxref
                                            {!isEditing && (
                                              <GripVertical className="w-3.5 h-3.5 text-gray-400 shrink-0 select-none cursor-grab active:cursor-grabbing hover:text-brand-purple" />
                                            )}
-                                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 flex-1">
+                                           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 flex-1">
                                              {isEditing ? (
                                                <>
                                                  <div>
@@ -8332,6 +8397,15 @@ startxref
                                                      <option value="interjection">interjection (အာမေဍိတ်)</option>
                                                    </select>
                                                  </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-amber-600 uppercase block mb-0.5">Myan Phonetic</span>
+                                                   <input
+                                                     type="text"
+                                                     value={editingVocabMyanmarPhonetic}
+                                                     onChange={(e) => setEditingVocabMyanmarPhonetic(e.target.value)}
+                                                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-sans text-brand-dark focus:border-brand-purple focus:outline-none bg-white font-semibold"
+                                                   />
+                                                 </div>
                                                </>
                                              ) : (
                                                <>
@@ -8352,6 +8426,10 @@ startxref
                                                    <span className="text-brand-dark block font-bold">{w.myanmar}</span>
                                                    <span className="text-[9px] uppercase font-bold text-brand-purple bg-brand-purple-light/40 px-1 py-0.5 rounded w-fit block mt-0.5">{w.partOfSpeech}</span>
                                                  </div>
+                                                 <div>
+                                                   <span className="text-[8px] font-black text-brand-muted uppercase block">Myan Phonetic</span>
+                                                   <span className="text-emerald-600 font-bold block">{w.myanmarPhonetic || getMyanmarPhonetic(w.phonetic || '')}</span>
+                                                 </div>
                                                </>
                                              )}
                                            </div>
@@ -8371,6 +8449,7 @@ startxref
                                                        phonetic: editingVocabPhonetic.trim(),
                                                        english: editingVocabEnglish.trim(),
                                                        myanmar: editingVocabMyanmar.trim(),
+                                                       myanmarPhonetic: editingVocabMyanmarPhonetic.trim() || undefined,
                                                        partOfSpeech: editingVocabPos as any
                                                      };
                                                      handleSaveVocabList(selectedLesson.id, updated);
@@ -8398,6 +8477,7 @@ startxref
                                                      setEditingVocabPhonetic(w.phonetic || '');
                                                      setEditingVocabEnglish(w.english || '');
                                                      setEditingVocabMyanmar(w.myanmar);
+                                                     setEditingVocabMyanmarPhonetic(w.myanmarPhonetic || '');
                                                      setEditingVocabPos(w.partOfSpeech || 'noun');
                                                    }}
                                                    className="p-1.5 hover:bg-gray-100 text-brand-purple rounded cursor-pointer transition-colors"
@@ -9465,7 +9545,12 @@ startxref
                 </div>
                 <h2 className="text-xl md:text-2xl font-sans font-black text-[#3c3c3c] tracking-tight mt-2 flex flex-wrap items-baseline gap-2">
                   <span>{activeLesson?.titleEnglish}</span>
-                  <span className="text-sm font-extrabold text-brand-green italic">({activeLesson?.titleThai} - {activeLesson?.titlePhonetic} = {getMyanmarPhonetic(activeLesson?.titlePhonetic)})</span>
+                  <span className="text-sm font-extrabold text-brand-green italic">({activeLesson?.titleThai} - {activeLesson?.titlePhonetic})</span>
+                  {activeLesson?.titlePhonetic && (
+                    <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs font-black px-2.5 py-0.5 rounded-full">
+                      အသံထွက်: {getMyanmarPhonetic(activeLesson.titlePhonetic)}
+                    </span>
+                  )}
                 </h2>
               </div>
 
@@ -9668,7 +9753,12 @@ startxref
                                         </button>
                                       </div>
                                     </div>
-                                    <div className="text-xs font-sans text-brand-green font-extrabold italic mt-0.5">{ex.phonetic} = {getMyanmarPhonetic(ex.phonetic)}</div>
+                                    <div className="flex flex-col gap-0.5 mt-0.5">
+                                      <div className="text-xs font-sans text-brand-green font-extrabold italic">{ex.phonetic}</div>
+                                      {ex.phonetic && (
+                                        <div className="text-[11px] font-sans text-emerald-600 font-extrabold">အသံထွက်: {getMyanmarPhonetic(ex.phonetic)}</div>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="mt-3">
                                     <div className="text-xs text-brand-muted font-sans font-bold">{ex.english}</div>

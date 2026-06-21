@@ -266,55 +266,6 @@ export function expandLessonQuizzes(allLessons: Lesson[]): Lesson[] {
       });
     }
 
-    // --- GENERATE TYPE 4: Sentence Level Translation (Thai -> Myanmar) ---
-    for (const line of lessonLines) {
-      if (!line.thai || !line.myanmar) continue;
-      const prompt = `Translate the following dialogue sentence: "${line.thai}" (${line.phonetic})`;
-      const correctAnswer = line.myanmar;
-      
-      // Look up candidate sentence distractors
-      const candidateLines = globalDialogues.filter(l => l.myanmar !== line.myanmar).map(l => l.myanmar);
-      const shuffledLines = stableShuffle(candidateLines, ++seed);
-      let distractors = shuffledLines.slice(0, 3);
-      while (distractors.length < 3) {
-        distractors.push(fallbacksMyanmar[Math.floor(Math.random() * fallbacksMyanmar.length)]);
-      }
-
-      addQuestionSafely({
-        id: `${lesson.id}_gen_s_th_mm_${line.thai.substring(0, 8)}`,
-        type: 'translate-thai-to-mm',
-        prompt,
-        options: [correctAnswer, ...distractors],
-        correctAnswer,
-        explanation: `"${line.thai}" matches: "${line.english}" in English.`,
-        explanationMyanmar: `ဝါကျ၏ မြန်မာပြန်မှာ "${line.myanmar}" ဖြစ်သည်။`
-      });
-    }
-
-    // --- GENERATE TYPE 5: Sentence Level Translation (Myanmar -> Thai) ---
-    for (const line of lessonLines) {
-      if (!line.thai || !line.myanmar) continue;
-      const prompt = `Choose the correct Thai translation for: "${line.myanmar}"`;
-      const correctAnswer = `${line.thai} (${line.phonetic})`;
-
-      const candidateThaiLines = globalDialogues.filter(l => l.thai !== line.thai).map(l => `${l.thai} (${l.phonetic})`);
-      const shuffledThaiLines = stableShuffle(candidateThaiLines, ++seed);
-      let distractors = shuffledThaiLines.slice(0, 3);
-      while (distractors.length < 3) {
-        distractors.push(fallbacksThai[Math.floor(Math.random() * fallbacksThai.length)]);
-      }
-
-      addQuestionSafely({
-        id: `${lesson.id}_gen_s_mm_th_${line.thai.substring(0, 8)}`,
-        type: 'translate-mm-to-thai',
-        prompt,
-        options: [correctAnswer, ...distractors],
-        correctAnswer,
-        explanation: `Pronounced as "${line.phonetic}", meaning "${line.english}".`,
-        explanationMyanmar: `"${line.myanmar}" ဝါကျ၏ ထိုင်းအသုံးမှာ "${line.thai}" ဖြစ်သည်။`
-      });
-    }
-
     // --- GENERATE TYPE 6: Fill-in-the-gap Grammar Particle / Word Challenge ---
     for (const line of lessonLines) {
       if (!line.thai || !line.words || line.words.length === 0) continue;

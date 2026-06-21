@@ -83,12 +83,14 @@ export function autoFillWord(
   englishIn: string,
   myanmarIn: string,
   posIn: string,
-  lessons: Lesson[]
+  lessons: Lesson[],
+  myanmarPhoneticIn?: string
 ): WordBreakdown {
   const cleanThai = thaiIn.trim();
   const cleanPhonetic = phoneticIn.trim();
   const cleanEnglish = englishIn.trim();
   const cleanMyanmar = myanmarIn.trim();
+  const cleanMyanmarPhonetic = myanmarPhoneticIn?.trim();
 
   // Try to find a reference match using English first, then Thai, then Myanmar
   let matched: WordBreakdown | null = null;
@@ -174,6 +176,7 @@ export function autoFillWord(
     phonetic: finalPhonetic,
     english: finalEnglish,
     myanmar: guessedMyanmar,
+    myanmarPhonetic: cleanMyanmarPhonetic || (matched ? matched.myanmarPhonetic : undefined),
     partOfSpeech: posIn || (matched ? matched.partOfSpeech : "Noun")
   };
 }

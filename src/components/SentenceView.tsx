@@ -270,7 +270,10 @@ export default function SentenceView({
               <div className="duo-card p-5 border-brand-purple/20 bg-brand-purple-light/20 flex justify-between items-center">
                 <div>
                   <div className="text-3xl font-sans font-black text-brand-purple select-all">{selectedWord.thai}</div>
-                  <div className="text-xs font-mono text-[#58cc02] font-black tracking-wide mt-1">{selectedWord.phonetic} = {getMyanmarPhonetic(selectedWord.phonetic)}</div>
+                  <div className="text-xs font-mono text-[#58cc02] font-black tracking-wide mt-1">({selectedWord.phonetic})</div>
+                  {selectedWord.phonetic && (
+                    <div className="text-[11px] font-sans text-emerald-600 font-bold mt-1">အသံထွက်: {getMyanmarPhonetic(selectedWord.phonetic)}</div>
+                  )}
                 </div>
                 <button
                   onClick={() => speakThai(selectedWord.thai)}
@@ -388,7 +391,10 @@ export default function SentenceView({
                 <div className="p-4.5 border border-brand-purple/10 bg-brand-purple-light/20 flex justify-between items-center rounded-2xl">
                   <div>
                     <div className="text-2xl font-sans font-black text-brand-purple select-all">{selectedWord.thai}</div>
-                    <div className="text-xs font-mono text-[#58cc02] font-black tracking-wide mt-1">{selectedWord.phonetic} = {getMyanmarPhonetic(selectedWord.phonetic)}</div>
+                    <div className="text-xs font-mono text-[#58cc02] font-black tracking-wide mt-1">({selectedWord.phonetic})</div>
+                    {selectedWord.phonetic && (
+                      <div className="text-[11px] font-sans text-emerald-600 font-bold mt-1">အသံထွက်: {getMyanmarPhonetic(selectedWord.phonetic)}</div>
+                    )}
                   </div>
                   <button
                     onClick={() => speakThai(selectedWord.thai)}

@@ -60,25 +60,8 @@ const syllableLookup: Record<string, string> = {
   "rʉ̌ʉ": "လူး",
   "yang": "ယန်း",
   "jaŋ": "ရမ်း",
-  "wat": "ဝါတ်",
-  "sa": "ဆာ",
-  "baai": "ဘိုင်",
-  "khop": "ခေါပ်",
-  "khòop": "ခေါပ်",
-  "khoop": "ခေါပ်",
-  "khoob": "ခေါပ်",
-  "koob": "ခေါပ်",
-  "koon": "ခွန်",
-  "châj": "ချိုင်",
-  "chai": "ချိုင်",
-  "khǐan": "ခီရန်",
-  "khian": "ခီရန်",
-  "raaj": "ရိုင်",
-  "raaj-ŋaan": "ရိုင်ငါန်",
-  "ŋaan": "ငါန်",
-  "sòŋ": "စုမ်း",
-  "song": "စုမ်း",
-  "aa": "อာ",
+  "wat": "ဝပ်",
+  "aa": "အာ",
   "caan": "ကျန်",
   "sèt": "စက်",
   "set": "စက်",
@@ -86,8 +69,8 @@ const syllableLookup: Record<string, string> = {
   "riap": "ရီယပ်",
   "rɔ́ɔj": "ရွိုင်း",
   "roi": "ရွိုင်း",
-  "lɛ́ɛw": "လည်ဝါး",
-  "laew": "လဲဝ်",
+  "lɛ́ɛw": "လဲဝ်း",
+  "laew": "လဲဝ်း",
   "mʉ̂a": "မောက်",
   "mua": "မောက်",
   "waan": "ဝမ်",
@@ -118,7 +101,7 @@ const syllableLookup: Record<string, string> = {
   "jùu": "ယူ",
   "yuu": "ယူ",
   "naj": "နိုင်",
-  "khrua": "ခုရူဝါ",
+  "khrua": "ခရူဝါ",
   "bplàaw": "ပလောင်",
   "bplaaw": "ပလောင်",
   "triam": "တရီယမ်",
@@ -131,10 +114,10 @@ const syllableLookup: Record<string, string> = {
   "kaan": "ကန်",
   "rian": "ရီယန်",
   "phaa": "ဖာ",
-  "sá": "သာ",
-  "šaa": "သာ",
-  "khʉʉ": "ခု",
-  "khua": "ခု",
+  "sá": "ဆာ",
+  "šaa": "ဆာ",
+  "khʉʉ": "ခူ",
+  "khua": "ခုဝါ",
   "khwaam": "ခွမ်",
   "sùk": "စုက်",
   "suk": "စုက်",
@@ -152,16 +135,16 @@ const syllableLookup: Record<string, string> = {
   "pra": "ပရာ",
   "jòot": "ယုတ်",
   "joot": "ယုတ်",
-  "ləəj": "လေဲ",
-  "loei": "လေဲ",
+  "ləəj": "လွေး",
+  "loei": "လွေး",
   "khɔ̌ɔ": "ခေါ",
   "kho": "ခေါ",
   "hâj": "ဟိုင်",
   "hai": "ဟိုင်",
   "rúu": "ရူး",
   "ruu": "ရူး",
-  "ná": "ဏ",
-  "na": "ဏ",
+  "ná": "န",
+  "na": "န"
 };
 
 function cleanDiacritics(str: string): string {
@@ -179,8 +162,8 @@ function fallbackSyllable(s: string): string {
   let onset = "";
   
   const onsets = [
-    "khrap", "khr", "khw", "bp", "dt", "kl", "kr", "pl", "pr", "tr", "sh", "ch", "kh", "ph", "th",
-    "k", "p", "t", "s", "m", "n", "l", "r", "y", "w", "b", "d", "f", "h", "g", "c", "j"
+    "khrap", "khw", "khr", "bpl", "bpr", "bpa", "bpo", "bp", "dtl", "dtr", "dt", "kl", "kr", "pl", "pr", "tr", "sh", "ch", "kh", "ph", "th", "ng", "ŋ", "ny", "ñ", "ɲ",
+    "k", "p", "t", "s", "m", "n", "l", "r", "y", "j", "w", "b", "d", "f", "h", "g", "c"
   ];
   
   for (const o of onsets) {
@@ -196,18 +179,18 @@ function fallbackSyllable(s: string): string {
     case "khrap": return "ခရတ်";
     case "khr": myanmarOnset = "ခရ"; break;
     case "khw": myanmarOnset = "ခွ"; break;
-    case "bp": myanmarOnset = "ပ"; break;
-    case "dt": myanmarOnset = "တ"; break;
-    case "kl": myanmarOnset = "ကလ"; break;
-    case "kr": myanmarOnset = "ကရ"; break;
-    case "pl": myanmarOnset = "ပလ"; break;
-    case "pr": myanmarOnset = "ပရ"; break;
+    case "bp": case "bpl": case "bpr": case "bpa": case "bpo": myanmarOnset = "ပ"; break;
+    case "dt": case "dtl": case "dtr": myanmarOnset = "တ"; break;
+    case "kl": case "kr": myanmarOnset = "ကရ"; break;
+    case "pl": case "pr": myanmarOnset = "ပရ"; break;
     case "tr": myanmarOnset = "တရ"; break;
     case "sh": myanmarOnset = "ရှ"; break;
     case "ch": myanmarOnset = "ချ"; break;
     case "kh": myanmarOnset = "ခ"; break;
     case "ph": myanmarOnset = "ဖ"; break;
     case "th": myanmarOnset = "သ"; break;
+    case "ng": case "ŋ": myanmarOnset = "င"; break;
+    case "ny": case "ñ": case "ɲ": myanmarOnset = "ည"; break;
     case "k": myanmarOnset = "က"; break;
     case "p": myanmarOnset = "ပ"; break;
     case "t": myanmarOnset = "တ"; break;
@@ -227,8 +210,13 @@ function fallbackSyllable(s: string): string {
     default: myanmarOnset = ""; break;
   }
   
+  // Vowel carrier fallback if no consonant onset
+  if (myanmarOnset === "") {
+    myanmarOnset = "အ";
+  }
+  
   if (remainder === "") {
-    return myanmarOnset || s;
+    return myanmarOnset;
   }
   
   let myanmarVowel = "";
@@ -323,13 +311,16 @@ export function getMyanmarPhonetic(phoneticString: string | null | undefined): s
   
   const convertedWords = words.map(word => {
     const match = word.match(/^([a-zA-Zʉɔɛ̌̂̀́̄\-]+)([^a-zA-Zʉɔɛ̌̂̀́̄]*)$/);
-    if (!match) return word;
+    if (!match) {
+      // Strip any English / Thai letters
+      return word.replace(/[a-zA-Z\u0e00-\u0e7f]/g, "");
+    }
     const base = match[1];
     const punctuation = match[2];
     
     const lowerBase = base.toLowerCase();
     if (wordLookup[lowerBase]) {
-      return wordLookup[lowerBase] + punctuation;
+      return wordLookup[lowerBase] + punctuation.replace(/[a-zA-Z\u0e00-\u0e7f]/g, "");
     }
     
     const syllables = base.split(/-/);
@@ -347,8 +338,10 @@ export function getMyanmarPhonetic(phoneticString: string | null | undefined): s
       return fallbackSyllable(cleanSyl);
     });
     
-    return convertedSyllables.join("") + punctuation;
+    const rawWordResult = convertedSyllables.join("") + punctuation;
+    // Strip absolutely any remaining English or Thai characters
+    return rawWordResult.replace(/[a-zA-Z\u0e00-\u0e7f]/g, "");
   });
   
-  return convertedWords.join(" ");
+  return convertedWords.filter(w => w.trim().length > 0).join(" ");
 }
