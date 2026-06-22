@@ -651,62 +651,65 @@ export const CheckoutGateway: React.FC<CheckoutGatewayProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 
                 {/* Bank details info container */}
-                <div className="md:col-span-7 bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 space-y-2 flex flex-col justify-between">
-                  <div className="space-y-1.5">
-                    <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider leading-none">
-                      {activeBank.bankName} Details
-                    </span>
-                    <p className="text-[8.5px] text-slate-400 font-medium leading-tight">
-                      {activeBank.instruction}
-                    </p>
-
-                    {/* Copier rows */}
-                    <div className="space-y-1 pt-0.5">
-                      {/* Name Row */}
-                      <div className="flex items-center justify-between bg-white px-2 py-1 rounded-lg border border-slate-100">
-                        <div className="min-w-0">
-                          <span className="text-[6.5px] text-slate-400 font-bold block uppercase leading-none mb-0.5">Receiver name</span>
-                          <span className="text-[9.5px] font-sans font-bold text-slate-800 truncate block">{activeBank.accountName}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(activeBank.accountName, 'name')}
-                          className="p-0.5 text-slate-400 hover:text-brand-purple transition-colors cursor-pointer shrink-0"
-                          title="Copy Account Name"
-                        >
-                          {copiedType === 'name' ? (
-                            <Check className="w-3 h-3 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
+                <div className="md:col-span-7 bg-slate-50/50 p-2 sm:p-2.5 rounded-xl border border-slate-100 flex flex-col justify-between gap-1.5">
+                  <div className="flex flex-row md:flex-col items-stretch gap-2.5 justify-between">
+                    <div className="flex-1 space-y-1.5 min-w-0">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider leading-none">
+                          {activeBank.bankName} Details
+                        </span>
+                        <p className="text-[8.5px] text-slate-400 font-medium leading-tight">
+                          {activeBank.instruction}
+                        </p>
                       </div>
 
-                      {/* Number Row */}
-                      <div className="flex items-center justify-between bg-white px-2 py-1 rounded-lg border border-slate-100">
-                        <div className="min-w-0">
-                          <span className="text-[6.5px] text-slate-400 font-bold block uppercase leading-none mb-0.5">Account / Card info</span>
-                          <span className="text-[10px] font-mono font-bold text-slate-950 block select-all tracking-wide">{activeBank.accountNumber}</span>
+                      {/* Copier rows */}
+                      <div className="space-y-1">
+                        {/* Name Row */}
+                        <div className="flex items-center justify-between bg-white px-2 py-0.5 sm:py-1 rounded-lg border border-slate-100">
+                          <div className="min-w-0">
+                            <span className="text-[6.5px] text-slate-400 font-bold block uppercase leading-none mb-0.5">Receiver name</span>
+                            <span className="text-[9.5px] font-sans font-bold text-slate-800 truncate block">{activeBank.accountName}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(activeBank.accountName, 'name')}
+                            className="p-1 text-slate-400 hover:text-brand-purple transition-colors cursor-pointer shrink-0"
+                            title="Copy Account Name"
+                          >
+                            {copiedType === 'name' ? (
+                              <Check className="w-3 h-3 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(activeBank.accountNumber, 'number')}
-                          className="p-0.5 text-slate-400 hover:text-brand-purple transition-colors cursor-pointer shrink-0"
-                          title="Copy Account Number"
-                        >
-                          {copiedType === 'number' ? (
-                            <Check className="w-3 h-3 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
+
+                        {/* Number Row */}
+                        <div className="flex items-center justify-between bg-white px-2 py-0.5 sm:py-1 rounded-lg border border-slate-100">
+                          <div className="min-w-0">
+                            <span className="text-[6.5px] text-slate-400 font-bold block uppercase leading-none mb-0.5">Account / Card info</span>
+                            <span className="text-[10px] font-mono font-bold text-slate-950 block select-all tracking-wide">{activeBank.accountNumber}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(activeBank.accountNumber, 'number')}
+                            className="p-1 text-slate-400 hover:text-brand-purple transition-colors cursor-pointer shrink-0"
+                            title="Copy Account Number"
+                          >
+                            {copiedType === 'number' ? (
+                              <Check className="w-3 h-3 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Built-in Scan Code */}
-                  <div className="flex justify-center">
-                    <DynamicQRCode value={activeBank.qrText} color={activeBank.qrColor} brandLabel={activeBank.logoText} />
+                    <div className="shrink-0 flex items-center justify-center">
+                      <DynamicQRCode value={activeBank.qrText} color={activeBank.qrColor} brandLabel={activeBank.logoText} />
+                    </div>
                   </div>
                 </div>
 

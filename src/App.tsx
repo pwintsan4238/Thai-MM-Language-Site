@@ -12,6 +12,8 @@ import AlphabetGuide from './components/AlphabetGuide';
 import { GrammarVocabDropdown } from './components/GrammarVocabDropdown';
 import { CheckoutGateway } from './components/CheckoutGateway';
 import { OrderDetailModal } from './components/OrderDetailModal';
+import { VOCAB_DATA, VocabCategory, VocabItem } from './data/vocab';
+import { VocabPage } from './components/VocabPage';
 import { 
   BookOpen, 
   Award, 
@@ -433,6 +435,36 @@ export default function App() {
   }, [adminSelectedCourseId, courses, courseIsNew]);
 
   const [adminSelectedLessonId, setAdminSelectedLessonId] = useState<number | null>(null);
+  const [adminSelectedVocabCategory, setAdminSelectedVocabCategory] = useState<string | null>(null);
+
+  const [vocabBookCategories, setVocabBookCategories] = useState<VocabCategory[]>(() => {
+    const saved = localStorage.getItem('thai_vocab_book_categories');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing saved vocab book categories:", e);
+      }
+    }
+    return VOCAB_DATA;
+  });
+
+  const handleSaveVocabBookCategories = (updatedCats: VocabCategory[]) => {
+    setVocabBookCategories(updatedCats);
+    localStorage.setItem('thai_vocab_book_categories', JSON.stringify(updatedCats));
+    window.dispatchEvent(new Event('thai_vocab_book_categories_updated'));
+  };
+  
+  // Dedicated vocab category item editing states
+  const [editingCatItemIndex, setEditingCatItemIndex] = useState<number | null>(null);
+  const [editingCatItemThai, setEditingCatItemThai] = useState<string>('');
+  const [editingCatItemPhonetic, setEditingCatItemPhonetic] = useState<string>('');
+  const [editingCatItemPhoneticMm, setEditingCatItemPhoneticMm] = useState<string>('');
+  const [editingCatItemEnglish, setEditingCatItemEnglish] = useState<string>('');
+  const [editingCatItemMyanmar, setEditingCatItemMyanmar] = useState<string>('');
+  const [editingCatItemIllustration, setEditingCatItemIllustration] = useState<string>('');
+  const [editingCatItemUrl, setEditingCatItemUrl] = useState<string>('');
+
   const [adminEditTab, setAdminEditTab] = useState<'metadata' | 'vocabulary' | 'dialogue' | 'grammar' | 'quiz'>('metadata');
   const [adminHubTab, setAdminHubTab] = useState<'orders' | 'accounts' | 'courses' | 'store' | 'orientation' | 'grammar' | 'brand'>('orders');
 
@@ -719,6 +751,9 @@ export default function App() {
   const [checkoutPhone, setCheckoutPhone] = useState<string>('');
   const [checkoutName, setCheckoutName] = useState<string>('');
   const [checkoutNetwork, setCheckoutNetwork] = useState<string>('KBZPay');
+
+  // Vocab book state
+  const [showVocabPage, setShowVocabPage] = useState<boolean>(false);
 
   // Interactive Course Store and Secure Payment Gateway Simulation states
   const [isCourseStoreExpanded, setIsCourseStoreExpanded] = useState<boolean>(false);
@@ -2386,6 +2421,7 @@ startxref
   };
 
   const handleTabClick = (tab: 'lessons' | 'notebook' | 'courses' | 'profile' | 'admin') => {
+    setShowVocabPage(false);
     if (tab === 'lessons') {
       if (dashboardTab === 'lessons' && activeLessonId !== null) {
         setActiveLessonId(null);
@@ -2428,6 +2464,34 @@ startxref
       (o.id === courseId || o.itemName.toLowerCase().includes(courseId.toLowerCase().replace('course-', '')))
     );
   };
+
+  const getSortedCourses = () => {
+    const hasPremiumUnlocked = courses.some(c => c.id !== 'course-basic' && isCourseUnlocked(c.id));
+    if (hasPremiumUnlocked) {
+      return [...courses].sort((a, b) => {
+        const aUnlocked = a.id !== 'course-basic' && isCourseUnlocked(a.id);
+        const bUnlocked = b.id !== 'course-basic' && isCourseUnlocked(b.id);
+        if (aUnlocked && !bUnlocked) return -1;
+        if (!aUnlocked && bUnlocked) return 1;
+        if (a.id === 'course-basic' && b.id !== 'course-basic') return 1;
+        if (a.id !== 'course-basic' && b.id === 'course-basic') return -1;
+        return 0;
+      });
+    } else {
+      return [...courses].sort((a, b) => {
+        if (a.id === 'course-basic' && b.id !== 'course-basic') return -1;
+        if (a.id !== 'course-basic' && b.id === 'course-basic') return 1;
+        return 0;
+      });
+    }
+  };
+
+  useEffect(() => {
+    const sorted = getSortedCourses();
+    if (sorted.length > 0) {
+      setSelectedCourseTab(sorted[0].id);
+    }
+  }, [currentUser, orders, courses]);
 
   const isStoreItemUnlocked = (itemId: string, itemPrice: number) => {
     if (itemPrice === 0) return true;
@@ -2541,7 +2605,7 @@ startxref
             {/* Middle: Integrated 4 Course Selection Tabs (Combined with Header Group) */}
             <div className="relative w-full lg:w-auto overflow-hidden shrink-0">
               <div className="flex items-center justify-start lg:justify-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-205 select-none overflow-x-auto scrollbar-none gap-2 w-full lg:w-auto max-w-full flex-nowrap shrink-0 pr-1.5">
-                {courses.map((course) => {
+                {getSortedCourses().map((course) => {
                   const isSelected = selectedCourseTab === course.id && dashboardTab === 'lessons';
                   let icon = "⭐️";
                   if (course.id === 'course-basic') icon = "⭐️";
@@ -2648,8 +2712,9 @@ startxref
       {/* Main Container Workspace */}
       <main className="flex-1 overflow-y-auto max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[88px] sm:pb-32">
         
-        {/* If no lesson is currently active: Display main student Dashboard */}
-        {!activeLessonId ? (
+        {showVocabPage ? (
+          <VocabPage onClose={() => setShowVocabPage(false)} />
+        ) : !activeLessonId ? (
           <div className="space-y-6 sm:space-y-8">
             {/* Courses Segmented Top Sub-Selector - Only visible under Courses Bottom Tab */}
             {['orientation', 'handbook', 'alphabet'].includes(dashboardTab) && (
@@ -2753,36 +2818,47 @@ startxref
                                 </p>
                               </div>
 
-                              {/* Compact Pagination Top Control */}
-                              {totalPages > 1 && (
-                                <div className="flex items-center gap-1.5 self-center sm:self-auto select-none border-none bg-transparent p-0">
-                                  <button
-                                    onClick={() => {
-                                      setCurrentPage((p) => Math.max(1, p - 1));
-                                    }}
-                                    disabled={currentPage === 1}
-                                    className="w-7 h-7 text-brand-purple hover:text-brand-dark disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
-                                    title="Previous page"
-                                  >
-                                    <ChevronLeft className="w-4 h-4" />
-                                  </button>
+                              <div className="flex flex-wrap items-center gap-3 self-center sm:self-auto justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowVocabPage(true)}
+                                  className="duo-btn duo-btn-purple text-xs font-black py-2.5 px-4 flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer animate-pulse"
+                                  title="Open Course Vocabulary Book"
+                                >
+                                  📙 Vocab Book • ဝေါဟာရ
+                                </button>
 
-                                  <div className="text-[11px] font-sans font-black tracking-wider text-brand-purple/90 uppercase whitespace-nowrap px-1">
-                                    {currentPage} / {totalPages}
+                                {/* Compact Pagination Top Control */}
+                                {totalPages > 1 && (
+                                  <div className="flex items-center gap-1.5 select-none border-none bg-transparent p-0">
+                                    <button
+                                      onClick={() => {
+                                        setCurrentPage((p) => Math.max(1, p - 1));
+                                      }}
+                                      disabled={currentPage === 1}
+                                      className="w-7 h-7 text-brand-purple hover:text-brand-dark disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+                                      title="Previous page"
+                                    >
+                                      <ChevronLeft className="w-4 h-4" />
+                                    </button>
+
+                                    <div className="text-[11px] font-sans font-black tracking-wider text-brand-purple/90 uppercase whitespace-nowrap px-1">
+                                      {currentPage} / {totalPages}
+                                    </div>
+
+                                    <button
+                                      onClick={() => {
+                                        setCurrentPage((p) => Math.min(totalPages, p + 1));
+                                      }}
+                                      disabled={currentPage === totalPages}
+                                      className="w-7 h-7 text-brand-purple hover:text-brand-dark disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+                                      title="Next page"
+                                    >
+                                      <ChevronRight className="w-4 h-4" />
+                                    </button>
                                   </div>
-
-                                  <button
-                                    onClick={() => {
-                                      setCurrentPage((p) => Math.min(totalPages, p + 1));
-                                    }}
-                                    disabled={currentPage === totalPages}
-                                    className="w-7 h-7 text-brand-purple hover:text-brand-dark disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
-                                    title="Next page"
-                                  >
-                                    <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="lessons-catalog">
@@ -7735,15 +7811,43 @@ startxref
 
                       <button
                         onClick={() => {
+                          const name = window.prompt("Enter new Vocabulary List/Category Name (e.g. 'Useful Phrases'):");
+                          if (!name || !name.trim()) return;
+                          const icon = window.prompt("Enter an Emoji Icon for this category (e.g. '💬'):") || '📙';
+                          
+                          const newCat: VocabCategory = {
+                            name: name.trim(),
+                            icon: icon.trim(),
+                            items: []
+                          };
+                          const updated = [...vocabBookCategories, newCat];
+                          handleSaveVocabBookCategories(updated);
+                          setAdminSelectedVocabCategory(newCat.name);
+                          setAdminSelectedLessonId(null);
+                          addSystemLog('admin', `Created new customized Vocabulary List: "${name}"`);
+                        }}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-sans font-black flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Create custom vocabulary book list category"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        CREATE VOCAB LIST
+                      </button>
+
+                      <button
+                        onClick={() => {
                           const ok = window.confirm("Are you absolutely sure you want to reset all curriculum contents back to factory defaults? Custom lessons and word edits will be permanently wiped.");
                           if (ok) {
                             localStorage.removeItem('thai_lessons_curriculum');
+                            localStorage.removeItem('thai_vocab_book_categories');
                             lessons.forEach(l => {
                               localStorage.removeItem(`thai_custom_vocab_${l.id}`);
                             });
                             setLessons(lessonsData);
+                            setVocabBookCategories(VOCAB_DATA);
                             setAdminSelectedLessonId(lessonsData[0]?.id || null);
+                            setAdminSelectedVocabCategory(null);
                             window.dispatchEvent(new Event('thai_vocab_updated'));
+                            window.dispatchEvent(new Event('thai_vocab_book_categories_updated'));
                             addSystemLog('admin', "Perform full factory reset of curriculum database");
                             alert("System curriculum reset to factory baseline!");
                           }
@@ -8012,6 +8116,7 @@ startxref
                         onChange={(e) => {
                           setAdminCurriculumCourseFilter(e.target.value);
                           setAdminSelectedLessonId(null);
+                          setAdminSelectedVocabCategory(null);
                         }}
                         className="bg-white border-2 border-brand-purple/20 px-3 py-1.5 rounded-lg text-xs font-black font-sans text-brand-purple focus:border-brand-purple focus:outline-none cursor-pointer"
                       >
@@ -8035,25 +8140,43 @@ startxref
                         SELECT LESSON TO EDIT:
                       </label>
                       <select
-                        value={adminSelectedLessonId || ""}
+                        value={adminSelectedVocabCategory ? `vocab-${adminSelectedVocabCategory}` : adminSelectedLessonId ? `lesson-${adminSelectedLessonId}` : ""}
                         onChange={(e) => {
-                          const id = Number(e.target.value);
-                          setAdminSelectedLessonId(id || null);
+                          const val = e.target.value;
+                          if (val.startsWith('vocab-')) {
+                            setAdminSelectedVocabCategory(val.substring(6));
+                            setAdminSelectedLessonId(null);
+                          } else if (val.startsWith('lesson-')) {
+                            setAdminSelectedLessonId(Number(val.substring(7)));
+                            setAdminSelectedVocabCategory(null);
+                          } else {
+                            setAdminSelectedLessonId(null);
+                            setAdminSelectedVocabCategory(null);
+                          }
                         }}
                         className="bg-white border-2 border-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold font-sans text-brand-dark focus:border-brand-purple focus:outline-none cursor-pointer"
                       >
                         <option value="">-- Choose a Lesson --</option>
-                        {lessons
-                          .filter(l => {
-                            if (adminCurriculumCourseFilter === 'all') return true;
-                            const lessonCourseId = l.courseId || 'course-basic';
-                            return lessonCourseId === adminCurriculumCourseFilter;
-                          })
-                          .map(l => (
-                            <option key={l.id} value={l.id}>
-                              Lesson {l.id}: {l.titleEnglish} ({l.titleThai})
+                        <optgroup label="📖 SYLLABUS LESSONS (သင်ခန်းစာများ)">
+                          {lessons
+                            .filter(l => {
+                              if (adminCurriculumCourseFilter === 'all') return true;
+                              const lessonCourseId = l.courseId || 'course-basic';
+                              return lessonCourseId === adminCurriculumCourseFilter;
+                            })
+                            .map(l => (
+                              <option key={l.id} value={`lesson-${l.id}`}>
+                                Lesson {l.id}: {l.titleEnglish} ({l.titleThai})
+                              </option>
+                            ))}
+                        </optgroup>
+                        <optgroup label="📙 VOCAB BOOK LISTS / CATEGORIES (ဝေါဟာရ အုပ်စုများ)">
+                          {vocabBookCategories.map(cat => (
+                            <option key={cat.name} value={`vocab-${cat.name}`}>
+                              📙 Vocab List: {cat.icon} {cat.name}
                             </option>
                           ))}
+                        </optgroup>
                       </select>
                     </div>
 
@@ -8074,7 +8197,479 @@ startxref
                         DELETE LESSON [{adminSelectedLessonId}]
                       </button>
                     )}
+
+                    {adminSelectedVocabCategory && (
+                      <button
+                        onClick={() => {
+                          const confirmed = window.confirm(`Are you absolutely sure you want to delete Vocabulary List "${adminSelectedVocabCategory}" and all its internal words?`);
+                          if (confirmed) {
+                            const updated = vocabBookCategories.filter(c => c.name !== adminSelectedVocabCategory);
+                            handleSaveVocabBookCategories(updated);
+                            addSystemLog('admin', `Permanently deleted Vocabulary List "${adminSelectedVocabCategory}" from database`);
+                            setAdminSelectedVocabCategory(updated[0]?.name || null);
+                          }
+                        }}
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[10px] font-sans font-black flex items-center gap-1 sm:ml-auto cursor-pointer border border-red-200"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        DELETE VOCAB LIST
+                      </button>
+                    )}
                   </div>
+
+                  {/* Selected vocab category edits section */}
+                  {adminSelectedVocabCategory && (() => {
+                    const selectedCategory = vocabBookCategories.find(c => c.name === adminSelectedVocabCategory);
+                    const idxInArray = vocabBookCategories.findIndex(c => c.name === adminSelectedVocabCategory);
+                    if (!selectedCategory) return <p className="text-xs text-brand-muted font-bold font-sans">Selected vocabulary list corrupt.</p>;
+
+                    const currentItems = selectedCategory.items || [];
+                    
+                    return (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-xs bg-white p-6 space-y-6 animate-fade-in text-left">
+                        {/* 1. Category metadata update form */}
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
+                          <h4 className="text-xs font-sans font-black text-brand-purple uppercase tracking-wider">
+                            📝 CATEGORY DETAILS • အုပ်စုအချက်အလက်
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-sans font-black text-brand-muted uppercase mb-1">List Name</label>
+                              <input
+                                type="text"
+                                value={selectedCategory.name}
+                                onChange={(e) => {
+                                  let newName = e.target.value;
+                                  if (!newName) return;
+                                  const updated = [...vocabBookCategories];
+                                  updated[idxInArray].name = newName;
+                                  handleSaveVocabBookCategories(updated);
+                                  setAdminSelectedVocabCategory(newName);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-brand-dark focus:border-brand-purple focus:outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-sans font-black text-brand-muted uppercase mb-1">Category Icon / Emoji</label>
+                              <input
+                                type="text"
+                                value={selectedCategory.icon}
+                                onChange={(e) => {
+                                  const updated = [...vocabBookCategories];
+                                  updated[idxInArray].icon = e.target.value || '📙';
+                                  handleSaveVocabBookCategories(updated);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-brand-dark focus:border-brand-purple focus:outline-none bg-white font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Add item form */}
+                        <div>
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const form = e.currentTarget;
+                              const th = (form.elements.namedItem('cat_th') as HTMLInputElement).value.trim();
+                              const ph = (form.elements.namedItem('cat_ph') as HTMLInputElement).value.trim();
+                              const phMm = (form.elements.namedItem('cat_phMm') as HTMLInputElement).value.trim();
+                              const en = (form.elements.namedItem('cat_en') as HTMLInputElement).value.trim();
+                              const mm = (form.elements.namedItem('cat_mm') as HTMLInputElement).value.trim();
+                              const ill = (form.elements.namedItem('cat_ill') as HTMLInputElement).value.trim();
+                              const url = (form.elements.namedItem('cat_url') as HTMLInputElement).value.trim();
+
+                              if (!th || !mm) {
+                                alert("Please specify at least Thai Characters and Myanmar translation!");
+                                return;
+                              }
+
+                              const newItem: VocabItem = {
+                                thai: th,
+                                phonetic: ph,
+                                phoneticMm: phMm,
+                                english: en,
+                                myanmar: mm,
+                                illustration: ill || '📙',
+                                ...((url) ? { url } : {})
+                              } as any;
+
+                              const updatedCats = [...vocabBookCategories];
+                              updatedCats[idxInArray].items = [...currentItems, newItem];
+                              handleSaveVocabBookCategories(updatedCats);
+                              form.reset();
+                              addSystemLog('admin', `Added word "${th}" to custom Vocabulary List "${selectedCategory.name}"`);
+                            }}
+                            className="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-6 gap-3"
+                          >
+                            <div className="sm:col-span-6 border-b border-gray-200 pb-1.5 flex items-center justify-between">
+                              <span className="text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider">
+                                ➕ Add Word to Vocab List: {selectedCategory.name}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Thai Character *</label>
+                              <input
+                                name="cat_th"
+                                type="text"
+                                placeholder="สวัสดี"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none bg-white text-black"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Phonetic [ENG]</label>
+                              <input
+                                name="cat_ph"
+                                type="text"
+                                placeholder="sawaatdee"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none bg-white text-black"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Phonetic [MM] / အသံထွက်</label>
+                              <input
+                                name="cat_phMm"
+                                type="text"
+                                placeholder="ဆဝပ်ဒီ"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none bg-white text-black"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">ENG English Translation</label>
+                              <input
+                                name="cat_en"
+                                type="text"
+                                placeholder="Hello"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none bg-white text-black"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">MM Myanmar Translation *</label>
+                              <input
+                                name="cat_mm"
+                                type="text"
+                                placeholder="မင်္ဂလာပါ"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none bg-white text-black"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Audio / Sound URL</label>
+                              <input
+                                name="cat_url"
+                                type="text"
+                                placeholder="https://example.com/audio.mp3"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none bg-white text-black"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-4 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Illustration (Emoji or Image URL / base64)</label>
+                              <input
+                                id="new_cat_ill_value"
+                                name="cat_ill"
+                                type="text"
+                                placeholder="🍎 or https://example.com/apple.png"
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold focus:border-brand-purple focus:outline-none bg-white text-black mb-1"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2 text-left">
+                              <label className="block text-[9px] font-sans font-black text-brand-muted uppercase">Illustration Upload</label>
+                              <div className="relative border border-dashed border-gray-300 hover:border-brand-purple rounded p-1 text-center cursor-pointer bg-white transition-all h-8 flex items-center justify-center">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (file.size > 2 * 1024 * 1024) {
+                                        alert("Image file must be less than 2MB for high-performance LocalStorage storage.");
+                                        return;
+                                      }
+                                      const reader = new FileReader();
+                                      reader.onload = (event) => {
+                                        if (event.target?.result && typeof event.target.result === 'string') {
+                                          const inputElem = document.getElementById('new_cat_ill_value') as HTMLInputElement;
+                                          if (inputElem) {
+                                            inputElem.value = event.target.result;
+                                          }
+                                        }
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                                <span className="text-[9px] font-sans font-bold text-gray-500 uppercase">📁 Choose File</span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="submit"
+                              className="sm:col-span-6 w-full bg-brand-purple text-white text-[11px] font-sans font-black py-2 rounded-lg mt-2 cursor-pointer hover:bg-brand-purple/90 transition-colors uppercase tracking-wider"
+                            >
+                              ➕ ADD WORD TO VOCAB LIST "{selectedCategory.name}"
+                            </button>
+                          </form>
+                        </div>
+
+                        {/* 3. Items list with inline editor */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between border-b pb-1.5">
+                            <span className="text-xs font-sans font-black text-brand-dark uppercase tracking-wide">
+                              ⭐ List words in "{selectedCategory.name}" ({currentItems.length} words)
+                            </span>
+                            <span className="text-[9.5px] text-brand-muted font-sans font-bold">In-line Editing supported below</span>
+                          </div>
+
+                          <div className="space-y-2.5 max-h-[500px] overflow-y-auto border border-gray-150 rounded-xl p-3 bg-gray-50/30">
+                            {currentItems.length === 0 ? (
+                              <p className="text-center py-8 text-xs text-brand-muted font-bold font-sans">No vocabulary rows registered. Add some above!</p>
+                            ) : (
+                              currentItems.map((item, index) => {
+                                const isEditing = editingCatItemIndex === index;
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`p-3 rounded-xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs font-sans transition-all ${
+                                      isEditing
+                                        ? 'bg-amber-50/40 border-amber-200 shadow-md'
+                                        : 'bg-white border-gray-200 hover:border-gray-250 hover:shadow-xs'
+                                    }`}
+                                  >
+                                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 flex-1">
+                                      {isEditing ? (
+                                        <>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">Thai Chars *</span>
+                                            <input
+                                              type="text"
+                                              value={editingCatItemThai}
+                                              onChange={(e) => setEditingCatItemThai(e.target.value)}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-bold text-black focus:border-brand-purple focus:outline-none bg-white"
+                                            />
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">Phonetic [ENG]</span>
+                                            <input
+                                              type="text"
+                                              value={editingCatItemPhonetic}
+                                              onChange={(e) => setEditingCatItemPhonetic(e.target.value)}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-black focus:border-brand-purple focus:outline-none bg-white font-semibold"
+                                            />
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">Phonetic [MM]</span>
+                                            <input
+                                              type="text"
+                                              value={editingCatItemPhoneticMm}
+                                              onChange={(e) => setEditingCatItemPhoneticMm(e.target.value)}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-black focus:border-brand-purple focus:outline-none bg-white font-semibold"
+                                            />
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">English Meaning</span>
+                                            <input
+                                              type="text"
+                                              value={editingCatItemEnglish}
+                                              onChange={(e) => setEditingCatItemEnglish(e.target.value)}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-black focus:border-brand-purple focus:outline-none bg-white"
+                                            />
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">Myanmar Meaning *</span>
+                                            <input
+                                              type="text"
+                                              value={editingCatItemMyanmar}
+                                              onChange={(e) => setEditingCatItemMyanmar(e.target.value)}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-bold text-black focus:border-brand-purple focus:outline-none bg-white"
+                                            />
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">Sound / Audio URL</span>
+                                            <input
+                                              type="text"
+                                              value={editingCatItemUrl}
+                                              onChange={(e) => setEditingCatItemUrl(e.target.value)}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-black focus:border-brand-purple focus:outline-none bg-white font-semibold"
+                                            />
+                                          </div>
+                                          <div className="sm:col-span-4 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">Illustration (emoji / image URL / base64)</span>
+                                            <input
+                                              id={`editing-cat-ill-${index}`}
+                                              type="text"
+                                              value={editingCatItemIllustration}
+                                              onChange={(e) => setEditingCatItemIllustration(e.target.value)}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-black focus:border-brand-purple focus:outline-none bg-white"
+                                            />
+                                          </div>
+                                          <div className="sm:col-span-2 text-left">
+                                            <span className="text-[8px] font-black text-amber-600 block mb-0.5 uppercase">Replace Illus File</span>
+                                            <div className="relative border border-dashed border-amber-300 hover:border-brand-purple rounded text-center cursor-pointer bg-white transition-all h-7 flex items-center justify-center">
+                                              <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                onChange={(e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (file) {
+                                                    if (file.size > 2 * 1024 * 1024) {
+                                                      alert("Image file must be less than 2MB for high-performance LocalStorage storage.");
+                                                      return;
+                                                    }
+                                                    const reader = new FileReader();
+                                                    reader.onload = (event) => {
+                                                      if (event.target?.result && typeof event.target.result === 'string') {
+                                                        setEditingCatItemIllustration(event.target.result);
+                                                      }
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                  }
+                                                }}
+                                              />
+                                              <span className="text-[9px] font-sans font-bold text-amber-600 uppercase">📁 Choose File</span>
+                                            </div>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-brand-muted uppercase block">Thai Chars</span>
+                                            <strong className="text-black text-sm">{item.thai}</strong>
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-brand-muted uppercase block">Phonetic [ENG]</span>
+                                            <span className="text-black italic">{item.phonetic || "-"}</span>
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-brand-muted uppercase block">Phonetic [MM]</span>
+                                            <span className="text-rose-600 font-bold">{item.phoneticMm || "-"}</span>
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-brand-muted uppercase block">ENG English</span>
+                                            <span className="text-black">{item.english || "-"}</span>
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-brand-muted uppercase block">MM Myanmar</span>
+                                            <span className="text-black font-semibold">{item.myanmar || "-"}</span>
+                                          </div>
+                                          <div className="sm:col-span-1 text-left">
+                                            <span className="text-[8px] font-black text-brand-muted uppercase block">Illustration</span>
+                                            {item.illustration && item.illustration.startsWith('data:') ? (
+                                              <img src={item.illustration} referrerPolicy="no-referrer" alt={item.thai} className="w-8 h-8 rounded border object-contain bg-slate-50" />
+                                            ) : item.illustration && item.illustration.startsWith('http') ? (
+                                              <img src={item.illustration} referrerPolicy="no-referrer" alt={item.thai} className="w-8 h-8 rounded border object-contain bg-slate-50" />
+                                            ) : (
+                                              <span className="text-lg">{item.illustration || "📙"}</span>
+                                            )}
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {/* Action buttons inside list entries */}
+                                    <div className="flex md:flex-col lg:flex-row items-center gap-1.5 shrink-0 self-start md:self-center">
+                                      {isEditing ? (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              if (!editingCatItemThai.trim() || !editingCatItemMyanmar.trim()) {
+                                                alert("Please specify at least Thai characters and Myanmar translation!");
+                                                return;
+                                              }
+                                              const updatedItems = [...currentItems];
+                                              const updatedVoiceUrl = editingCatItemUrl.trim();
+                                              updatedItems[index] = {
+                                                thai: editingCatItemThai.trim(),
+                                                phonetic: editingCatItemPhonetic.trim(),
+                                                phoneticMm: editingCatItemPhoneticMm.trim(),
+                                                english: editingCatItemEnglish.trim(),
+                                                myanmar: editingCatItemMyanmar.trim(),
+                                                illustration: editingCatItemIllustration.trim() || '📙',
+                                                ...((updatedVoiceUrl) ? { url: updatedVoiceUrl } : {})
+                                              } as any;
+
+                                              const updatedCategories = [...vocabBookCategories];
+                                              updatedCategories[idxInArray].items = updatedItems;
+                                              handleSaveVocabBookCategories(updatedCategories);
+                                              setEditingCatItemIndex(null);
+                                              addSystemLog('admin', `Updated details for word "${editingCatItemThai}" in vocabulary list`);
+                                            }}
+                                            className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-sans font-black text-[10px] rounded uppercase cursor-pointer transition-colors"
+                                          >
+                                            💾 Save
+                                          </button>
+                                          <button
+                                            onClick={() => setEditingCatItemIndex(null)}
+                                            className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-sans font-black text-[10px] rounded uppercase cursor-pointer transition-colors"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          {item.url && (
+                                            <button
+                                              onClick={() => {
+                                                const audio = new Audio(item.url);
+                                                audio.play().catch(e => console.error("Audio playback failure:", e));
+                                              }}
+                                              className="p-1 px-2 border border-slate-200 hover:bg-slate-50 text-brand-purple rounded text-[10px] uppercase font-bold cursor-pointer"
+                                              title="Test Pronunciation Voice Audio"
+                                            >
+                                              🔊 Play
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() => {
+                                              setEditingCatItemIndex(index);
+                                              setEditingCatItemThai(item.thai);
+                                              setEditingCatItemPhonetic(item.phonetic || '');
+                                              setEditingCatItemPhoneticMm(item.phoneticMm || '');
+                                              setEditingCatItemEnglish(item.english || '');
+                                              setEditingCatItemMyanmar(item.myanmar || '');
+                                              setEditingCatItemIllustration(item.illustration || '📙');
+                                              setEditingCatItemUrl((item as any).url || '');
+                                            }}
+                                            className="p-1 px-2 border border-gray-200 hover:bg-slate-50 text-blue-600 rounded text-[10px] uppercase font-bold cursor-pointer"
+                                          >
+                                            ✏️ Edit
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              if (window.confirm(`Are you sure you want to remove word "${item.thai}" from this Vocabulary List?`)) {
+                                                const updatedItems = currentItems.filter((_, i) => i !== index);
+                                                const updatedCategories = [...vocabBookCategories];
+                                                updatedCategories[idxInArray].items = updatedItems;
+                                                handleSaveVocabBookCategories(updatedCategories);
+                                                addSystemLog('admin', `Removed word "${item.thai}" from custom Vocabulary List "${selectedCategory.name}"`);
+                                              }
+                                            }}
+                                            className="p-1 px-2 border border-red-200 hover:bg-red-50 text-red-600 rounded text-[10px] uppercase font-bold cursor-pointer"
+                                          >
+                                            🗑️ Del
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Selected lesson edits section */}
                   {adminSelectedLessonId && (() => {
@@ -9864,306 +10459,541 @@ startxref
         )}
 
 
+
+
         {showAuthModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[9999] overflow-hidden">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white border-2 border-gray-100 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative"
+              className={`bg-white border-2 border-gray-100 rounded-3xl p-4 sm:p-6 md:p-8 w-full max-h-[calc(100vh-2rem)] md:max-h-[88vh] flex flex-col overflow-hidden shadow-2xl relative transition-all duration-300 ${
+                isAuthModalCoursePurchaseExpanded ? 'max-w-3xl' : 'max-w-sm'
+              }`}
             >
               <button 
                 onClick={handleDismissPromo}
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors cursor-pointer z-10"
                 title="Dismiss"
               >
                 <X className="w-5 h-5 text-brand-dark" />
               </button>
 
-              <div className="text-center mb-6">
-                <div className="w-14 h-14 bg-brand-purple/10 text-brand-purple rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <User className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-sans font-black text-brand-dark uppercase tracking-tight">
-                  Join Language Course!
-                </h3>
-                <p className="text-[11px] text-brand-muted font-sans font-semibold mt-1 leading-normal">
-                  အကောင့်ဝင်ပြီး သင်ခန်းစာများ လေ့လာပါ။
-                </p>
-              </div>
-
-              {/* Modal Tabs inside Auth Form */}
-              <div className="flex gap-1 p-1 bg-gray-50 rounded-xl border border-gray-100/80 mb-5 font-sans text-[10px] sm:text-xs font-black">
-                <button 
-                  onClick={() => {
-                    setAuthTab('student-signup');
-                    setAuthError('');
-                  }}
-                  className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-signup' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
-                >
-                  Sign Up
-                </button>
-                <button 
-                  onClick={() => {
-                    setAuthTab('student-login');
-                    setAuthError('');
-                  }}
-                  className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-login' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
-                >
-                  Log In
-                </button>
-                <button 
-                  onClick={() => {
-                    setAuthTab('admin');
-                    setAuthError('');
-                  }}
-                  className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'admin' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
-                >
-                  Admin Box
-                </button>
-              </div>
-
-              {authTab === 'student-signup' && (
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  if (authUsername.trim()) {
-                    const success = handleStandardSignUp(authUsername, authPassword);
-                    if (success) {
-                      setAuthUsername('');
-                      setAuthPassword('');
-                      setAuthError('');
-                    }
-                  }
-                }} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
-                      Choose Username • အမည်အသစ်ပေးပါ
-                    </label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. ko_nay_min"
-                      value={authUsername}
-                      onChange={(e) => setAuthUsername(e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
-                      Choose Password • စကားဝှက်အသစ်
-                    </label>
-                    <input 
-                      type="password" 
-                      placeholder="e.g. secret123"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2"
-                  >
-                    <CheckSquare className="w-4 h-4" />
-                    CREATE STUDENT USER • အကောင့်သစ်ဖွင့်မည်
-                  </button>
-                </form>
-              )}
-
-              {authTab === 'student-login' && (
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  if (authUsername.trim() && authPassword) {
-                    const success = handleAdminLogin(authUsername, authPassword);
-                    if (success) {
-                      setAuthUsername('');
-                      setAuthPassword('');
-                      setAuthError('');
-                    } else {
-                      setAuthError('Error: Incorrect credentials or not found. (Note: standard demo password is password123)');
-                    }
-                  }
-                }} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
-                      Student Username • အသုံးပြုသူအမည်
-                    </label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. ko_nay_min"
-                      value={authUsername}
-                      onChange={(e) => setAuthUsername(e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
-                      Password • စကားဝှက်
-                    </label>
-                    <input 
-                      type="password" 
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
-                    />
-                  </div>
-
-                  {authError && (
-                    <p className="text-red-500 text-[10px] font-semibold leading-tight">{authError}</p>
-                  )}
-
-                  <button 
-                    type="submit"
-                    className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2"
-                  >
-                    <Lock className="w-4 h-4" />
-                    LOG IN STUDENT • အကောင့်ဝင်မည်
-                  </button>
-                </form>
-              )}
-
-              {authTab === 'admin' && (
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  if (authUsername.trim() && authPassword) {
-                    const success = handleAdminLogin(authUsername, authPassword);
-                    if (success) {
-                      setAuthUsername('');
-                      setAuthPassword('');
-                      setAuthError('');
-                    } else {
-                      setAuthError('Invalid admin credentials! (Master admin: use admin & admin@4238)');
-                    }
-                  }
-                }} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
-                      Admin Username • စီမံသူအမည်
-                    </label>
-                    <input 
-                      type="text" 
-                      placeholder="Username (admin)"
-                      value={authUsername}
-                      onChange={(e) => setAuthUsername(e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
-                      Password • စကားဝှက်
-                    </label>
-                    <input 
-                      type="password" 
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
-                    />
-                  </div>
-
-                  {authError && (
-                    <p className="text-red-500 text-[10px] font-semibold leading-tight">{authError}</p>
-                  )}
-
-                  <button 
-                    type="submit"
-                    className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2 mb-2"
-                  >
-                    <Shield className="w-4 h-4" />
-                    ADMIN LOG IN • စီမံသူဖြင့် ဝင်မည်
-                  </button>
-                </form>
-              )}
-
-              {/* DIRECT COURSE PURCHASE EXPANSION ZONE */}
-              <div className="mt-4 pt-4 border-t border-gray-100/80">
-                {!isAuthModalCoursePurchaseExpanded ? (
-                  <button
-                    onClick={() => setIsAuthModalCoursePurchaseExpanded(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-tr from-orange-500 via-amber-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 font-sans font-black text-xs text-white uppercase tracking-wider rounded-2xl shadow-sm transition-all transform active:translate-y-0.5 cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4 animate-pulse shrink-0 text-white" />
-                    ⚡ Direct Enrollment / Buy Course
-                  </button>
-                ) : (
-                  <div className="space-y-3 animate-fade-in text-left">
-                    <div className="flex justify-between items-start bg-amber-50 border border-amber-200 p-2.5 rounded-xl gap-2">
-                      <div>
-                        <span className="text-[10px] text-amber-800 font-sans font-black uppercase tracking-tight block">⚡ Premium Course Enrollment</span>
-                        <p className="text-[9.5px] text-amber-700 font-sans font-semibold leading-tight mt-0.5">
-                          Purchase any premium course & get an auto-provisioned student account instantly!
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setIsAuthModalCoursePurchaseExpanded(false)}
-                        className="text-[9.5px] font-sans font-black text-slate-500 hover:text-slate-800 underline uppercase shrink-0"
-                      >
-                        Hide
-                      </button>
-                    </div>
-
-                    <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1">
-                      {courses.filter(c => c.id !== 'course-basic').map((course) => (
-                        <div
-                          key={course.id}
-                          className="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 hover:border-brand-purple/25 transition-all text-left flex flex-col justify-between gap-2"
+              {isAuthModalCoursePurchaseExpanded ? (
+                /* SIDE BY SIDE PANEL Layout when unfolded */
+                <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-stretch flex-1 overflow-y-auto pr-1 scrollbar-thin">
+                  {/* Left Column: Purchase List / Active Packages */}
+                  <div className="flex-1 flex flex-col justify-between pr-0 md:pr-6 md:border-r md:border-gray-100 order-2 md:order-1">
+                    <div>
+                      <div className="flex justify-between items-center bg-amber-50 border border-amber-200 p-2.5 rounded-xl mb-4">
+                        <span className="text-[10.5px] text-amber-800 font-sans font-black uppercase tracking-tight block">
+                          🎁 Packages & Courses • ဝယ်ယူရန်
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsAuthModalCoursePurchaseExpanded(false)}
+                          className="text-[9.5px] font-sans font-black text-amber-700 hover:text-amber-800 underline uppercase shrink-0"
                         >
-                          <div>
-                            <h4 className="text-[10px] sm:text-[11px] font-sans font-black text-brand-dark leading-snug">{course.name}</h4>
-                            <p className="text-[9px] sm:text-[9.5px] italic text-[#583092] mt-0.5 font-bold leading-normal">{course.nameMm}</p>
-                            <div className="flex items-center gap-1.5 mt-1 text-[8.5px] text-brand-muted font-bold">
-                              <span>⏱️ {course.duration}</span>
+                          HIDE • ပြန်ပိတ်ရန်
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-[160px] md:max-h-[300px] overflow-y-auto pr-1">
+                        {courses.filter(c => c.id !== 'course-basic').map((course) => (
+                          <div
+                            key={course.id}
+                            className="p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-brand-purple/25 transition-all text-left flex flex-col justify-between gap-2"
+                          >
+                            <div>
+                              <h4 className="text-[10.5px] font-sans font-black text-brand-dark leading-snug">{course.name}</h4>
+                              <p className="text-[9px] italic text-[#583092] mt-0.5 font-bold leading-normal">{course.nameMm}</p>
+                              <div className="flex items-center gap-1.5 mt-1 text-[8.5px] text-brand-muted font-bold">
+                                <span>⏱️ {course.duration}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between gap-2 mt-1 border-t border-gray-100 pt-1.5">
+                              <span className="text-[10.5px] font-mono font-black text-brand-purple">
+                                {course.priceAmount.toLocaleString()} MMK
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setShowAuthModal(false);
+                                  setCheckoutName('');
+                                  setGatewayCourse(course);
+                                  setGatewayPhone("09-");
+                                  setGatewayEmail("student@classroom.edu");
+                                  setGatewayStep(1);
+                                  setGatewayPaymentMethod('kbzpay');
+                                  setGatewayOtp('');
+                                  setGatewayTimer(180);
+                                  setIsGatewayOpen(true);
+                                }}
+                                className="px-2.5 py-1.5 bg-brand-purple text-white text-[9.5px] font-sans font-black uppercase tracking-wider rounded-lg border-b-2 border-brand-purple-shadow hover:bg-brand-purple/90 transition-all cursor-pointer flex items-center gap-0.5"
+                              >
+                                ⚡ BUY • ဝယ်မည်
+                              </button>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center justify-between gap-2 mt-1 border-t border-gray-100 pt-2">
-                            <span className="text-[11px] font-mono font-black text-brand-purple">
-                              {course.priceAmount.toLocaleString()} MMK
-                            </span>
-                            <button
-                              onClick={() => {
-                                // Close auth modal and open secure checkout modal
-                                setShowAuthModal(false);
-                                setCheckoutName('');
-                                setGatewayCourse(course);
-                                setGatewayPhone("09-");
-                                setGatewayEmail("student@classroom.edu");
-                                setGatewayStep(1);
-                                setGatewayPaymentMethod('kbzpay');
-                                setGatewayOtp('');
-                                setGatewayTimer(180);
-                                setIsGatewayOpen(true);
-                              }}
-                              className="px-3 py-1.5 bg-brand-purple text-white text-[9.5px] font-sans font-black uppercase tracking-wider rounded-lg border-b-2 border-brand-purple-shadow hover:bg-brand-purple/90 transition-all cursor-pointer flex items-center gap-0.5"
-                            >
-                              ⚡ BUY • ဝယ်မည်
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-gray-150 flex items-center gap-1.5 text-[9px] text-brand-muted font-sans font-bold">
+                      <Lock className="w-3.5 h-3.5 text-brand-muted" />
+                      Secure Enrollment Gateway
                     </div>
                   </div>
-                )}
-              </div>
 
-              <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
-                <button 
-                  onClick={handleDismissPromo}
-                  className="text-[10px] text-brand-muted hover:text-brand-dark font-sans font-black underline cursor-pointer"
-                >
-                  Skip for Now • ကျော်မည်
-                </button>
-                <div className="flex items-center gap-1 text-[9px] text-brand-muted font-sans font-bold">
-                  <Lock className="w-3.5 h-3.5" />
-                  Secure Student Session
+                  {/* Right Column: Auth Panel */}
+                  <div className="w-full md:w-[300px] flex flex-col justify-between order-1 md:order-2">
+                    <div>
+                      <div className="text-center mb-4">
+                        <div className="w-10 h-10 bg-brand-purple/10 text-brand-purple rounded-xl flex items-center justify-center mx-auto mb-2">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-xs font-sans font-black text-brand-dark uppercase tracking-tight">
+                          Join Course Hub
+                        </h3>
+                        <p className="text-[9.5px] text-brand-muted font-sans font-semibold mt-0.5 leading-normal">
+                          အကောင့်ဝင်ပါ သို့မဟုတ် ဖွင့်ပါ။
+                        </p>
+                      </div>
+
+                      {/* Modal Tabs inside Auth Form */}
+                      <div className="flex gap-1 p-0.5 bg-gray-50 rounded-lg border border-gray-100/80 mb-4 font-sans text-[9px] font-black">
+                        <button 
+                          onClick={() => {
+                            setAuthTab('student-signup');
+                            setAuthError('');
+                          }}
+                          className={`flex-1 py-1 text-center rounded-md transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-signup' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                        >
+                          Sign Up
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setAuthTab('student-login');
+                            setAuthError('');
+                          }}
+                          className={`flex-1 py-1 text-center rounded-md transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-login' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                        >
+                          Log In
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setAuthTab('admin');
+                            setAuthError('');
+                          }}
+                          className={`flex-1 py-1 text-center rounded-md transition-all uppercase tracking-tight cursor-pointer ${authTab === 'admin' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                        >
+                          Admin
+                        </button>
+                      </div>
+
+                      {authTab === 'student-signup' && (
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          if (authUsername.trim()) {
+                            const success = handleStandardSignUp(authUsername, authPassword);
+                            if (success) {
+                              setAuthUsername('');
+                              setAuthPassword('');
+                              setAuthError('');
+                            }
+                          }
+                        }} className="space-y-3">
+                          <div>
+                            <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                              Username • အမည်အသစ်
+                            </label>
+                            <input 
+                              type="text" 
+                              placeholder="e.g. ko_nay_min"
+                              value={authUsername}
+                              onChange={(e) => setAuthUsername(e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                              Password • စကားဝှက်အသစ်
+                            </label>
+                            <input 
+                              type="password" 
+                              placeholder="e.g. secret123"
+                              value={authPassword}
+                              onChange={(e) => setAuthPassword(e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                            />
+                          </div>
+                          <button 
+                            type="submit"
+                            className="w-full duo-btn duo-btn-purple text-[10.5px] font-black py-2.5 flex items-center justify-center gap-1.5"
+                          >
+                            <CheckSquare className="w-3.5 h-3.5" />
+                            SIGN UP • အကောင့်ဖွင့်မည်
+                          </button>
+                        </form>
+                      )}
+
+                      {authTab === 'student-login' && (
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          if (authUsername.trim() && authPassword) {
+                            const success = handleAdminLogin(authUsername, authPassword);
+                            if (success) {
+                              setAuthUsername('');
+                              setAuthPassword('');
+                              setAuthError('');
+                            } else {
+                              setAuthError('Error: Incorrect credentials.');
+                            }
+                          }
+                        }} className="space-y-3">
+                          <div>
+                            <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                              Username • အသုံးပြုသူအမည်
+                            </label>
+                            <input 
+                              type="text" 
+                              placeholder="e.g. ko_nay_min"
+                              value={authUsername}
+                              onChange={(e) => setAuthUsername(e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                              Password • စကားဝှက်
+                            </label>
+                            <input 
+                              type="password" 
+                              placeholder="••••••••"
+                              value={authPassword}
+                              onChange={(e) => setAuthPassword(e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                            />
+                          </div>
+
+                          {authError && (
+                            <p className="text-red-500 text-[9px] font-semibold leading-tight">{authError}</p>
+                          )}
+
+                          <button 
+                            type="submit"
+                            className="w-full duo-btn duo-btn-purple text-[10.5px] font-black py-2.5 flex items-center justify-center gap-1.5"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            LOG IN • အကောင့်ဝင်မည်
+                          </button>
+                        </form>
+                      )}
+
+                      {authTab === 'admin' && (
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          if (authUsername.trim() && authPassword) {
+                            const success = handleAdminLogin(authUsername, authPassword);
+                            if (success) {
+                              setAuthUsername('');
+                              setAuthPassword('');
+                              setAuthError('');
+                            } else {
+                              setAuthError('Invalid admin credentials.');
+                            }
+                          }
+                        }} className="space-y-3">
+                          <div>
+                            <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                              Admin Username • စီမံသူအမည်
+                            </label>
+                            <input 
+                              type="text" 
+                              placeholder="Username (admin)"
+                              value={authUsername}
+                              onChange={(e) => setAuthUsername(e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1">
+                              Password • စကားဝှက်
+                            </label>
+                            <input 
+                              type="password" 
+                              placeholder="••••••••"
+                              value={authPassword}
+                              onChange={(e) => setAuthPassword(e.target.value)}
+                              required
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                            />
+                          </div>
+
+                          {authError && (
+                            <p className="text-red-500 text-[9px] font-semibold leading-tight">{authError}</p>
+                          )}
+
+                          <button 
+                            type="submit"
+                            className="w-full duo-btn duo-btn-purple text-[10.5px] font-black py-2.5 flex items-center justify-center gap-1.5"
+                          >
+                            <Shield className="w-3.5 h-3.5" />
+                            ADMIN LOG IN • ဝင်မည်
+                          </button>
+                        </form>
+                      )}
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                      <button 
+                        onClick={handleDismissPromo}
+                        className="text-[9.5px] text-brand-muted hover:text-brand-dark font-sans font-black underline cursor-pointer"
+                      >
+                        Skip • ကျော်မည်
+                      </button>
+                      <div className="flex items-center gap-1 text-[9px] text-brand-muted font-sans font-bold">
+                        <Lock className="w-3.5 h-3.5" />
+                        Secure Student Session
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* COMPACT Layout when folded */
+                <div className="space-y-4 flex-1 overflow-y-auto pr-1 scrollbar-thin">
+                  <div className="text-center mb-5">
+                    <div className="w-14 h-14 bg-brand-purple/10 text-brand-purple rounded-2xl flex items-center justify-center mx-auto mb-3">
+                      <User className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-lg font-sans font-black text-brand-dark uppercase tracking-tight">
+                      Join Language Course!
+                    </h3>
+                    <p className="text-[11px] text-brand-muted font-sans font-semibold mt-1 leading-normal">
+                      အကောင့်ဝင်ပြီး သင်ခန်းစာများ လေ့လာပါ။
+                    </p>
+                  </div>
+
+                  {/* Modal Tabs inside Auth Form */}
+                  <div className="flex gap-1 p-1 bg-gray-50 rounded-xl border border-gray-100/80 mb-5 font-sans text-[10px] sm:text-xs font-black">
+                    <button 
+                      onClick={() => {
+                        setAuthTab('student-signup');
+                        setAuthError('');
+                      }}
+                      className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-signup' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                    >
+                      Sign Up
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setAuthTab('student-login');
+                        setAuthError('');
+                      }}
+                      className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'student-login' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                    >
+                      Log In
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setAuthTab('admin');
+                        setAuthError('');
+                      }}
+                      className={`flex-1 py-1 text-center rounded-lg transition-all uppercase tracking-tight cursor-pointer ${authTab === 'admin' ? 'bg-brand-purple text-white shadow-xs' : 'text-brand-muted hover:text-brand-dark'}`}
+                    >
+                      Admin Box
+                    </button>
+                  </div>
+
+                  {authTab === 'student-signup' && (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (authUsername.trim()) {
+                        const success = handleStandardSignUp(authUsername, authPassword);
+                        if (success) {
+                          setAuthUsername('');
+                          setAuthPassword('');
+                          setAuthError('');
+                        }
+                      }
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                          Choose Username • အမည်အသစ်ပေးပါ
+                        </label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. ko_nay_min"
+                          value={authUsername}
+                          onChange={(e) => setAuthUsername(e.target.value)}
+                          required
+                          className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                          Choose Password • စကားဝှက်အသစ်
+                        </label>
+                        <input 
+                          type="password" 
+                          placeholder="e.g. secret123"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          required
+                          className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                        />
+                      </div>
+                      <button 
+                        type="submit"
+                        className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2"
+                      >
+                        <CheckSquare className="w-4 h-4" />
+                        CREATE STUDENT USER • အကောင့်သစ်ဖွင့်မည်
+                      </button>
+                    </form>
+                  )}
+
+                  {authTab === 'student-login' && (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (authUsername.trim() && authPassword) {
+                        const success = handleAdminLogin(authUsername, authPassword);
+                        if (success) {
+                          setAuthUsername('');
+                          setAuthPassword('');
+                          setAuthError('');
+                        } else {
+                          setAuthError('Error: Incorrect credentials or not found. (Note: standard demo password is password123)');
+                        }
+                      }
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                          Student Username • အသုံးပြုသူအမည်
+                        </label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. ko_nay_min"
+                          value={authUsername}
+                          onChange={(e) => setAuthUsername(e.target.value)}
+                          required
+                          className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                          Password • စကားဝှက်
+                        </label>
+                        <input 
+                          type="password" 
+                          placeholder="••••••••"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          required
+                          className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                        />
+                      </div>
+
+                      {authError && (
+                        <p className="text-red-500 text-[10px] font-semibold leading-tight">{authError}</p>
+                      )}
+
+                      <button 
+                        type="submit"
+                        className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2"
+                      >
+                        <Lock className="w-4 h-4" />
+                        LOG IN STUDENT • အကောင့်ဝင်မည်
+                      </button>
+                    </form>
+                  )}
+
+                  {authTab === 'admin' && (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (authUsername.trim() && authPassword) {
+                        const success = handleAdminLogin(authUsername, authPassword);
+                        if (success) {
+                          setAuthUsername('');
+                          setAuthPassword('');
+                          setAuthError('');
+                        } else {
+                          setAuthError('Invalid admin credentials! (Master admin: use admin & admin@4238)');
+                        }
+                      }
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                          Admin Username • စီမံသူအမည်
+                        </label>
+                        <input 
+                          type="text" 
+                          placeholder="Username (admin)"
+                          value={authUsername}
+                          onChange={(e) => setAuthUsername(e.target.value)}
+                          required
+                          className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-sans font-black text-brand-dark uppercase tracking-wider mb-1.5">
+                          Password • စကားဝှက်
+                        </label>
+                        <input 
+                          type="password" 
+                          placeholder="••••••••"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          required
+                          className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-brand-purple focus:outline-none transition-colors font-sans text-xs font-semibold text-brand-dark"
+                        />
+                      </div>
+
+                      {authError && (
+                        <p className="text-red-500 text-[10px] font-semibold leading-tight">{authError}</p>
+                      )}
+
+                      <button 
+                        type="submit"
+                        className="w-full duo-btn duo-btn-purple text-xs font-black py-3.5 flex items-center justify-center gap-2 mb-2"
+                      >
+                        <Shield className="w-4 h-4" />
+                        ADMIN LOG IN • စီမံသူဖြင့် ဝင်မည်
+                      </button>
+                    </form>
+                  )}
+
+                  {/* FOLDED TRIGGER ZONE */}
+                  <div className="mt-4 pt-3 border-t border-gray-100/60 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setIsAuthModalCoursePurchaseExpanded(true)}
+                      className="inline-flex items-center gap-1.5 text-[10.5px] font-sans font-black text-amber-600 hover:text-amber-700 transition-colors uppercase tracking-wider cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 animate-bounce text-amber-500 shrink-0" />
+                      View Packages & Courses • ဝယ်ယူရန်
+                    </button>
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <button 
+                      onClick={handleDismissPromo}
+                      className="text-[10px] text-brand-muted hover:text-brand-dark font-sans font-black underline cursor-pointer"
+                    >
+                      Skip for Now • ကျော်မည်
+                    </button>
+                    <div className="flex items-center gap-1 text-[9px] text-brand-muted font-sans font-bold">
+                      <Lock className="w-3.5 h-3.5" />
+                      Secure Student Session
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
