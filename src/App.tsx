@@ -3,17 +3,21 @@ import { lessonsData } from './data/lessonsData';
 import { grammarChapters as initialGrammarChapters, GrammarChapter } from './data/grammarChapters';
 import { orientationData as initialOrientationData, OrientationArticle } from './data/orientation';
 import { pdfVocabulary } from './data/pdfVocabulary';
+import { getGrammarExtDataForChapter } from './data/grammarExt';
 import { ProgressState, Lesson, WordBreakdown, DialogueLine, GrammarNote, QuizQuestion, RegisteredUser, PurchaseOrder, Course, StoreItem } from './types';
+import { SAYAR_SON_JAI_BLUE_BOOK } from './data/sayarSonJaiBlueBook';
 import ProgressCard from './components/ProgressCard';
 import SentenceView from './components/SentenceView';
 import VocabularyView from './components/VocabularyView';
 import QuizView from './components/QuizView';
 import AlphabetGuide from './components/AlphabetGuide';
 import { GrammarVocabDropdown } from './components/GrammarVocabDropdown';
+import SentenceStructureLesson from './components/SentenceStructureLesson';
 import { CheckoutGateway } from './components/CheckoutGateway';
 import { OrderDetailModal } from './components/OrderDetailModal';
 import { VOCAB_DATA, VocabCategory, VocabItem } from './data/vocab';
 import { VocabPage } from './components/VocabPage';
+import { TextbookReader } from './components/TextbookReader';
 import { 
   BookOpen, 
   Award, 
@@ -95,6 +99,18 @@ const adjustHexBrightness = (hex: string, percent: number): string => {
 };
 
 const DEFAULT_STORE_ITEMS: StoreItem[] = [
+  {
+    id: "sayar-son-jai-blue-book",
+    name: "Sayar Son Jai Basic Thai Blue Book (Audio eBook)",
+    nameMm: "ဆရာဆွန်လွင် စိတ်ကြိုက် အခြေခံထိုင်းစာအုပ်ပြာ (အသံဖိုင်ပါဝင်သည်)",
+    type: "e-book" as const,
+    description: "Contains 40 plain-text textbook lessons with audio files. Study Myanmar to Thai translation tables with Myanmar phonetic guidelines.",
+    descriptionMm: "သင်ခန်းစာပေါင်း ၄၀ ပါဝင်သော ဆရာ ဆွန်လွင် ၏ အခြေခံဖတ်စာအုပ်ပြာ (အသံပြည့်စုံစွာပါဝင်သည်)။",
+    price: 18000,
+    currency: "MMK" as const,
+    popular: true,
+    pdfFileName: "Sayar_Son_Jai_Basic_Thai_BlueBook.pdf"
+  },
   {
     id: "premium-book",
     name: "Advanced Thai-Myanmar Grammar Manual (Printed E-Book)",
@@ -393,7 +409,17 @@ export default function App() {
         duration: "6 Weeks (Self-paced Job-Oriented Training)",
         description: "Master workplace communication, technical operations terminology, factory shift dialogues, and HR speech formulas for working in Thailand comfortably.",
         descriptionMm: "ထိုင်းနိုင်ငံအတွင်း အလုပ်လုပ်ကိုင်နေသူများ၊ စက်ရုံ/အလုပ်ရုံတန်းများ၊ ရုံးဝန်ထမ်းများနှင့် အရောင်းကိုယ်စားလှယ်များအတွက် လက်တွေ့လုပ်ငန်းခွင်သုံး အထူးပြုပြောဆိုနည်းများ။",
-        instructor: "Kru Jane & Sayar Thura"
+        instructor: "Kru Jane & Sayar Thura",
+        resources: [
+          {
+            id: "res-workplace-hr",
+            name: "Workplace Thai HR Speech Formulas & Terminology",
+            nameMm: "လုပ်ငန်းခွင်သုံး စက်ရုံနှင့် HR စကားပြော အထူးလက်စွဲ",
+            downloadUrl: "https://drive.google.com/open?id=demo_workplace_hr",
+            priceAmount: 5000,
+            currency: 'MMK'
+          }
+        ]
       }
     ];
   });
@@ -885,13 +911,15 @@ export default function App() {
   const [dashboardTab, setDashboardTab] = useState<'lessons' | 'orientation' | 'handbook' | 'alphabet' | 'notebook' | 'profile' | 'admin'>('lessons');
   const [selectedCourseTab, setSelectedCourseTab] = useState<string>('course-basic');
   const [courseSubTab, setCourseSubTab] = useState<'lessons' | 'resources'>('lessons');
-  const [activeChapterId, setActiveChapterId] = useState<number>(1);
+  const [activeChapterId, setActiveChapterId] = useState<number | null>(1);
   const [activeOrientationId, setActiveOrientationId] = useState<string>('better-thai');
   const [mobileChapterDetailActive, setMobileChapterDetailActive] = useState<boolean>(false);
   const [currentGrammarPageIndex, setCurrentGrammarPageIndex] = useState<number>(0);
   const [expandedChapterRuleIndex, setExpandedChapterRuleIndex] = useState<number>(0);
   const [lessonSubPageIndex, setLessonSubPageIndex] = useState<number>(0);
   const [handbookSubPageIndex, setHandbookSubPageIndex] = useState<number>(0);
+  const [activeHandbookSubTab, setActiveHandbookSubTab] = useState<'vocab' | 'sentence' | 'qa' | 'conversation'>('vocab');
+  const [expandedGrammarSection, setExpandedGrammarSection] = useState<'vocab' | 'sentence' | 'qa' | 'conversation' | null>(null);
   const [exampleModeForRules, setExampleModeForRules] = useState<{[key: string]: 'standard' | 'more' | 'formal' | 'casual'}>({});
   const [audioSpeedIndex, setAudioSpeedIndex] = useState<number>(0); // 0: Normal, 1: Slow, 2: Much Slower
 
@@ -959,6 +987,8 @@ export default function App() {
   const [authTab, setAuthTab] = useState<'student-signup' | 'student-login' | 'admin'>('student-signup');
   const [authUsername, setAuthUsername] = useState<string>('');
   const [authPassword, setAuthPassword] = useState<string>('');
+  const [activeEbookId, setActiveEbookId] = useState<string | null>(null);
+  const [activeEbookLessonId, setActiveEbookLessonId] = useState<number>(1);
   const [authError, setAuthError] = useState<string>('');
   const [isAuthModalCoursePurchaseExpanded, setIsAuthModalCoursePurchaseExpanded] = useState<boolean>(false);
 
@@ -2505,6 +2535,24 @@ startxref
     );
   };
 
+  const speakThai = (thaiText: string) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const cleanedText = thaiText.replace(/\s*ครับ\/ค่ะ\s*/g, ' ครับ')
+                                  .replace(/\s*ครับ\s*/g, ' ครับ')
+                                  .replace(/\s*ค่ะ\s*/g, '  ค่ะ');
+      const utterance = new SpeechSynthesisUtterance(cleanedText);
+      utterance.lang = 'th-TH';
+      const voices = window.speechSynthesis.getVoices();
+      const thaiVoice = voices.find(v => v.lang.includes('th') || v.lang.includes('TH'));
+      if (thaiVoice) {
+        utterance.voice = thaiVoice;
+      }
+      utterance.rate = 0.85;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   const activeCourse = courses.find(c => c.id === selectedCourseTab);
   const courseLessons = activeCourse 
     ? lessons.filter(l => (l.courseId || 'course-basic') === activeCourse.id)
@@ -2712,7 +2760,9 @@ startxref
       {/* Main Container Workspace */}
       <main className="flex-1 overflow-y-auto max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[88px] sm:pb-32">
         
-        {showVocabPage ? (
+        {activeEbookId ? (
+          <TextbookReader bookId={activeEbookId} onClose={() => setActiveEbookId(null)} />
+        ) : showVocabPage ? (
           <VocabPage onClose={() => setShowVocabPage(false)} />
         ) : !activeLessonId ? (
           <div className="space-y-6 sm:space-y-8">
@@ -2759,7 +2809,7 @@ startxref
             {dashboardTab === 'lessons' && (
               <div className="max-w-4xl mx-auto space-y-6 min-h-[500px]">
 
-                {selectedCourseTab !== 'resources' ? (() => {
+                {selectedCourseTab !== 'resources' && (() => {
                   const activeCourse = courses.find(c => c.id === selectedCourseTab);
                   if (!activeCourse) return <p className="text-center font-sans font-bold text-xs text-brand-muted py-10">Unknown Course selection.</p>;
 
@@ -2767,6 +2817,7 @@ startxref
 
                   if (unlocked) {
                     const courseResources = storeItems.filter(item => item.courseId === activeCourse.id);
+                    const courseLinkedEbooks = courseResources;
                     const hasDirectResources = activeCourse.resources && activeCourse.resources.length > 0;
                     const hasStoreResources = courseResources.length > 0;
                     const hasAnyResources = hasDirectResources || hasStoreResources;
@@ -3123,287 +3174,197 @@ startxref
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {courseResources.map((item) => {
                                           const itemOwned = isStoreItemUnlocked(item.id, item.price);
-                                          return (
-                                            <div
-                                              key={item.id}
-                                              className="duo-card p-6 bg-white flex flex-col justify-between hover:shadow-md transition-all duration-200 animate-fade-in"
-                                            >
-                                      <div className="space-y-4">
-                                        <div className="flex items-start justify-between">
-                                          <div className="w-12 h-12 rounded-xl bg-brand-purple/5 border border-brand-purple/10 flex items-center justify-center text-2xl select-none">
-                                            📕
-                                          </div>
-                                          {item.popular && (
-                                            <span className="px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider bg-orange-500 text-white border-b-2 border-orange-700 select-none">
-                                              POPULAR
-                                            </span>
-                                          )}
-                                        </div>
+                                          const isFree = item.price === 0;
 
-                                        <div className="space-y-1">
-                                          <h4 className="font-sans font-black text-sm text-[#3c3c3c] leading-tight">
-                                            {item.name}
+                                          const getBookStyles = (id: string, nameStr: string) => {
+                                            if (id === 'free-writing') {
+                                              return {
+                                                gradient: "from-purple-700 via-indigo-850 to-indigo-950",
+                                                borderLeft: "border-purple-900",
+                                                accentText: "text-purple-200",
+                                                titleColor: "text-yellow-250",
+                                                topLabel: "ALPHABET SHEETS",
+                                                titleText: "LETTER WRITING",
+                                                subText: "PRACTICE EXERCISES",
+                                                emoji: "✍️",
+                                                emojiLabel: "STROKE GUIDELINES",
+                                                author: "STUDY WORKSHEET",
+                                                status: "FREE PRACTICE BOOK"
+                                              };
+                                            }
+                                            
+                                            // Breathtaking cover template for any dynamic custom user-created products!
+                                            const rawWords = nameStr.toUpperCase().replace(/[^A-Z0-9 ]/g, '').split(' ').filter(Boolean);
+                                            const word1 = rawWords[0] || "THAI";
+                                            const word2 = rawWords.slice(1, 3).join(' ') || "STUDY MANUAL";
+                                            return {
+                                              gradient: "from-violet-700 via-brand-purple to-indigo-950",
+                                              borderLeft: "border-purple-900",
+                                              accentText: "text-purple-200",
+                                              titleColor: "text-yellow-250",
+                                              topLabel: "LIBRARY CATALOG",
+                                              titleText: word1.substring(0, 15),
+                                              subText: word2.substring(0, 20),
+                                              emoji: "📘",
+                                              emojiLabel: "EBOOK REFERENCE",
+                                              author: "ONLINE RESOURCE",
+                                              status: "PREMIUM STUDY"
+                                            };
+                                          };
+
+                                          const bookStyle = getBookStyles(item.id, item.name);
+
+                                          if (item.id === 'sayar-son-jai-blue-book' || item.id === 'free-writing') {
+
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="col-span-1 md:col-span-2 duo-card p-5 sm:p-6 bg-white border-2 border-slate-150 rounded-2xl flex flex-col md:flex-row gap-5 hover:shadow-md transition-all duration-200 animate-fade-in relative overflow-hidden text-left"
+                                    >
+                                      {/* A4 Shape cover image */}
+                                      <div className={`w-[120px] sm:w-[150px] mx-auto md:mx-0 aspect-[1/1.414] bg-gradient-to-tr ${bookStyle.gradient} rounded-lg shadow-md hover:shadow-lg transition-transform transform hover:scale-[1.02] active:scale-95 shrink-0 relative flex flex-col justify-between p-4 text-white border-l-4 ${bookStyle.borderLeft} border-r border-t border-b border-white/10 select-none overflow-hidden`}>
+                                        {/* Book shine overlay */}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none" />
+                                        <div className="absolute top-0 bottom-0 left-0 w-2.5 bg-black/20 shadow-inner" />
+                                        
+                                        <div className="space-y-1 text-center pl-1 pt-1">
+                                          <span className={`block text-[6.5px] sm:text-[7.5px] font-black tracking-widest ${bookStyle.accentText} uppercase leading-none`}>
+                                            {bookStyle.topLabel}
+                                          </span>
+                                          <div className="h-[2px] bg-yellow-400 w-1/2 mx-auto mt-1 rounded" />
+                                          <h4 className={`font-sans font-black text-[10px] sm:text-xs leading-tight ${bookStyle.titleColor} drop-shadow mt-1`}>
+                                            {bookStyle.titleText}
                                           </h4>
-                                          <p className="text-[11px] font-sans font-bold text-brand-purple/80">
-                                            {item.nameMm}
+                                          <p className={`text-[7.5px] sm:text-[8px] tracking-wide font-sans font-extrabold ${bookStyle.accentText} uppercase opacity-90 leading-tight`}>
+                                            {bookStyle.subText}
                                           </p>
-                                          <p className="text-[11.5px] text-brand-muted font-sans font-semibold leading-relaxed pt-1.5 line-clamp-3">
-                                            {item.description}
-                                          </p>
-                                          {item.descriptionMm && (
-                                            <p className="text-[10px] text-gray-500 font-sans font-semibold italic mt-1 leading-snug line-clamp-2">
-                                              {item.descriptionMm}
-                                            </p>
-                                          )}
                                         </div>
-                                      </div>
-
-                                      <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between gap-3 bg-gray-50/50 -mx-6 -mb-6 p-4 rounded-b-2xl">
-                                        <div className="text-left font-sans select-none">
-                                          <span className="text-[8px] text-brand-muted block font-extrabold uppercase leading-none">PRICING RATE</span>
-                                          <span className="text-[12px] font-black text-brand-purple block mt-0.5">
-                                            {item.price === 0 ? "FREE" : `${item.price.toLocaleString()} ${item.currency}`}
+                                        
+                                        <div className="flex flex-col items-center justify-center pl-2 py-1.5 space-y-1">
+                                          <div className="w-10 h-10 rounded-full bg-white/10 border border-white/15 flex flex-col items-center justify-center animate-pulse">
+                                            <span className="text-base text-white">{bookStyle.emoji}</span>
+                                          </div>
+                                          <span className="text-[6.5px] font-bold text-yellow-105 tracking-wider uppercase text-center leading-tight">
+                                            {bookStyle.emojiLabel}
                                           </span>
                                         </div>
 
-                                        {itemOwned ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (item.pdfDownloadUrl) {
-                                                window.open(item.pdfDownloadUrl, '_blank');
-                                                addSystemLog('system', `Opened eBook resource downland link: "${item.name}"`);
-                                              } else {
-                                                const fileName = item.pdfFileName || `${item.id}_study_manual.pdf`;
-                                                const docTitle = item.name;
-                                                const docDesc = item.description;
-                                                
-                                                const lessonsInCourse = lessons.filter(l => (l.courseId || 'course-basic') === activeCourse.id);
-                                                const baseList = lessonsInCourse.flatMap(l => l.vocabularyBreakout || []).slice(0, 15);
-                                                const highlights = baseList.length > 0 
-                                                  ? baseList.map(v => ({ thai: v.thai, pronunciation: v.phonetic || '', myanmar: v.myanmar }))
-                                                  : [{ thai: "สวัสดี", pronunciation: "sa-wat-di", myanmar: "မင်္ဂလာပါ" }];
-                                                  
-                                                triggerPdfDownload(fileName, docTitle, docDesc, highlights);
-                                                addSystemLog('system', `Downloaded PDF companion: "${item.name}"`);
-                                              }
-                                            }}
-                                            className="px-3.5 py-2 bg-gradient-to-r from-[#00875a] to-[#00a36c] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#006644] flex items-center gap-1 shrink-0"
-                                          >
-                                            {item.pdfDownloadUrl ? "📥 Open Download URL" : "📥 Download PDF"}
-                                          </button>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const checkoutProduct = {
-                                                id: item.id,
-                                                name: item.name,
-                                                nameMm: item.nameMm,
-                                                priceAmount: item.price,
-                                                currency: item.currency,
-                                                duration: "Lifetime E-Book Study License",
-                                                description: item.description,
-                                                descriptionMm: item.descriptionMm || '',
-                                                instructor: "Kru Jane & Sayar Thura",
-                                                includes: ["Custom E-Book PDF Download", "Topic practice questions", "Vocabulary listings"]
-                                              };
-                                              setGatewayCourse(checkoutProduct);
-                                              setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
-                                              setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
-                                              setGatewayStep(1);
-                                              setGatewayPaymentMethod('kbzpay');
-                                              setGatewayOtp('');
-                                              setGatewayTimer(180);
-                                              setIsGatewayOpen(true);
-                                            }}
-                                            className="px-3.5 py-2 bg-gradient-to-r from-[#583092] to-[#7a42c4] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#3c1e66] flex items-center gap-1 shrink-0"
-                                          >
-                                            🔒 Buy E-Book
-                                          </button>
-                                        )}
+                                        <div className="space-y-0.5 text-center pl-1">
+                                          <div className="h-[1px] bg-slate-100/20 w-3/4 mx-auto rounded" />
+                                          <p className="text-[7px] sm:text-[8px] font-bold text-white/95 tracking-tight uppercase">
+                                            {bookStyle.author}
+                                          </p>
+                                          <p className="text-[6.5px] text-yellow-400 font-extrabold tracking-wider uppercase leading-none">
+                                            {bookStyle.status}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      {/* EBook Details Panel */}
+                                      <div className="flex-1 flex flex-col justify-between text-left font-sans">
+                                        <div className="space-y-3">
+                                          <div>
+                                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                              <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider border select-none ${
+                                                isFree
+                                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-250'
+                                                  : 'bg-blue-50 text-blue-700 border-blue-200'
+                                              }`}>
+                                                {isFree ? 'FREE PDF DOWNLOAD' : 'PREMIUM STUDY BOOK'}
+                                              </span>
+                                              {item.popular && (
+                                                <span className="bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider flex items-center gap-0.5 animate-pulse">
+                                                  🔥 COMPREHENSIVE
+                                                </span>
+                                              )}
+                                            </div>
+                                            <h3 className="font-sans font-black text-base sm:text-lg text-slate-800 leading-snug">
+                                              {item.name}
+                                            </h3>
+                                            <p className="text-xs font-extrabold text-brand-purple mt-0.5">
+                                              {item.nameMm}
+                                            </p>
+                                          </div>
+
+                                          <div className="text-xs text-brand-muted space-y-1.5 leading-relaxed font-medium">
+                                            <p>{item.description}</p>
+                                            {item.descriptionMm && (
+                                              <p className="text-[11px] text-slate-500 italic">{item.descriptionMm}</p>
+                                            )}
+                                            <div className="pt-2 flex flex-wrap gap-2 text-[9.5px] font-bold uppercase text-slate-500">
+                                              {item.id === 'sayar-son-jai-blue-book' ? (
+                                                <>
+                                                  <span className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">🎙️ 40 Full Audio Lessons</span>
+                                                  <span className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">📘 Plain Textbook Style Layout</span>
+                                                  <span className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">🇲🇲 Myanmar Phonetic Assist</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <span className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">📱 Optimized for Mobile Study</span>
+                                                  <span className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">🇲🇲 Burmese Translation Guides</span>
+                                                  <span className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">✏️ Stroke lessons & vocabulary sheets</span>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-3 pt-4 mt-6 border-t border-slate-100 -mx-5 -mb-5 p-4 bg-[#fafafc] rounded-b-2xl md:-mx-0 md:-mb-0 md:rounded-none md:bg-transparent md:border-none md:p-0 md:pt-4 md:mt-4">
+                                          <div className="text-left select-none">
+                                            <span className="text-[7.5px] text-brand-muted block font-extrabold uppercase leading-none">Access Price</span>
+                                            <span className="text-xs sm:text-sm font-black text-brand-purple block mt-0.5">
+                                              {isFree ? 'FREE' : `${item.price.toLocaleString()} MMK`}
+                                            </span>
+                                          </div>
+
+                                          {itemOwned ? (
+                                            <button
+                                              onClick={() => {
+                                                setActiveEbookId(item.id);
+                                                setActiveEbookLessonId(1);
+                                                window.speechSynthesis?.cancel();
+                                                addSystemLog(currentUser || 'student', `Opened dynamic textbook reader: "${item.name}"`);
+                                              }}
+                                              className="px-4 py-2 bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-brand-purple-shadow flex items-center gap-1.5 shrink-0"
+                                            >
+                                              <span>📖 Enter Book (စာအုပ်ဖတ်ရန်)</span>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                const bookProduct = {
+                                                  id: item.id,
+                                                  name: item.name,
+                                                  nameMm: item.nameMm,
+                                                  priceAmount: item.price,
+                                                  currency: item.currency || 'MMK',
+                                                  itemType: 'e-book',
+                                                  duration: "Lifetime Study Access License",
+                                                  description: item.description,
+                                                  descriptionMm: item.descriptionMm,
+                                                  instructor: "Kru Jane & Sayar Thura",
+                                                  includes: ["Full Interactive Audiobook Access", "Complete plain textbook lessons", "Thai Accent Pronunciation Tracks", "Burmese Phonetic Guides"]
+                                                };
+                                                setGatewayCourse(bookProduct as any);
+                                                setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                                setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                                setGatewayStep(1);
+                                                setGatewayPaymentMethod('kbzpay');
+                                                setGatewayOtp('');
+                                                setGatewayTimer(180);
+                                                setIsGatewayOpen(true);
+                                              }}
+                                              className="px-4 py-2 bg-gradient-to-r from-brand-purple to-brand-purple/95 text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-lg cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-brand-purple-shadow flex items-center gap-1 shrink-0"
+                                            >
+                                              🔒 Unlock eBook & Audio
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                          </div>
-                        )}
-                      </>
-                    );
-                  } else {
-                    const courseCancelledOrder = orders.find(o => 
-                      o.username.toLowerCase() === (currentUser || "").toLowerCase() && 
-                      o.status === 'cancelled' &&
-                      (o.id === activeCourse.id || o.itemName.toLowerCase().includes(activeCourse.id.toLowerCase().replace('course-', '')))
-                    );
+                                }
 
-                    return (
-                      <div className="bg-white rounded-3xl border-2 border-[#e5e5e5] p-6 sm:p-10 text-center space-y-3.5 shadow-xs max-w-2xl mx-auto motion-safe:animate-fade-inMac">
-                        {courseCancelledOrder ? (
-                          <div className="bg-rose-50 border-2 border-rose-200 p-5 rounded-2xl text-left space-y-3 shadow-3xs animate-fade-in text-slate-800">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-bold">
-                                <AlertTriangle className="w-5 h-5 text-white" />
-                              </div>
-                              <div>
-                                <h4 className="font-sans font-black text-rose-800 text-sm uppercase leading-none tracking-wider">
-                                  PAYMENT DECLINED • ငွေပေးချေမှုငြင်းပယ်ခံရသည်
-                                </h4>
-                                <span className="text-[9.5px] font-sans font-bold text-rose-600 uppercase tracking-widest block mt-1">
-                                  Course: {activeCourse.name}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <p className="text-[11px] font-sans font-bold text-slate-700 leading-relaxed font-mono">
-                              We are sorry, but your previous payment transfer slip was reviewed and declined by Kru Jane / Sayar Thura. As a result, this premium class remains locked.
-                            </p>
-
-                            {courseCancelledOrder.adminNotes && (
-                              <div className="bg-white p-3 rounded-xl border border-rose-150/80 shadow-3xs space-y-1">
-                                <span className="block text-[8.5px] font-sans font-black text-rose-500 uppercase tracking-wider">
-                                  Admin Rejection Memo (အကြောင်းပြချက်):
-                                </span>
-                                <p className="text-[11.5px] font-sans font-black text-[#3c3c3c] leading-relaxed">
-                                  "{courseCancelledOrder.adminNotes}"
-                                </p>
-                              </div>
-                            )}
-
-                            <div className="text-[9.5px] text-slate-500 font-bold leading-normal">
-                              💡 To unlock access, please click the button below to retry and upload your transaction receipt again. Make sure the screenshot clearly displays the date, time, and TXN code.
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto border-b-4 border-amber-200">
-                            <Lock className="w-8 h-8" />
-                          </div>
-                        )}
-                        
-                        <div className="space-y-2">
-                          <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800">
-                            PREMIUM LOCKED • အဆင့်မြင့်တန်း
-                          </span>
-                          <h3 className="text-xl sm:text-2xl font-sans font-black text-[#3c3c3c] tracking-tight">
-                            {activeCourse.name}
-                          </h3>
-                          <p className="text-xs sm:text-sm text-brand-muted leading-relaxed font-sans max-w-md mx-auto font-medium">
-                            {activeCourse.description}
-                          </p>
-                          <p className="text-xs sm:text-sm text-[#583092] italic mt-1 leading-relaxed font-sans max-w-md mx-auto font-black">
-                            {activeCourse.descriptionMm || ""}
-                          </p>
-                        </div>
-
-                        <div className="p-5 bg-amber-50/70 rounded-2xl border border-amber-100 text-left space-y-3.5">
-                          <h4 className="font-sans font-black text-[10px] sm:text-xs text-[#583092] uppercase tracking-wider">
-                            WHAT'S INCLUDED IN THIS CLASS:
-                          </h4>
-                          <ul className="text-[11px] sm:text-xs font-sans font-black text-brand-dark/80 space-y-2.5">
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-brand-green shrink-0" />
-                              <span>Custom Video Lectures & Interactive Speech Exercises • ဗီဒီယို သင်ခန်းစာများ</span>
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-brand-green shrink-0" />
-                              <span>Instructor Profile: {activeCourse.instructor || "Jane & Thura"}</span>
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-brand-green shrink-0" />
-                              <span>Duration Period: {activeCourse.duration || "Self-paced"}</span>
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-brand-green shrink-0" />
-                              <span>Direct Q&A Forum with Kru Jane & Sayar Thura • ဆရာများနှင့်မေးမြန်းခြင်း</span>
-                            </li>
-                          </ul>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-200 gap-4">
-                          <div className="text-left select-none">
-                            <div className="text-[8px] sm:text-[10px] font-sans font-extrabold text-brand-muted uppercase tracking-wider">ONE-TIME LIFE-TIME ENROLLMENT</div>
-                            <div className="text-xl sm:text-2xl font-sans font-black text-brand-purple mt-0.5">
-                              {activeCourse.priceAmount.toLocaleString()} MMK
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const courseProduct = {
-                                id: activeCourse.id,
-                                name: activeCourse.name,
-                                nameMm: activeCourse.nameMm || activeCourse.name,
-                                priceAmount: activeCourse.priceAmount,
-                                currency: "MMK" as const,
-                                duration: activeCourse.duration || "8 Weeks",
-                                description: activeCourse.description || "",
-                                descriptionMm: activeCourse.descriptionMm || "",
-                                instructor: activeCourse.instructor || "Kru Jane & Sayar Thura"
-                              };
-                              setGatewayCourse(courseProduct);
-                              setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
-                              setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
-                              setGatewayStep(1);
-                              setGatewayPaymentMethod('kbzpay');
-                              setGatewayOtp('');
-                              setGatewayTimer(180);
-                              setIsGatewayOpen(true);
-                            }}
-                            className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-brand-purple to-brand-purple/90 text-white rounded-xl text-[11px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 flex items-center justify-center gap-1.5 border-b-4 border-brand-purple-shadow"
-                          >
-                            <Sparkles className="w-4 h-4" />
-                            🎓 Purchase & Unlock Course • ဝယ်ယူမည်
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-                })() : (
-                  <div className="bg-white rounded-3xl border-2 border-[#e5e5e5] p-6 sm:p-8 space-y-8 shadow-xs max-w-4xl mx-auto motion-safe:animate-fade-in">
-                    <div className="space-y-2 text-center">
-                      <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-[#583092]">
-                        📚 Dynamic Library & Learning PDF Hub • စာအုပ်ဆိုင်ရာ ပရိုဂရမ်
-                      </span>
-                      <h3 className="text-xl sm:text-2xl font-sans font-black text-[#3c3c3c] tracking-tight justify-center flex items-center gap-2">
-                        <span>Thai Library & Handbooks Hub</span>
-                      </h3>
-                      <p className="text-xs sm:text-sm text-brand-muted max-w-xl mx-auto font-medium font-sans leading-relaxed">
-                        Download high-quality vocabulary worksheets, practice keys, and reference handbooks directly for offline learning. Premium eBooks can be unlocked via instant local mobile checkout!
-                      </p>
-                    </div>
-
-                    {(() => {
-                      const allStoreEbooks = storeItems.filter(item => item.type === 'e-book');
-                      const standaloneEbooks = allStoreEbooks.filter(item => !item.courseId);
-                      const courseLinkedEbooks = allStoreEbooks.filter(item => !!item.courseId);
-
-                      if (allStoreEbooks.length === 0) {
-                        return (
-                          <div className="p-8 bg-slate-50 rounded-2xl text-center border border-slate-150">
-                            <span className="text-2xl block mb-2">📁</span>
-                            <span className="text-xs text-brand-muted font-bold font-sans">No eBooks configured yet in store items. Add some in Store Manager!</span>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-8">
-                          {/* 1. STANDALONE EBOOKS & INDEPENDENT MANUALS */}
-                          {standaloneEbooks.length > 0 && (
-                            <div className="space-y-4">
-                              <h4 className="font-sans font-black text-xs text-brand-dark uppercase tracking-wider flex items-center gap-2 border-b-2 border-slate-100 pb-2 text-left">
-                                <span className="p-1 rounded-lg bg-indigo-50 text-indigo-600">📕</span>
-                                <span>General Reference Manuals & Independent Guides ({standaloneEbooks.length})</span>
-                              </h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                                {standaloneEbooks.map((item) => {
-                                  const isFree = item.price === 0;
-                                  const itemOwned = isStoreItemUnlocked(item.id, item.price);
 
                                   return (
                                     <div
@@ -3467,7 +3428,7 @@ startxref
                                                     { thai: "สวัสดี ครับ/ค่ะ", pronunciation: "sawàtdii khráp/khâ", myanmar: "မင်္ဂလာပါ (ကျား/မ)" },
                                                     { thai: "ขอบคุณ ครับ/ค่ะ", pronunciation: "khɔ̀ɔp-khun khráp/khâ", myanmar: "ကျေးဇူးတင်ပါတယ်" },
                                                     { thai: "สบายดีไหม", pronunciation: "sabaaj dii mǎi", myanmar: "နေကောင်းလား" },
-                                                    { thai: "ขอโทษ ครับ/ค่ะ", pronunciation: "khɔ̌ɔ-thôot khráp/khâ", myanmar: "တောင်းပန်ပါတယ်" },
+                                                    { thai: "ขอโทษ ครับ/ค่ะ", pronunciation: "khɔ̌ɔ-thôot khráp/khâ", myanmar: "ตောင်းပန်ပါတယ်" },
                                                     { thai: "เรียนภาษาไทย", pronunciation: "riian phaasǎathai", myanmar: "ထိုင်းစာ သင်ယူသည်" }
                                                   ]
                                                 );
@@ -3634,407 +3595,1174 @@ startxref
                     })()}
                   </div>
                 )}
-              </div>
-            )}
+              </>
+            );
+          }
 
-            {/* TAB CONTENT: Orientation & Pronunciation Guide */}
-            {dashboardTab === 'orientation' && (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8 min-h-[500px]">
-                
-                {/* Left Sidebar Article Selector */}
-                <div className="space-y-4 lg:col-span-1">
-                  <div className="mb-4">
-                    <h3 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wider">
-                      Orientation • လမ်းညွှန်ချက်
-                    </h3>
-                  </div>
+          return (
+            <div className="bg-white p-8 rounded-3xl border-2 border-gray-100 text-center space-y-4 max-w-md mx-auto">
+              <span className="text-4xl block">🔒</span>
+              <h3 className="font-sans font-black text-brand-dark text-lg uppercase tracking-tight">Course Group is Locked</h3>
+              <p className="text-xs text-brand-muted font-semibold leading-relaxed">
+                To unlock full access to this custom course, interactive syllabus, audio playbacks, exams, and dynamic companion PDFs, unlock the course from the Bookstore or Study Store catalog!
+              </p>
+              <button 
+                type="button"
+                onClick={() => setDashboardTab('bookstore')}
+                className="px-6 py-2.5 bg-gradient-to-r from-brand-purple to-brand-purple/95 text-white rounded-xl text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-brand-purple-shadow"
+              >
+                🛍️ View Student Bookstore • စာအုပ်ဆိုင်သို့သွားရန်
+              </button>
+            </div>
+          );
+        })()}
 
-                  <div className="space-y-2.5">
-                    {orientationData.map((article) => {
-                      const isActive = article.id === activeOrientationId;
-                      return (
-                        <button
-                          key={article.id}
-                          onClick={() => setActiveOrientationId(article.id)}
-                          className={`w-full text-left p-4 rounded-2xl border-2 flex items-center gap-3.5 transition-all text-xs outline-none ${
-                            isActive
-                              ? 'bg-brand-purple text-white border-brand-purple border-b-4 border-brand-purple-shadow'
-                              : 'bg-white hover:bg-gray-50 text-brand-dark border-gray-150 border-b-4'
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className={`font-sans font-black leading-tight text-sm ${isActive ? 'text-white' : 'text-[#3c3c3c]'}`}>
-                              {article.titleEnglish}
-                            </div>
-                          </div>
-                          <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'translate-x-0.5 text-white' : 'text-gray-300'}`} />
-                        </button>
-                      );
-                    })}
-                  </div>
+        {selectedCourseTab === 'resources' && (() => {
+          // Restored unified student resources and eBook library tab design and content!
+          return (
+            <div className="space-y-8 animate-fade-in text-left">
+              {/* Resources Page Header */}
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border-2 border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-sm">
+                <div className="space-y-1.5 text-left">
+                  <span className="text-[10px] text-brand-purple font-sans font-black uppercase tracking-wider block">Unified Library Hub</span>
+                  <h3 className="font-sans font-black text-brand-dark text-xl uppercase tracking-tight flex items-center gap-2">
+                    📚 Student Resources & eBooks Store • စာအုပ်များနှင့် PDFs
+                  </h3>
+                  <p className="text-xs text-brand-muted font-sans font-semibold leading-relaxed">
+                    Access our full catalog of premium textbooks, companion lesson workbooks, handbooks, and reference sheets across all levels in one single dashboard.
+                  </p>
                 </div>
+              </div>
 
-                {/* Right Area Article details panel */}
-                <div className="lg:col-span-3 space-y-6">
-                  {(() => {
-                    const article = orientationData.find(a => a.id === activeOrientationId) || orientationData[0];
-                    return (
-                      <>
-                        {/* Article Welcome Card */}
-                        <div className="duo-card p-6 md:p-8 bg-white border-2 border-gray-100">
-                          <span className="text-[10px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-1 rounded-full font-extrabold border border-brand-purple/20 select-none uppercase">
-                            Course Orientation
-                          </span>
-                          <h2 className="text-xl md:text-2xl font-sans font-black text-brand-dark tracking-tight mt-3">
-                            {article.titleEnglish}
-                          </h2>
-                        </div>
+              {/* Course specific companion groups */}
+              {courses.map((course) => {
+                const courseResources = storeItems.filter(item => item.courseId === course.id);
+                const hasDirectResources = course.resources && course.resources.length > 0;
+                const hasStoreResources = courseResources.length > 0;
+                const hasAny = hasDirectResources || hasStoreResources;
 
-                        {/* Article Sections */}
-                        <div className="space-y-6">
-                          {article.sections.map((section, secIdx) => (
-                            <motion.div
-                              key={secIdx}
-                              className="duo-card p-6 bg-white border-2 border-gray-100"
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: secIdx * 0.05 }}
-                            >
-                              <h4 className="font-sans font-black text-brand-purple text-base mb-2">
-                                {section.headingEnglish}
-                              </h4>
-                              <h5 className="font-sans font-black text-brand-muted text-xs mb-4">
-                                {section.headingMyanmar}
-                              </h5>
-                              <div className="space-y-4">
-                                {section.paragraphs.map((p, pIdx) => (
-                                  <div key={pIdx} className="space-y-1">
-                                    <p className="text-xs sm:text-sm text-brand-dark font-sans leading-relaxed font-semibold">
-                                      {p.en}
-                                    </p>
-                                    <p className="text-xs sm:text-sm text-brand-muted font-sans leading-relaxed italic border-l-4 border-brand-purple/20 pl-3 font-semibold whitespace-pre-line">
-                                      {p.mm}
-                                    </p>
-                                  </div>
-                                ))}
+                // Only render courses that have eBook resources
+                if (!hasAny) return null;
+
+                return (
+                  <div key={course.id} className="space-y-4">
+                    <h4 className="font-sans font-black text-xs text-brand-dark uppercase tracking-wider flex items-center gap-2 border-b-2 border-slate-100 pb-2.5 text-left">
+                      <span className="p-1.5 rounded-lg bg-indigo-50 text-brand-purple text-xs">🎓</span>
+                      <span>{course.name} Companion Materials</span>
+                      <span className="text-[8px] bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded font-black tracking-normal uppercase">
+                        Enrolled Guides
+                      </span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Direct resource list */}
+                      {course.resources?.map((res: any) => {
+                        const isFree = res.priceAmount === 0;
+                        const itemOwned = isStoreItemUnlocked(res.id, res.priceAmount);
+                        return (
+                          <div
+                            key={res.id}
+                            className="duo-card p-6 bg-white flex flex-col justify-between hover:shadow-md transition-all duration-200 border-2 border-slate-100 text-left"
+                          >
+                            <div className="space-y-4">
+                              <div className="flex items-start justify-between">
+                                <div className="w-11 h-11 rounded-xl bg-brand-purple/5 border border-brand-purple/10 flex items-center justify-center text-2xl select-none">
+                                  📕
+                                </div>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider border select-none ${
+                                  isFree 
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {isFree ? "FREE PDF" : "PREMIUM COMPANION"}
+                                </span>
                               </div>
 
-                              {section.highlights && section.highlights.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {section.highlights.map((hl, hlIdx) => (
-                                    <div key={hlIdx} className="p-3.5 bg-brand-light/50 border border-gray-200 rounded-xl flex items-center justify-between gap-3.5 hover:border-brand-purple/30 transition-all shadow-3xs">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="font-sans font-bold text-xs flex items-center flex-wrap gap-1">
-                                          {hl.termThai && (
-                                            <span className="text-brand-purple text-base font-black mr-1">{hl.termThai}</span>
-                                          )}
-                                          <span className="text-brand-green italic font-black">({hl.termPhonetic})</span>
-                                          {hl.termPhonetic && (
-                                            <span className="text-[10px] text-emerald-600 font-extrabold ml-1.5 font-sans">အသံထွက်: {getMyanmarPhonetic(hl.termPhonetic)}</span>
-                                          )}
-                                        </div>
-                                        <div className="text-[11px] font-sans mt-2 font-bold text-brand-dark leading-snug">
-                                          {hl.meaningEnglish} • <span className="text-brand-muted">{hl.meaningMyanmar}</span>
-                                        </div>
-                                      </div>
-                                      {hl.termThai && (
-                                        <button
-                                          onClick={() => speakText(hl.termThai)}
-                                          className="p-1 px-2 border-2 border-brand-purple/20 bg-[#fbfaff] hover:bg-brand-purple/10 text-brand-purple hover:text-brand-purple-dark text-[10px] rounded-lg font-black shrink-0 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                                          title="Play sound • အသံထွက်ဖွင့်ရန်"
-                                        >
-                                          <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                                          <span>Play</span>
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
+                              <div className="space-y-1">
+                                <h4 className="font-sans font-black text-sm text-[#3c3c3c] leading-tight text-left">
+                                  {res.name}
+                                </h4>
+                                {res.nameMm && (
+                                  <p className="text-[11px] font-sans font-bold text-[#5a3194] text-left">
+                                    {res.nameMm}
+                                  </p>
+                                )}
+                                <p className="text-[11px] text-brand-muted font-sans font-medium leading-relaxed pt-1 text-left">
+                                  Study worksheets and practice guidelines specifically designed for the {course.name}.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between gap-3 bg-[#fafafc] -mx-6 -mb-6 p-4 rounded-b-2xl">
+                              <div className="text-left font-sans select-none">
+                                <span className="text-[8px] text-brand-muted block font-extrabold uppercase leading-none">PRICING RATE</span>
+                                <span className="text-[11.5px] font-black text-brand-purple block mt-0.5">
+                                  {isFree ? "FREE" : `${res.priceAmount.toLocaleString()} MMK`}
+                                </span>
+                              </div>
+
+                              {itemOwned ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    window.open(res.downloadUrl, '_blank');
+                                    addSystemLog(currentUser || 'student', `Downloaded PDF companion resource: "${res.name}"`);
+                                  }}
+                                  className="px-3.5 py-2 bg-gradient-to-r from-[#00875a] to-[#00a36c] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#006644] flex items-center gap-1 shrink-0"
+                                >
+                                  📥 Open / Download
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const checkoutProduct = {
+                                      id: res.id,
+                                      name: res.name,
+                                      nameMm: res.nameMm || '',
+                                      priceAmount: res.priceAmount,
+                                      currency: 'MMK' as const,
+                                      itemType: 'e-book',
+                                      duration: "Companion eBook Study Resource",
+                                      description: `Direct premium supplementary eBook for ${course.name}`,
+                                      descriptionMm: res.nameMm || '',
+                                      instructor: course.instructor || "Kru Jane & Sayar Thura",
+                                      includes: ["Permanent direct download URL", "Study exercises", "Vocabulary sheets"]
+                                    };
+                                    setGatewayCourse(checkoutProduct as any);
+                                    setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                    setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                    setGatewayStep(1);
+                                    setGatewayPaymentMethod('kbzpay');
+                                    setGatewayOtp('');
+                                    setGatewayTimer(180);
+                                    setIsGatewayOpen(true);
+                                  }}
+                                  className="px-3.5 py-2 bg-gradient-to-r from-[#583092] to-[#7a42c4] text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-[#3c1e66] flex items-center gap-1 shrink-0"
+                                >
+                                  🔒 Unlock eBook
+                                </button>
                               )}
-                            </motion.div>
-                          ))}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-
-              </div>
-            )}
-
-            {/* TAB CONTENT: 2. Grammar Handbook */}
-            {dashboardTab === 'handbook' && (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8 min-h-[500px]">
-                
-                {/* Left Chapters list sidebar (responsive layout) */}
-                <div className={`space-y-4 lg:col-span-1 ${mobileChapterDetailActive ? 'hidden lg:block' : 'block'}`}>
-                  <div className="mb-4">
-                    <h3 className="font-sans font-black text-brand-dark text-sm uppercase tracking-wider">
-                      Grammar Index • သဒ္ဒါမာတိကာ
-                    </h3>
-                  </div>
-
-                  <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
-                    {grammarChapters.map((ch) => {
-                      const isActive = ch.id === activeChapterId;
-                      return (
-                        <button
-                          key={ch.id}
-                          onClick={() => {
-                            setActiveChapterId(ch.id);
-                            setExpandedChapterRuleIndex(0);
-                            setHandbookSubPageIndex(0);
-                            setMobileChapterDetailActive(true);
-                          }}
-                          className={`w-full text-left p-4 rounded-2xl border-2 flex items-center gap-3.5 transition-all text-xs outline-none ${
-                            isActive
-                              ? 'bg-brand-purple text-white border-brand-purple border-b-4 border-brand-purple-shadow'
-                              : 'bg-white hover:bg-gray-50 text-brand-dark border-gray-150 border-b-4'
-                          }`}
-                        >
-                          <BookOpen className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-brand-purple'}`} />
-                          <div className="min-w-0 flex-1">
-                            <div className={`font-sans font-black leading-tight text-sm ${isActive ? 'text-white' : 'text-[#3c3c3c]'}`}>
-                              Chapter {ch.id}: {ch.titleEnglish}
                             </div>
                           </div>
-                          <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'translate-x-0.5 text-white' : 'text-gray-300'}`} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                        );
+                      })}
 
-                {/* Right Area active chapter details deck */}
-                <div className={`lg:col-span-3 space-y-6 ${mobileChapterDetailActive ? 'block' : 'hidden lg:block'}`}>
-                  {(() => {
-                    const chapter = grammarChapters.find(c => c.id === activeChapterId) || grammarChapters[0];
-                    return (
-                      <>
-                        {/* Mobile Back navigation button */}
-                        <div className="lg:hidden">
-                          <button
-                            onClick={() => setMobileChapterDetailActive(false)}
-                            className="text-brand-purple text-xs font-sans font-black flex items-center gap-1 hover:underline pb-3"
+                      {/* Course linked bookstore store items list */}
+                      {courseResources.map((item) => {
+                        const itemOwned = isStoreItemUnlocked(item.id, item.price);
+                        const isFree = item.price === 0;
+                        return (
+                          <div
+                            key={item.id}
+                            className="duo-card p-6 bg-white border-2 border-slate-100 flex flex-col justify-between hover:shadow-md transition-all duration-200 animate-fade-in relative overflow-hidden text-left"
                           >
-                            <ChevronLeft className="w-4 h-4" />
-                            BACK TO HANDBOOK CHAPTERS LIST
-                          </button>
-                        </div>
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border select-none ${
+                                  isFree
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-brand-purple/10 text-[#583092] border-brand-purple/20'
+                                }`}>
+                                  {isFree ? 'FREE PDF DOWNLOAD' : 'PREMIUM STUDY BOOK'}
+                                </span>
+                                <FileText className={`w-4 h-4 ${isFree ? 'text-emerald-600' : 'text-brand-purple'}`} />
+                              </div>
+                              <div>
+                                <h4 className="font-sans font-black text-sm text-[#3c3c3c] leading-snug">
+                                  {item.name}
+                                </h4>
+                                <p className="text-[10px] sm:text-[11px] font-sans font-bold text-brand-purple mt-0.5">
+                                  {item.nameMm}
+                                </p>
+                                <p className="text-[11px] text-brand-muted font-sans font-medium mt-2 leading-relaxed">
+                                  {item.description}
+                                </p>
+                              </div>
+                            </div>
 
-                        {/* Active Chapter Splash Welcome card */}
-                        <div className="duo-card p-6 md:p-8 bg-white border-2 border-gray-100 flex items-start gap-4">
-                          <div className="w-12 h-12 bg-brand-purple-light text-brand-purple rounded-2xl flex items-center justify-center shrink-0 border border-brand-purple/20 shadow-xs font-sans font-black text-sm select-none">
-                            {chapter.id}
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-1 rounded-full font-extrabold border border-brand-purple/20 select-none uppercase">
-                              Active Handbook Chapter
-                            </span>
-                            <h2 className="text-xl md:text-2xl font-sans font-black text-brand-dark tracking-tight mt-3">
-                              Chapter {chapter.id}: {chapter.titleEnglish}
-                            </h2>
-                          </div>
-                        </div>
+                            <div className="flex items-center justify-between gap-3 pt-4 mt-5 border-t border-slate-100 -mx-5 -mb-5 p-4 bg-[#fafafc] rounded-b-2xl">
+                              <div className="text-left font-sans select-none">
+                                <span className="text-[7.5px] text-brand-muted block font-extrabold uppercase leading-none">Price Tag</span>
+                                <span className="text-xs sm:text-sm font-black text-brand-purple block mt-0.5">
+                                  {isFree ? 'FREE' : `${item.price.toLocaleString()} ${item.currency}`}
+                                </span>
+                              </div>
 
-                        {/* Interactive Chapter Rules Deck */}
-                        <div className="space-y-4">
-                          {chapter.rules.map((rule, ruleIdx) => {
-                            const isExpanded = expandedChapterRuleIndex === ruleIdx;
-                            const currentMode = exampleModeForRules[`${chapter.id}-${ruleIdx}`] || 'standard';
-                            
-                            // Get page-specific rule data
-                            const ruleData = getSubPageContent('handbook', chapter.id, ruleIdx, handbookSubPageIndex, rule);
-
-                            // Active examples: if custom mode is chosen, we query additional phrases. Otherwise, we use current page's examples.
-                            const activeExamples = currentMode === 'standard' 
-                              ? (ruleData.examples || []) 
-                              : getAdditionalPhrases(chapter.id, ruleIdx, currentMode);
-
-                            return (
-                              <motion.div
-                                key={ruleIdx}
-                                id={`handbook-rule-${ruleIdx}`}
-                                className="duo-card bg-white border-2 border-gray-100 overflow-hidden"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: ruleIdx * 0.05 }}
-                              >
-                                {/* Collapsible Accordion Header */}
+                              {itemOwned ? (
                                 <button
                                   onClick={() => {
-                                    setExpandedChapterRuleIndex(isExpanded ? -1 : ruleIdx);
-                                    setHandbookSubPageIndex(0);
+                                    if (item.pdfDownloadUrl) {
+                                      window.open(item.pdfDownloadUrl, '_blank');
+                                      addSystemLog(currentUser || 'student', `Opened dynamic download link for eBook: "${item.name}"`);
+                                    } else {
+                                      triggerPdfDownload(
+                                        item.pdfFileName || `${item.id}.pdf`,
+                                        item.name,
+                                        item.description,
+                                        [
+                                          { thai: "สวัสดี ครับ/ค่ะ", pronunciation: "sawàtdii khráp/khâ", myanmar: "မင်္ဂလာပါ (ကျား/မ)" },
+                                          { thai: "ขอบคุณ ครับ/ค่ะ", pronunciation: "khɔ̀ɔp-khun khráp/khâ", myanmar: "ကျေးဇူးတင်ပါတယ်" }
+                                        ]
+                                      );
+                                      addSystemLog(currentUser || 'student', `Completed dynamic auto-generation download: "${item.name}"`);
+                                    }
                                   }}
-                                  className="w-full text-left p-5 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors select-none focus:outline-none"
+                                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-750 text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-emerald-805 flex items-center gap-1.5 shrink-0"
                                 >
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-sans font-black text-xs shrink-0 select-none ${
-                                      isExpanded 
-                                        ? 'bg-brand-purple text-white border-brand-purple shadow-xs' 
-                                        : 'bg-brand-purple-light text-brand-purple border-brand-purple/20'
-                                    }`}>
-                                      {ruleIdx + 1}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h5 className="font-sans font-black text-brand-purple text-base leading-tight truncate">
-                                        {rule.title}
-                                      </h5>
-                                    </div>
-                                  </div>
-
-                                  <div className="shrink-0">
-                                    {isExpanded ? (
-                                      <ChevronUp className="w-5 h-5 text-brand-purple" />
-                                    ) : (
-                                      <ChevronDown className="w-5 h-5 text-gray-400" />
-                                    )}
-                                  </div>
+                                  <Download className="w-3.5 h-3.5" />
+                                  📥 Download Free Guide
                                 </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    const bookProduct = {
+                                      id: item.id,
+                                      name: item.name,
+                                      nameMm: item.nameMm,
+                                      priceAmount: item.price,
+                                      currency: item.currency || 'MMK',
+                                      itemType: 'e-book',
+                                      duration: "Lifetime Study Access License",
+                                      description: item.description,
+                                      descriptionMm: item.descriptionMm,
+                                      instructor: "Kru Jane & Sayar Thura",
+                                      includes: ["Full Dynamic PDF eBook Download", "Offline Reading Support", "Grammar Revision Sheets", "Burmese Pronunciation Guide"]
+                                    };
+                                    setGatewayCourse(bookProduct as any);
+                                    setGatewayPhone(progress.masteredWords.length > 0 ? "09-791112233" : "09-");
+                                    setGatewayEmail(currentUser ? `${currentUser.toLowerCase()}@classroom.edu` : "student@classroom.edu");
+                                    setGatewayStep(1);
+                                    setGatewayPaymentMethod('kbzpay');
+                                    setGatewayOtp('');
+                                    setGatewayTimer(180);
+                                    setIsGatewayOpen(true);
+                                  }}
+                                  className="px-4 py-2 bg-gradient-to-r from-brand-purple to-brand-purple/95 text-white rounded-xl text-[10px] sm:text-xs font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer transition-all transform active:translate-y-0.5 border-b-4 border-brand-purple-shadow flex items-center gap-1 shrink-0"
+                                >
+                                  🔒 Unlock eBook
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
 
-                                {/* Collapsible Content Body */}
-                                {isExpanded && (
-                                  <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-100">
-                                    
-                                    {/* Sub-Page Navigation Controls Bar */}
-                                    <div className="flex items-center justify-end bg-[#fdfcff] p-3 rounded-2xl border border-brand-purple/15 mt-2">
-                                      {/* Quick Pagers */}
-                                      <div className="flex items-center gap-2 select-none">
-                                        <button
-                                          onClick={() => setHandbookSubPageIndex((p) => Math.max(0, p - 1))}
-                                          disabled={handbookSubPageIndex === 0}
-                                          className="text-[10px] font-sans font-black text-brand-dark hover:text-brand-purple disabled:opacity-30 disabled:pointer-events-none flex items-center gap-0.5"
-                                        >
-                                          <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
-                                          BACK
-                                        </button>
-                                        <span className="text-[10px] font-mono font-bold bg-brand-purple-light/50 px-2 py-0.5 rounded text-brand-purple">
-                                          {handbookSubPageIndex + 1} / 3
-                                        </span>
-                                        <button
-                                          onClick={() => setHandbookSubPageIndex((p) => Math.min(2, p + 1))}
-                                          disabled={handbookSubPageIndex === 2}
-                                          className="text-[10px] font-sans font-black text-brand-dark hover:text-brand-purple disabled:opacity-30 disabled:pointer-events-none flex items-center gap-0.5"
-                                        >
-                                          NEXT
-                                          <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-                                        </button>
-                                      </div>
-                                    </div>
+              {/* General Reference PDF library section */}
+              <div className="space-y-4 pt-4 text-left">
+                <h4 className="font-sans font-black text-xs text-brand-dark uppercase tracking-wider flex items-center gap-2 border-b-2 border-slate-100 pb-2.5">
+                  <span className="p-1.5 rounded-lg bg-indigo-50 text-brand-purple text-xs">📖</span>
+                  <span>General Study E-Books & Reference Library</span>
+                  <span className="text-[8px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-black tracking-normal uppercase">
+                    Library Catalog
+                  </span>
+                </h4>
 
-                                    {/* Page-Specific Topic Title */}
-                                    <div className="pt-1">
-                                      <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light border border-brand-purple/10 px-2 py-0.5 rounded font-black uppercase">
-                                        Page {handbookSubPageIndex + 1} • {handbookSubPageIndex === 0 ? "Theory" : handbookSubPageIndex === 1 ? "Nuance" : "Drills"}
-                                      </span>
-                                      <h6 className="font-sans font-black text-brand-dark text-sm mt-1">
-                                        {ruleData.title}
-                                      </h6>
-                                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {storeItems.filter(item => !item.courseId).map((item) => {
+                    const itemOwned = isStoreItemUnlocked(item.id, item.price);
+                    const isFree = item.price === 0;
 
-                                    {/* Expositions */}
-                                    {isSingleSentenceEnglish(ruleData.explanation) && (
-                                      <p className="text-xs sm:text-sm text-brand-dark font-sans leading-relaxed font-semibold">
-                                        {ruleData.explanation}
-                                      </p>
-                                    )}
-                                    <p className="text-xs sm:text-sm text-brand-muted font-sans leading-relaxed italic border-l-4 border-brand-purple/20 pl-3 font-semibold mt-1">
-                                      {ruleData.explanationMyanmar}
-                                    </p>
+                    const getBookStyles = (id: string, nameStr: string) => {
+                      if (id === 'free-writing') {
+                        return {
+                          gradient: "from-purple-700 via-indigo-850 to-indigo-950",
+                          borderLeft: "border-purple-900",
+                          accentText: "text-purple-250",
+                          titleColor: "text-yellow-405",
+                          topLabel: "ALPHABET SHEETS",
+                          titleText: "LETTER WRITING",
+                          subText: "PRACTICE EXERCISES",
+                          emoji: "✍️",
+                          emojiLabel: "STROKE GUIDELINES",
+                          author: "STUDY WORKSHEET",
+                          status: "FREE PRACTICE BOOK"
+                        };
+                      }
+                      if (id === 'sayar-son-jai-blue-book') {
+                        return {
+                          gradient: "from-blue-600 via-[#1c3a70] to-[#0b1b3a]",
+                          borderLeft: "border-brand-purple-shadow",
+                          accentText: "text-blue-150",
+                          titleColor: "text-yellow-250",
+                          topLabel: "BASIC THAI GUIDE",
+                          titleText: "BLUE BOOK",
+                          subText: "SAYAR SON JAI",
+                          emoji: "📘",
+                          emojiLabel: "AUDIO INSIDE",
+                          author: "BESTSELLER textbook",
+                          status: "PREMIUM AUDIO BOOK"
+                        };
+                      }
 
+                      const rawWords = nameStr.toUpperCase().replace(/[^A-Z0-9 ]/g, '').split(' ').filter(Boolean);
+                      const word1 = rawWords[0] || "THAI";
+                      const word2 = rawWords.slice(1, 3).join(' ') || "STUDY MANUAL";
+                      return {
+                        gradient: "from-violet-700 via-brand-purple to-indigo-950",
+                        borderLeft: "border-purple-900",
+                        accentText: "text-purple-200",
+                        titleColor: "text-yellow-250",
+                        topLabel: "LIBRARY CATALOG",
+                        titleText: word1.substring(0, 15),
+                        subText: word2.substring(0, 20),
+                        emoji: "📘",
+                        emojiLabel: "EBOOK REFERENCE",
+                        author: "ONLINE RESOURCE",
+                        status: "PREMIUM STUDY"
+                      };
+                    };
 
+                    const bookStyle = getBookStyles(item.id, item.name);
 
-                                    {/* Rule Examples Grid */}
-                                    {activeExamples && activeExamples.length > 0 && (
-                                      <div className="space-y-3 pt-1">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                          {activeExamples.map((ex, exIdx) => (
-                                            <div key={exIdx} className="duo-card p-4 bg-gray-50/50 border border-gray-100 flex items-center justify-between gap-4 hover:border-gray-250 transition-all">
-                                              <div className="min-w-0 flex-1">
-                                                <div className="font-sans font-black text-brand-dark text-sm leading-tight flex items-baseline gap-1.5 flex-wrap">
-                                                  <span className="text-brand-purple text-[15px]">{ex.thai}</span>
-                                                  <span className="text-[10px] text-brand-green font-extrabold italic bg-brand-green-light px-2 py-0.5 rounded-full">
-                                                    ({ex.phonetic})
-                                                  </span>
-                                                  {ex.phonetic && (
-                                                    <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-                                                      အသံထွက်: {getMyanmarPhonetic(ex.phonetic)}
-                                                    </span>
-                                                  )}
-                                                </div>
-                                                <div className="text-[11px] text-brand-muted font-sans font-bold leading-normal mt-2">
-                                                  {ex.english}
-                                                </div>
-                                                <div className="text-[11px] text-brand-dark font-sans font-bold leading-normal mt-0.5">
-                                                  {ex.myanmar}
-                                                </div>
-                                              </div>
+                    if (item.id === 'sayar-son-jai-blue-book' || item.id === 'free-writing' || item.id === 'premium-book' || item.id === 'free-phrases') {
+                      return (
+                        <div
+                          key={item.id}
+                          className="duo-card p-5 sm:p-6 bg-white border-2 border-slate-150 rounded-2xl flex flex-col md:flex-row gap-5 hover:shadow-md transition-all duration-200 animate-fade-in relative overflow-hidden text-left"
+                        >
+                          {/* Rich physical cover render widget */}
+                          <div className={`w-[120px] sm:w-[130px] mx-auto md:mx-0 aspect-[1/1.414] bg-gradient-to-tr ${bookStyle.gradient} rounded-lg shadow-md hover:shadow-lg transition-transform transform hover:scale-[1.02] active:scale-95 shrink-0 relative flex flex-col justify-between p-4 text-white border-l-4 ${bookStyle.borderLeft} border-r border-t border-b border-white/10 select-none overflow-hidden`}>
+                            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none" />
+                            <div className="absolute top-0 bottom-0 left-0 w-2.5 bg-black/20 shadow-inner" />
+                            
+                            <div className="space-y-1 text-center pl-1 pt-1">
+                              <span className={`block text-[6.5px] sm:text-[7.5px] font-black tracking-widest ${bookStyle.accentText} uppercase leading-none`}>
+                                {bookStyle.topLabel}
+                              </span>
+                              <div className="h-[2px] bg-yellow-400 w-1/2 mx-auto mt-1 rounded" />
+                              <h4 className={`font-sans font-black text-[10px] sm:text-xs leading-tight ${bookStyle.titleColor} drop-shadow mt-1`}>
+                                {bookStyle.titleText}
+                              </h4>
+                              <p className={`text-[7.5px] sm:text-[8px] tracking-wide font-sans font-extrabold ${bookStyle.accentText} uppercase opacity-90 leading-tight`}>
+                                {bookStyle.subText}
+                              </p>
+                            </div>
+                            
+                            <div className="flex flex-col items-center justify-center pl-2 py-1.5 space-y-1">
+                              <div className="w-9 h-9 rounded-full bg-white/10 border border-white/15 flex flex-col items-center justify-center">
+                                <span className="text-sm text-white">{bookStyle.emoji}</span>
+                              </div>
+                              <span className="text-[6.5px] font-bold text-yellow-105 tracking-wider uppercase text-center leading-tight">
+                                {bookStyle.emojiLabel}
+                              </span>
+                            </div>
 
-                                              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 shrink-0 self-start">
-                                                <GrammarVocabDropdown sentence={ex.thai} allLessons={lessons} />
-                                                <button
-                                                  onClick={() => speakText(ex.thai)}
-                                                  className="px-2 h-8 rounded-xl bg-white border-2 border-b-4 border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-1 shrink-0 transition-all active:translate-y-0.5"
-                                                  title={`Listen (${audioSpeedIndex === 0 ? "Normal" : audioSpeedIndex === 1 ? "Slow 0.7x" : "Slower 0.5x"})`}
-                                                >
-                                                  {audioSpeedIndex === 0 ? (
-                                                    <>
-                                                      <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
-                                                      <span className="text-[8px] font-sans font-black text-brand-purple bg-brand-purple-light px-1 py-0.5 rounded-md select-none leading-none">1.0x</span>
-                                                    </>
-                                                  ) : audioSpeedIndex === 1 ? (
-                                                    <>
-                                                      <Volume1 className="w-3.5 h-3.5 text-indigo-500" />
-                                                      <span className="text-[8px] font-sans font-black text-indigo-500 bg-indigo-50 px-1 py-0.5 rounded-md select-none leading-none">0.7x</span>
-                                                    </>
-                                                  ) : (
-                                                    <>
-                                                      <Volume className="w-3.5 h-3.5 text-orange-500" />
-                                                      <span className="text-[8px] font-sans font-black text-orange-500 bg-orange-50 px-1 py-0.5 rounded-md select-none leading-none">0.5x</span>
-                                                    </>
-                                                  )}
-                                                </button>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
+                            <div className="space-y-0.5 text-center pl-1">
+                              <div className="h-[1px] bg-slate-100/20 w-3/4 mx-auto rounded" />
+                              <p className="text-[7px] sm:text-[8px] font-bold text-white/95 tracking-tight uppercase">
+                                {bookStyle.author}
+                              </p>
+                              <p className="text-[6.5px] text-yellow-400 font-extrabold tracking-wider uppercase leading-none">
+                                {bookStyle.status}
+                              </p>
+                            </div>
+                          </div>
 
-                                    {/* Elegant Footer Navigation Bar */}
-                                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-4 bg-[#fdfcff] -mx-5 -mb-5 p-4 rounded-b-2xl">
-                                      {handbookSubPageIndex < 2 ? (
-                                        <button
-                                          onClick={() => setHandbookSubPageIndex(handbookSubPageIndex + 1)}
-                                          className="text-brand-purple font-sans font-black text-xs flex items-center gap-1 hover:underline active:translate-y-0.5 transition-transform"
-                                        >
-                                          Next
-                                          <ChevronRight className="w-3.5 h-3.5" />
-                                        </button>
-                                      ) : ruleIdx < chapter.rules.length - 1 ? (
-                                        <button
-                                          onClick={() => {
-                                            setExpandedChapterRuleIndex(ruleIdx + 1);
-                                            setHandbookSubPageIndex(0);
-                                            setTimeout(() => {
-                                              document.getElementById(`handbook-rule-${ruleIdx + 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                            }, 100);
-                                          }}
-                                          className="text-brand-purple font-sans font-black text-xs flex items-center gap-1 hover:underline active:translate-y-0.5 transition-transform"
-                                        >
-                                          Next Topic • အောက်ပါမှတ်စု
-                                          <ChevronRight className="w-3.5 h-3.5" />
-                                        </button>
-                                      ) : (
-                                        <span className="text-[10px] font-sans text-brand-green font-extrabold uppercase">Chapter Complete • ပြီးဆုံးပါသည်</span>
-                                      )}
-                                    </div>
+                          {/* Detail fields */}
+                          <div className="flex-1 flex flex-col justify-between text-left font-sans">
+                            <div className="space-y-3">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider border select-none ${
+                                    isFree
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-250'
+                                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                                  }`}>
+                                    {isFree ? 'FREE PDF DOWNLOAD' : 'PREMIUM STUDY BOOK'}
+                                  </span>
+                                </div>
+                                <h3 className="font-sans font-black text-sm sm:text-base text-slate-800 leading-snug">
+                                  {item.name}
+                                </h3>
+                                <p className="text-xs font-extrabold text-brand-purple mt-0.5">
+                                  {item.nameMm}
+                                </p>
+                              </div>
 
-                                  </div>
+                              <div className="text-xs text-brand-muted space-y-1 my-1 leading-relaxed text-left">
+                                <p className="font-semibold">{item.description}</p>
+                                {item.descriptionMm && (
+                                  <p className="text-[11px] text-slate-500 italic">{item.descriptionMm}</p>
                                 )}
-                              </motion.div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 pt-3 mt-4 border-t border-slate-100">
+                              <div className="text-left select-none">
+                                <span className="text-[7.5px] text-brand-muted block font-extrabold uppercase leading-none">Price Tag</span>
+                                <span className="text-xs font-black text-brand-purple block mt-0.5">
+                                  {isFree ? 'FREE' : `${item.price.toLocaleString()} MMK`}
+                                </span>
+                              </div>
+
+                              {itemOwned && (
+                                <button
+                                  onClick={() => {
+                                    setActiveEbookId(item.id);
+                                    setActiveEbookLessonId(1);
+                                    window.speechSynthesis?.cancel();
+                                    addSystemLog(currentUser || 'student', `Opened dynamic textbook reader: "${item.name}"`);
+                                  }}
+                                  className="px-3 py-1.5 bg-gradient-to-r from-brand-purple to-[#7a42c4] text-white rounded-xl text-[10px] font-sans font-black uppercase tracking-wider hover:shadow-md cursor-pointer border-b-4 border-brand-purple-shadow flex items-center gap-1.5 shrink-0"
+                                >
+                                  <span>📖 Enter Book</span>
+                                </button>
+                              )}
+
+                                                      {/* 4 Tabs Selector for Active Content List */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 rounded-3xl border-2 border-gray-100 shadow-xs mb-6">
+                          {(['vocab', 'sentence', 'qa', 'conversation'] as const).map((tab) => {
+                            const isActive = activeHandbookSubTab === tab;
+                            let title = '';
+                            let mmTitle = '';
+                            let thTitle = '';
+                            let icon = null;
+
+                            if (tab === 'vocab') {
+                              title = 'Vocabulary';
+                              mmTitle = 'ဝေါဟာရစု';
+                              thTitle = 'คำศัพท์';
+                              icon = <FileText className={`w-5 h-5 ${isActive ? 'text-white' : 'text-brand-purple'}`} />;
+                            } else if (tab === 'sentence') {
+                              title = 'Sentence Structure';
+                              mmTitle = 'ဝါကျစနစ်';
+                              thTitle = 'โครงสร้าง';
+                              icon = <BookOpen className={`w-5 h-5 ${isActive ? 'text-white' : 'text-brand-purple'}`} />;
+                            } else if (tab === 'qa') {
+                              title = 'Q&A System';
+                              mmTitle = 'အမေးအဖြေ';
+                              thTitle = 'ถาม-ตอบ';
+                              icon = <HelpCircle className={`w-5 h-5 ${isActive ? 'text-white' : 'text-brand-purple'}`} />;
+                            } else {
+                              title = 'Conversation';
+                              mmTitle = 'စကားပြော';
+                              thTitle = 'บทสนทนา';
+                              icon = <Users className={`w-5 h-5 ${isActive ? 'text-white' : 'text-brand-purple'}`} />;
+                            }
+
+                            return (
+                              <button
+                                key={tab}
+                                onClick={() => setActiveHandbookSubTab(tab)}
+                                className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border-2 transition-all outline-none text-center select-none ${
+                                  isActive
+                                    ? 'bg-brand-purple border-brand-purple text-white border-b-4 border-brand-purple-shadow shadow-xs'
+                                    : 'bg-white hover:bg-gray-50 text-brand-dark border-gray-150 border-b-4'
+                                }`}
+                              >
+                                <div className={`p-2 rounded-xl mb-1.5 shrink-0 flex items-center justify-center ${isActive ? 'bg-white/10' : 'bg-brand-purple-light'}`}>
+                                  {icon}
+                                </div>
+                                <span className="font-sans font-black text-xs tracking-tight line-clamp-1 leading-tight">
+                                  {title}
+                                </span>
+                                <span className={`text-[9px] font-sans font-bold leading-tight mt-0.5 ${isActive ? 'text-white/80' : 'text-brand-muted'}`}>
+                                  {mmTitle} • {thTitle}
+                                </span>
+                              </button>
                             );
                           })}
+                        </div>
+
+                        {/* Selected Tab Content Area */}
+                        <div className="space-y-6">
+                          {(() => {
+                            const enriched = getGrammarExtDataForChapter(chapter.id, chapter.titleEnglish, chapter.titleMyanmar);
+
+                            if (activeHandbookSubTab === 'vocab') {
+                              const filteredVocab = enriched.vocab.filter((v) => {
+                                const q = vocabSearch.trim().toLowerCase();
+                                if (!q) return true;
+                                return (
+                                  v.thai.toLowerCase().includes(q) ||
+                                  v.phonetic.toLowerCase().includes(q) ||
+                                  v.english.toLowerCase().includes(q) ||
+                                  v.myanmar.toLowerCase().includes(q)
+                                );
+                              });
+
+                              return (
+                                <div className="bg-white rounded-3xl border-2 border-gray-100 shadow-xs p-6 space-y-4 animate-fadeIn">
+                                  <div className="flex items-start gap-4 border-b border-gray-100 pb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-brand-purple-light text-brand-purple flex items-center justify-center shrink-0 border border-brand-purple/20">
+                                      <FileText className="w-6 h-6 text-brand-purple" />
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-0.5 rounded font-black uppercase">
+                                        Section 1 • အပိုင်း ၁
+                                      </span>
+                                      <h3 className="text-lg md:text-xl font-sans font-black text-brand-dark tracking-tight">
+                                        Vocabulary • ဝေါဟာရစု <span className="text-brand-muted text-sm font-normal font-sans">(คำศัพท์)</span>
+                                      </h3>
+                                      <p className="text-xs text-brand-muted font-sans font-bold mt-1">
+                                        Core vocabulary words with phonetic guides, Myanmar translations, and native pronunciation playback.
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Vocab Search Controls Bar */}
+                                  <div className="flex items-center gap-3 bg-gray-50/50 p-3.5 rounded-2xl border-2 border-gray-150">
+                                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                                    <input
+                                      type="text"
+                                      placeholder="Search vocabulary words (Thai, Phonetics, Myanmar, English)..."
+                                      className="w-full bg-transparent border-none outline-none font-sans font-bold text-xs text-brand-dark"
+                                      value={vocabSearch}
+                                      onChange={(e) => setVocabSearch(e.target.value)}
+                                    />
+                                    {vocabSearch && (
+                                      <button
+                                        onClick={() => setVocabSearch('')}
+                                        className="text-[10px] font-sans font-black text-brand-purple bg-brand-purple-light px-2.5 py-1 rounded-lg"
+                                      >
+                                        CLEAR
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Vocabulary Entries Grid */}
+                                  {filteredVocab.length === 0 ? (
+                                    <div className="p-8 text-center bg-gray-50/50 rounded-2xl border border-gray-150">
+                                      <p className="text-xs font-sans font-bold text-brand-muted">
+                                        No matching vocabulary words found in this chapter.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                                      {filteredVocab.map((item, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="duo-card p-4 bg-gray-50/50 border border-gray-100 flex items-center justify-between gap-4 hover:border-gray-250 transition-all"
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <div className="font-sans font-black text-brand-dark text-sm leading-tight flex items-baseline gap-1.5 flex-wrap">
+                                              <span className="text-brand-purple text-[15px]">{item.thai}</span>
+                                              <span className="text-[10px] text-brand-green font-extrabold italic bg-brand-green-light px-2 py-0.5 rounded-full">
+                                                ({item.phonetic})
+                                              </span>
+                                              {item.phonetic && (
+                                                <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                                                  အသံထွက်: {getMyanmarPhonetic(item.phonetic)}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-[11px] text-brand-muted font-sans font-bold leading-normal mt-2">
+                                              {item.english}
+                                            </div>
+                                            <div className="text-xs text-brand-dark font-sans font-semibold border-l-2 border-brand-purple/25 pl-2 mt-1">
+                                              {item.myanmar}
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            <GrammarVocabDropdown sentence={item.thai} allLessons={lessons} />
+                                            <button
+                                              onClick={() => speakText(item.thai)}
+                                              className="w-10 h-10 rounded-xl bg-white border-2 border-b-4 border-gray-200 hover:bg-gray-50 flex items-center justify-center shrink-0 transition-all active:translate-y-0.5 active:border-b-2"
+                                              title="Listen pronunciation"
+                                            >
+                                              <Volume2 className="w-5 h-5 text-brand-purple" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            if (activeHandbookSubTab === 'sentence') {
+                              return (
+                                <div className="bg-white rounded-3xl border-2 border-gray-100 shadow-xs p-6 space-y-4 animate-fadeIn">
+                                  <div className="flex items-start gap-4 border-b border-gray-100 pb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-brand-purple-light text-brand-purple flex items-center justify-center shrink-0 border border-brand-purple/20">
+                                      <BookOpen className="w-6 h-6 text-brand-purple" />
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-0.5 rounded font-black uppercase">
+                                        Section 2 • အပိုင်း ၂
+                                      </span>
+                                      <h3 className="text-lg md:text-xl font-sans font-black text-brand-dark tracking-tight">
+                                        Sentence Structure • ဝါကျစနစ် <span className="text-brand-muted text-sm font-normal font-sans">(โครงสร้าง)</span>
+                                      </h3>
+                                      <p className="text-xs text-brand-muted font-sans font-bold mt-1">
+                                        Interactive syntax patterns, descriptive grammar components, and practice exercises.
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    {chapter.rules.map((rule, ruleIdx) => {
+                                      const isExpanded = expandedChapterRuleIndex === ruleIdx;
+                                      const currentMode = exampleModeForRules[`${chapter.id}-${ruleIdx}`] || 'standard';
+                                      
+                                      // Get page-specific rule data
+                                      const ruleData = getSubPageContent('handbook', chapter.id, ruleIdx, handbookSubPageIndex, rule);
+
+                                      // Active examples
+                                      const activeExamples = currentMode === 'standard' 
+                                        ? (ruleData.examples || []) 
+                                        : getAdditionalPhrases(chapter.id, ruleIdx, currentMode);
+
+                                      return (
+                                        <div
+                                          key={ruleIdx}
+                                          id={`handbook-rule-${ruleIdx}`}
+                                          className="duo-card bg-white border-2 border-gray-100 overflow-hidden"
+                                        >
+                                          {/* Collapsible Accordion Header */}
+                                          <button
+                                            onClick={() => {
+                                              setExpandedChapterRuleIndex(isExpanded ? -1 : ruleIdx);
+                                              setHandbookSubPageIndex(0);
+                                            }}
+                                            className="w-full text-left p-5 flex items-center justify-between gap-4 hover:bg-gray-55 transition-colors select-none focus:outline-none"
+                                          >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                              <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-sans font-black text-xs shrink-0 select-none ${
+                                                isExpanded 
+                                                  ? 'bg-brand-purple text-white border-brand-purple shadow-xs' 
+                                                  : 'bg-brand-purple-light text-brand-purple border-brand-purple/20'
+                                              }`}>
+                                                {ruleIdx + 1}
+                                              </div>
+                                              <div className="min-w-0">
+                                                <h5 className="font-sans font-black text-brand-purple text-base leading-tight truncate">
+                                                  {rule.title}
+                                                </h5>
+                                              </div>
+                                            </div>
+
+                                            <div className="shrink-0">
+                                              {isExpanded ? (
+                                                <ChevronUp className="w-5 h-5 text-brand-purple" />
+                                              ) : (
+                                                <ChevronDown className="w-5 h-5 text-gray-400" />
+                                              )}
+                                            </div>
+                                          </button>
+
+                                          {/* Collapsible Content Body */}
+                                          {isExpanded && (
+                                            <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-100">
+                                              
+                                              {/* Sub-Page Navigation Controls Bar */}
+                                              <div className="flex items-center justify-end bg-[#fdfcff] p-3 rounded-2xl border border-brand-purple/15 mt-2">
+                                                {/* Quick Pagers */}
+                                                <div className="flex items-center gap-2 select-none">
+                                                  <button
+                                                    onClick={() => setHandbookSubPageIndex((p) => Math.max(0, p - 1))}
+                                                    disabled={handbookSubPageIndex === 0}
+                                                    className="text-[10px] font-sans font-black text-brand-dark hover:text-brand-purple disabled:opacity-30 disabled:pointer-events-none flex items-center gap-0.5"
+                                                  >
+                                                    <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+                                                    BACK
+                                                  </button>
+                                                  <span className="text-[10px] font-mono font-bold bg-brand-purple-light/50 px-2 py-0.5 rounded text-brand-purple">
+                                                    {handbookSubPageIndex + 1} / 3
+                                                  </span>
+                                                  <button
+                                                    onClick={() => setHandbookSubPageIndex((p) => Math.min(2, p + 1))}
+                                                    disabled={handbookSubPageIndex === 2}
+                                                    className="text-[10px] font-sans font-black text-brand-dark hover:text-brand-purple disabled:opacity-30 disabled:pointer-events-none flex items-center gap-0.5"
+                                                  >
+                                                    NEXT
+                                                    <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+                                                  </button>
+                                                </div>
+                                              </div>
+
+                                              {/* Page-Specific Topic Title */}
+                                              <div className="pt-1">
+                                                <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light border border-brand-purple/10 px-2 py-0.5 rounded font-black uppercase">
+                                                  Page {handbookSubPageIndex + 1} • {handbookSubPageIndex === 0 ? "Theory" : handbookSubPageIndex === 1 ? "Nuance" : "Drills"}
+                                                </span>
+                                                <h6 className="font-sans font-black text-brand-dark text-sm mt-1">
+                                                  {ruleData.title}
+                                                </h6>
+                                              </div>
+
+                                              {/* Expositions */}
+                                              {isSingleSentenceEnglish(ruleData.explanation) && (
+                                                <p className="text-xs sm:text-sm text-brand-dark font-sans leading-relaxed font-semibold">
+                                                  {ruleData.explanation}
+                                                </p>
+                                              )}
+                                              <p className="text-xs sm:text-sm text-brand-muted font-sans leading-relaxed italic border-l-4 border-brand-purple/20 pl-3 font-semibold mt-1">
+                                                {ruleData.explanationMyanmar}
+                                              </p>
+
+                                              {/* Rule Examples Grid */}
+                                              {activeExamples && activeExamples.length > 0 && (
+                                                <div className="space-y-3 pt-1">
+                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                                    {activeExamples.map((ex: any, exIdx: number) => (
+                                                      <div key={exIdx} className="duo-card p-4 bg-gray-50/50 border border-gray-100 flex items-center justify-between gap-4 hover:border-gray-250 transition-all">
+                                                        <div className="min-w-0 flex-1">
+                                                          <div className="font-sans font-black text-brand-dark text-sm leading-tight flex items-baseline gap-1.5 flex-wrap">
+                                                            <span className="text-brand-purple text-[15px]">{ex.thai}</span>
+                                                            <span className="text-[10px] text-brand-green font-extrabold italic bg-brand-green-light px-2 py-0.5 rounded-full">
+                                                              ({ex.phonetic})
+                                                            </span>
+                                                            {ex.phonetic && (
+                                                              <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                                                                အသံထွက်: {getMyanmarPhonetic(ex.phonetic)}
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                          <div className="text-[11px] text-brand-muted font-sans font-bold leading-normal mt-2">
+                                                            {ex.english}
+                                                          </div>
+                                                          <div className="text-[11px] text-brand-dark font-sans font-bold leading-normal mt-0.5">
+                                                            {ex.myanmar}
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 shrink-0 self-start">
+                                                          <GrammarVocabDropdown sentence={ex.thai} allLessons={lessons} />
+                                                          <button
+                                                            onClick={() => speakText(ex.thai)}
+                                                            className="px-2 h-8 rounded-xl bg-white border-2 border-b-4 border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-1 shrink-0 transition-all active:translate-y-0.5"
+                                                            title="Listen normal speed"
+                                                          >
+                                                            <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
+                                                            <span className="text-[8px] font-sans font-black text-brand-purple bg-brand-purple-light px-1 py-0.5 rounded-md select-none leading-none">1.0x</span>
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {/* Elegant Footer Navigation Bar */}
+                                              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-4 bg-[#fdfcff] -mx-5 -mb-5 p-4 rounded-b-2xl">
+                                                {handbookSubPageIndex < 2 ? (
+                                                  <button
+                                                    onClick={() => setHandbookSubPageIndex(handbookSubPageIndex + 1)}
+                                                    className="text-brand-purple font-sans font-black text-xs flex items-center gap-1 hover:underline active:translate-y-0.5 transition-transform"
+                                                  >
+                                                    Next
+                                                    <ChevronRight className="w-3.5 h-3.5" />
+                                                  </button>
+                                                ) : ruleIdx < chapter.rules.length - 1 ? (
+                                                  <button
+                                                    onClick={() => {
+                                                      setExpandedChapterRuleIndex(ruleIdx + 1);
+                                                      setHandbookSubPageIndex(0);
+                                                      setTimeout(() => {
+                                                        document.getElementById(`handbook-rule-${ruleIdx + 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                      }, 100);
+                                                    }}
+                                                    className="text-brand-purple font-sans font-black text-xs flex items-center gap-1 hover:underline active:translate-y-0.5 transition-transform"
+                                                  >
+                                                    Next Topic • အောက်ပါမှတ်စု
+                                                    <ChevronRight className="w-3.5 h-3.5" />
+                                                  </button>
+                                                ) : (
+                                                  <span className="text-[10px] font-sans text-brand-green font-extrabold uppercase">Chapter Complete • ပြီးဆုံးပါသည်</span>
+                                                )}
+                                              </div>
+
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (activeHandbookSubTab === 'qa') {
+                              return (
+                                <div className="bg-white rounded-3xl border-2 border-gray-100 shadow-xs p-6 space-y-4 animate-fadeIn">
+                                  <div className="flex items-start gap-4 border-b border-gray-100 pb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-brand-purple-light text-brand-purple flex items-center justify-center shrink-0 border border-brand-purple/20">
+                                      <HelpCircle className="w-6 h-6 text-brand-purple" />
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-0.5 rounded font-black uppercase">
+                                        Section 3 • အပိုင်း ၃
+                                      </span>
+                                      <h3 className="text-lg md:text-xl font-sans font-black text-brand-dark tracking-tight">
+                                        Q&A System • အမေးအဖြေ <span className="text-brand-muted text-sm font-normal font-sans">(ถาม-ตอบ)</span>
+                                      </h3>
+                                      <p className="text-xs text-brand-muted font-sans font-bold mt-1">
+                                        Conversational response practice. Play and repeat either query or resolution.
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    {enriched.qa.map((qa, qi) => (
+                                      <div
+                                        key={qi}
+                                        className="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-xs space-y-4"
+                                      >
+                                        {/* Question Section */}
+                                        <div className="flex items-start gap-3">
+                                          <span className="w-6 h-6 bg-amber-500 text-white rounded-lg flex items-center justify-center font-sans font-black text-xs shrink-0 select-none">
+                                            Q
+                                          </span>
+                                          <div className="min-w-0 flex-1 space-y-1">
+                                            <div className="flex items-baseline gap-2 flex-wrap">
+                                              <span className="text-base font-sans font-extrabold text-brand-dark">
+                                                {qa.q.thai}
+                                              </span>
+                                              <span className="text-[9px] text-[#e0a800] font-extrabold italic bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">
+                                                ({qa.q.phonetic})
+                                              </span>
+                                            </div>
+                                            <div className="text-xs text-brand-muted font-sans font-medium">
+                                              {qa.q.myanmar}
+                                            </div>
+                                          </div>
+                                          <button
+                                            onClick={() => speakText(qa.q.thai)}
+                                            className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 flex items-center justify-center shrink-0"
+                                          >
+                                            <Volume2 className="w-4 h-4 text-brand-purple" />
+                                          </button>
+                                        </div>
+
+                                        {/* Separator line */}
+                                        <div className="border-t border-dashed border-gray-150 my-1" />
+
+                                        {/* Answer Section */}
+                                        <div className="flex items-start gap-3">
+                                          <span className="w-6 h-6 bg-brand-green text-white rounded-lg flex items-center justify-center font-sans font-black text-xs shrink-0 select-none">
+                                            A
+                                          </span>
+                                          <div className="min-w-0 flex-1 space-y-1">
+                                            <div className="flex items-baseline gap-2 flex-wrap">
+                                              <span className="text-base font-sans font-extrabold text-[#4caf50]">
+                                                {qa.a.thai}
+                                              </span>
+                                              <span className="text-[9px] text-brand-green font-extrabold italic bg-brand-green-light px-1.5 py-0.5 rounded-full border border-green-200">
+                                                ({qa.a.phonetic})
+                                              </span>
+                                            </div>
+                                            <div className="text-xs text-brand-dark font-sans font-semibold">
+                                              {qa.a.myanmar}
+                                            </div>
+                                          </div>
+                                          <button
+                                            onClick={() => speakText(qa.a.thai)}
+                                            className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 flex items-center justify-center shrink-0"
+                                          >
+                                            <Volume2 className="w-4 h-4 text-brand-purple" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (activeHandbookSubTab === 'conversation') {
+                              return (
+                                <div className="bg-white rounded-3xl border-2 border-gray-100 shadow-xs p-6 space-y-4 animate-fadeIn">
+                                  <div className="flex items-start gap-4 border-b border-gray-100 pb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-brand-purple-light text-brand-purple flex items-center justify-center shrink-0 border border-brand-purple/20">
+                                      <Users className="w-6 h-6 text-brand-purple" />
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-0.5 rounded font-black uppercase">
+                                        Section 4 • အပိုင်း ၄
+                                      </span>
+                                      <h3 className="text-lg md:text-xl font-sans font-black text-brand-dark tracking-tight">
+                                        Dialogue & Conversations • စကားပြော <span className="text-brand-muted text-sm font-normal font-sans">(บทสนทนา)</span>
+                                      </h3>
+                                      <p className="text-xs text-brand-muted font-sans font-bold mt-1">
+                                        Practice native conversational flow utilizing this chapter's key grammar points.
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-5 bg-gray-100 p-4 md:p-6 rounded-3xl border-2 border-gray-200">
+                                    {enriched.conversation.map((turn, ti) => {
+                                      const isA = turn.speaker === 'A';
+                                      return (
+                                        <div
+                                          key={ti}
+                                          className={`flex items-start gap-2.5 ${isA ? 'justify-start' : 'justify-end'}`}
+                                        >
+                                          {/* Speaker Avatar Badge left */}
+                                          {isA && (
+                                            <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-sans font-black text-xs select-none shadow-xs shrink-0 mt-1">
+                                              A
+                                            </div>
+                                          )}
+
+                                          {/* Chat Bubble card */}
+                                          <div
+                                            className={`max-w-[85%] rounded-2xl p-4 shadow-xs relative border-2 ${
+                                              isA
+                                                ? 'bg-white border-gray-200 rounded-tl-none'
+                                                : 'bg-brand-purple-light border-brand-purple/20 rounded-tr-none'
+                                            }`}
+                                          >
+                                            <div className="space-y-1">
+                                              {/* Thai bubble characters */}
+                                              <div className="flex items-baseline gap-2 flex-wrap">
+                                                <span className={`text-[15px] font-sans font-black ${isA ? 'text-brand-dark' : 'text-brand-purple'}`}>
+                                                  {turn.thai}
+                                                </span>
+                                                <span className="text-[9px] text-brand-muted font-extrabold italic bg-black/4 px-1.5 py-0.5 rounded-full select-none">
+                                                  ({turn.phonetic})
+                                                </span>
+                                              </div>
+
+                                              {/* Phonetic guide rendering */}
+                                              {turn.phonetic && (
+                                                <div className="text-[10px] text-emerald-700 font-semibold italic">
+                                                  အသံထွက်: {getMyanmarPhonetic(turn.phonetic)}
+                                                </div>
+                                              )}
+
+                                              {/* Myanmar Translation rendering */}
+                                              <div className="text-xs text-[#3c3c3c] font-sans font-bold mt-1.5">
+                                                {turn.myanmar}
+                                              </div>
+                                            </div>
+
+                                            {/* Small playback action trigger inside speech bubble */}
+                                            <button
+                                              onClick={() => speakText(turn.thai)}
+                                              className="absolute bottom-2 right-2 w-7 h-7 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center shadow-xs cursor-pointer active:translate-y-0.5"
+                                              title="Speak"
+                                            >
+                                              <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
+                                            </button>
+                                          </div>
+
+                                          {/* Speaker Avatar Badge right */}
+                                          {!isA && (
+                                            <div className="w-8 h-8 rounded-full bg-brand-purple text-white flex items-center justify-center font-sans font-black text-xs select-none shadow-xs shrink-0 mt-1">
+                                              B
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })()}
+                        </div>andedGrammarSection(expandedGrammarSection === 'qa' ? null : 'qa')}
+                                    className="w-full text-left p-6 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors select-none outline-none"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div className="w-12 h-12 rounded-2xl bg-brand-purple-light text-brand-purple flex items-center justify-center shrink-0 border border-brand-purple/20">
+                                        <HelpCircle className="w-6 h-6 text-brand-purple" />
+                                      </div>
+                                      <div>
+                                        <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-0.5 rounded font-black uppercase">
+                                          Section 3 • အပိုင်း ၃
+                                        </span>
+                                        <h3 className="text-lg md:text-xl font-sans font-black text-brand-dark tracking-tight">
+                                          Q&A System • အမေးအဖြေ <span className="text-brand-muted text-sm font-normal font-sans">(ถาม-ตอบ)</span>
+                                        </h3>
+                                        <p className="text-xs text-brand-muted font-sans font-bold mt-1">
+                                          Conversational response practice. Play and repeat either query or resolution.
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="shrink-0 bg-gray-50 p-2 rounded-xl border border-gray-150">
+                                      {expandedGrammarSection === 'qa' ? (
+                                        <ChevronUp className="w-5 h-5 text-brand-purple" />
+                                      ) : (
+                                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                                      )}
+                                    </div>
+                                  </button>
+
+                                  {expandedGrammarSection === 'qa' && (
+                                    <div className="p-6 pt-2 border-t border-gray-100 space-y-4">
+                                      <div className="space-y-4">
+                                        {enriched.qa.map((qa, qi) => (
+                                          <div
+                                            key={qi}
+                                            className="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-xs space-y-4"
+                                          >
+                                            {/* Question Section */}
+                                            <div className="flex items-start gap-3">
+                                              <span className="w-6 h-6 bg-amber-500 text-white rounded-lg flex items-center justify-center font-sans font-black text-xs shrink-0 select-none">
+                                                Q
+                                              </span>
+                                              <div className="min-w-0 flex-1 space-y-1">
+                                                <div className="flex items-baseline gap-2 flex-wrap">
+                                                  <span className="text-base font-sans font-extrabold text-brand-dark">
+                                                    {qa.q.thai}
+                                                  </span>
+                                                  <span className="text-[9px] text-[#e0a800] font-extrabold italic bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">
+                                                    ({qa.q.phonetic})
+                                                  </span>
+                                                </div>
+                                                <div className="text-xs text-brand-muted font-sans font-medium">
+                                                  {qa.q.myanmar}
+                                                </div>
+                                              </div>
+                                              <button
+                                                onClick={() => speakText(qa.q.thai)}
+                                                className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 flex items-center justify-center shrink-0"
+                                              >
+                                                <Volume2 className="w-4 h-4 text-brand-purple" />
+                                              </button>
+                                            </div>
+
+                                            {/* Separator line */}
+                                            <div className="border-t border-dashed border-gray-150 my-1" />
+
+                                            {/* Answer Section */}
+                                            <div className="flex items-start gap-3">
+                                              <span className="w-6 h-6 bg-brand-green text-white rounded-lg flex items-center justify-center font-sans font-black text-xs shrink-0 select-none">
+                                                A
+                                              </span>
+                                              <div className="min-w-0 flex-1 space-y-1">
+                                                <div className="flex items-baseline gap-2 flex-wrap">
+                                                  <span className="text-base font-sans font-extrabold text-[#4caf50]">
+                                                    {qa.a.thai}
+                                                  </span>
+                                                  <span className="text-[9px] text-brand-green font-extrabold italic bg-brand-green-light px-1.5 py-0.5 rounded-full border border-green-200">
+                                                    ({qa.a.phonetic})
+                                                  </span>
+                                                </div>
+                                                <div className="text-xs text-brand-dark font-sans font-semibold">
+                                                  {qa.a.myanmar}
+                                                </div>
+                                              </div>
+                                              <button
+                                                onClick={() => speakText(qa.a.thai)}
+                                                className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 flex items-center justify-center shrink-0"
+                                              >
+                                                <Volume2 className="w-4 h-4 text-brand-purple" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* SECTION 4: Conversation */}
+                                <div className="bg-white rounded-3xl border-2 border-gray-100 shadow-xs overflow-hidden">
+                                  <button
+                                    onClick={() => setExpandedGrammarSection(expandedGrammarSection === 'conversation' ? null : 'conversation')}
+                                    className="w-full text-left p-6 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors select-none outline-none"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div className="w-12 h-12 rounded-2xl bg-brand-purple-light text-brand-purple flex items-center justify-center shrink-0 border border-brand-purple/20">
+                                        <Users className="w-6 h-6 text-brand-purple" />
+                                      </div>
+                                      <div>
+                                        <span className="text-[9px] font-sans text-brand-purple bg-brand-purple-light px-2.5 py-0.5 rounded font-black uppercase">
+                                          Section 4 • အပိုင်း ၄
+                                        </span>
+                                        <h3 className="text-lg md:text-xl font-sans font-black text-brand-dark tracking-tight">
+                                          Dialogue & Conversations • စကားပြော <span className="text-brand-muted text-sm font-normal font-sans">(บทสนทนา)</span>
+                                        </h3>
+                                        <p className="text-xs text-brand-muted font-sans font-bold mt-1">
+                                          Practice native conversational flow utilizing this chapter's key grammar points.
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="shrink-0 bg-gray-50 p-2 rounded-xl border border-gray-150">
+                                      {expandedGrammarSection === 'conversation' ? (
+                                        <ChevronUp className="w-5 h-5 text-brand-purple" />
+                                      ) : (
+                                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                                      )}
+                                    </div>
+                                  </button>
+
+                                  {expandedGrammarSection === 'conversation' && (
+                                    <div className="p-6 pt-2 border-t border-gray-100 space-y-4">
+                                      <div className="space-y-5 bg-gray-100 p-4 md:p-6 rounded-3xl border-2 border-gray-200">
+                                        {enriched.conversation.map((turn, ti) => {
+                                          const isA = turn.speaker === 'A';
+                                          return (
+                                            <div
+                                              key={ti}
+                                              className={`flex items-start gap-2.5 ${isA ? 'justify-start' : 'justify-end'}`}
+                                            >
+                                              {/* Speaker Avatar Badge left */}
+                                              {isA && (
+                                                <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-sans font-black text-xs select-none shadow-xs shrink-0 mt-1">
+                                                  A
+                                                </div>
+                                              )}
+
+                                              {/* Chat Bubble card */}
+                                              <div
+                                                className={`max-w-[85%] rounded-2xl p-4 shadow-xs relative border-2 ${
+                                                  isA
+                                                    ? 'bg-white border-gray-200 rounded-tl-none'
+                                                    : 'bg-brand-purple-light border-brand-purple/20 rounded-tr-none'
+                                                }`}
+                                              >
+                                                <div className="space-y-1">
+                                                  {/* Thai bubble characters */}
+                                                  <div className="flex items-baseline gap-2 flex-wrap">
+                                                    <span className={`text-[15px] font-sans font-black ${isA ? 'text-brand-dark' : 'text-brand-purple'}`}>
+                                                      {turn.thai}
+                                                    </span>
+                                                    <span className="text-[9px] text-brand-muted font-extrabold italic bg-black/4 px-1.5 py-0.5 rounded-full select-none">
+                                                      ({turn.phonetic})
+                                                    </span>
+                                                  </div>
+
+                                                  {/* Phonetic guide rendering */}
+                                                  {turn.phonetic && (
+                                                    <div className="text-[10px] text-emerald-700 font-semibold italic">
+                                                      အသံထွက်: {getMyanmarPhonetic(turn.phonetic)}
+                                                    </div>
+                                                  )}
+
+                                                  {/* Myanmar Translation rendering */}
+                                                  <div className="text-xs text-[#3c3c3c] font-sans font-bold mt-1.5">
+                                                    {turn.myanmar}
+                                                  </div>
+                                                </div>
+
+                                                {/* Small playback action trigger inside speech bubble */}
+                                                <button
+                                                  onClick={() => speakText(turn.thai)}
+                                                  className="absolute bottom-2 right-2 w-7 h-7 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center shadow-xs cursor-pointer active:translate-y-0.5"
+                                                  title="Speak"
+                                                >
+                                                  <Volume2 className="w-3.5 h-3.5 text-brand-purple" />
+                                                </button>
+                                              </div>
+
+                                              {/* Speaker Avatar Badge right */}
+                                              {!isA && (
+                                                <div className="w-8 h-8 rounded-full bg-brand-purple text-white flex items-center justify-center font-sans font-black text-xs select-none shadow-xs shrink-0 mt-1">
+                                                  B
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       </>
                     );
@@ -10266,7 +10994,10 @@ startxref
               )}
 
               {activeTab === 'grammar' && activeLesson && (
-                <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+                activeLesson.id === 2 ? (
+                  <SentenceStructureLesson onBack={() => setActiveLessonId(null)} />
+                ) : (
+                  <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
                   {/* Grammar Notes Pagination Header with Dropdown */}
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white px-6 py-4 rounded-2xl border-2 border-gray-100/80 shadow-xs">
                     <div className="flex items-center gap-2 shrink-0">
@@ -10393,7 +11124,8 @@ startxref
                       </motion.div>
                     );
                   })() : null}
-                </div>
+                  </div>
+                )
               )}
 
               {activeTab === 'quiz' && activeLesson && (
@@ -10440,6 +11172,8 @@ startxref
             orders={orders}
             setOrders={setOrders}
             setIsCourseStoreExpanded={setIsCourseStoreExpanded}
+            registeredUsers={registeredUsers}
+            setRegisteredUsers={setRegisteredUsers}
           />
         )}
 

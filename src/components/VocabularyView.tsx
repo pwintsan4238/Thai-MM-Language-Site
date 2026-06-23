@@ -197,45 +197,83 @@ export default function VocabularyView({
                     const isSelected = selectedWord?.thai === w.thai;
                     const isMastered = masteredWords.includes(w.thai);
 
+                    const getPosEmoji = (pos?: string) => {
+                      const p = (pos || '').toLowerCase();
+                      if (p.includes('noun')) return '📝';
+                      if (p.includes('verb')) return '🏃‍♂️';
+                      if (p.includes('pronoun')) return '👤';
+                      if (p.includes('adjective') || p.includes('adj')) return '✨';
+                      if (p.includes('adverb') || p.includes('adv')) return '⚡';
+                      if (p.includes('phrase') || p.includes('sentence')) return '🗣️';
+                      return '📖';
+                    };
+
+                    const pastelColors = [
+                      'bg-[#EFEFFA] text-[#6366F1]',
+                      'bg-[#FFF5E6] text-[#F97316]',
+                      'bg-[#E6F7F0] text-[#10B981]',
+                      'bg-[#FFF0F2] text-[#F43F5E]',
+                      'bg-[#EEF2FF] text-[#4F46E5]',
+                      'bg-[#F0FDF4] text-[#16A34A]',
+                      'bg-[#ECFDFC] text-[#0D9488]',
+                      'bg-[#FAF5FF] text-[#9333EA]',
+                      'bg-[#FFFBEB] text-[#D97706]',
+                      'bg-[#F8FAFC] text-[#64748B]',
+                    ];
+                    const pastelClass = pastelColors[idx % pastelColors.length];
+
                     return (
                       <button
                         key={idx}
                         onClick={() => setSelectedWord(w)}
-                        className={`text-left p-4 rounded-2xl border-2 flex items-center justify-between gap-4 transition-all focus:outline-none ${
+                        className={`text-left p-3.5 sm:p-4 rounded-3xl border transition-all flex items-center justify-between gap-4 focus:outline-none group ${
                           isSelected
-                            ? 'bg-brand-purple text-white border-brand-purple border-b-4 border-brand-purple-shadow'
+                            ? 'bg-brand-purple/5 border-brand-purple shadow-xs'
                             : isMastered
-                            ? 'bg-brand-green-light/40 hover:bg-brand-green-light/60 text-brand-dark border-brand-green/20 border-b-4 border-brand-green/30'
-                            : 'bg-white hover:bg-gray-50 text-brand-dark border-[#e5e5e5] border-b-4'
+                            ? 'bg-brand-green-light/25 hover:bg-brand-green-light/45 text-brand-dark border-brand-green/20'
+                            : 'bg-white hover:bg-gray-50 text-brand-dark border-slate-100'
                         }`}
                       >
-                        <div className="min-w-0">
-                          <div className={`font-sans font-black text-base truncate ${isSelected ? 'text-white' : 'text-brand-purple'}`}>
-                            {w.thai}
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          {/* Left side Visual POS beautiful pastel badge */}
+                          <div className={`w-13 h-13 sm:w-14 sm:h-14 ${pastelClass} rounded-2xl flex items-center justify-center text-2xl shrink-0 select-none transition-transform duration-300 group-hover:scale-105`}>
+                            {getPosEmoji(w.partOfSpeech)}
                           </div>
-                          <div className={`text-xs font-mono mt-0.5 font-bold ${isSelected ? 'text-purple-200' : 'text-[#58cc02]'}`}>
-                            ({w.phonetic})
-                          </div>
-                          {w.phonetic && (
-                            <div className={`text-[10px] font-sans font-black mt-0.5 ${isSelected ? 'text-purple-100' : 'text-emerald-600'}`}>
-                              အသံထွက်: {getMyanmarPhonetic(w.phonetic)}
+
+                          <div className="min-w-0 flex-1">
+                            {/* Thai script & green phonetic pronunciation */}
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className={`font-sans font-extrabold text-base sm:text-lg select-all tracking-wide ${isSelected ? 'text-brand-purple' : 'text-[#222]'}`}>
+                                {w.thai}
+                              </span>
+                              <span className="text-[11px] sm:text-xs font-bold text-emerald-600 select-all">
+                                ({w.phonetic})
+                              </span>
                             </div>
-                          )}
-                          <div className={`text-xs font-sans mt-2 font-bold truncate ${isSelected ? 'text-white' : 'text-brand-dark'}`}>
-                            {w.myanmar}
+
+                            {/* Myanmar translation directly below */}
+                            <div className="text-xs sm:text-[13.5px] font-sans mt-1 font-bold text-slate-700 leading-tight truncate">
+                              {w.myanmar}
+                            </div>
+
+                            {w.phonetic && (
+                              <div className="text-[10px] font-sans text-slate-400 font-bold mt-1.5">
+                                အသံထွက်: <span className="text-slate-500 bg-slate-50 px-1 py-0.5 rounded text-[9px] font-extrabold">{getMyanmarPhonetic(w.phonetic)}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* Speaker mini icon */}
+                        {/* Speaker circle icon button */}
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
                             speakWord(w.thai);
                           }}
-                          className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-transform hover:scale-105 active:scale-95 ${
+                          className={`w-9.5 h-9.5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                             isSelected
-                              ? 'bg-white/10 text-white border-white/20'
-                              : 'bg-brand-purple-light/25 border-brand-purple/10 text-brand-purple'
+                              ? 'bg-brand-purple text-white border-brand-purple'
+                              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500 hover:text-brand-purple group-hover:scale-105 shadow-3xs'
                           }`}
                         >
                           <Volume2 className="w-4 h-4" />

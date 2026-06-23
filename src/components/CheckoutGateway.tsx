@@ -16,7 +16,7 @@ import {
   UserCheck,
   AlertTriangle
 } from 'lucide-react';
-import { Course, PurchaseOrder } from '../types';
+import { Course, PurchaseOrder, RegisteredUser } from '../types';
 
 // ============================================================================
 // SLEEK MINIMAL BANK LOGOS (INLINE SVGS)
@@ -245,6 +245,8 @@ interface CheckoutGatewayProps {
   orders: PurchaseOrder[];
   setOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
   setIsCourseStoreExpanded: (expanded: boolean) => void;
+  registeredUsers: RegisteredUser[];
+  setRegisteredUsers: React.Dispatch<React.SetStateAction<RegisteredUser[]>>;
 }
 
 export const CheckoutGateway: React.FC<CheckoutGatewayProps> = ({
@@ -274,8 +276,13 @@ export const CheckoutGateway: React.FC<CheckoutGatewayProps> = ({
   orders,
   setOrders,
   setIsCourseStoreExpanded,
+  registeredUsers,
+  setRegisteredUsers,
 }) => {
   if (!isGatewayOpen || !gatewayCourse) return null;
+
+  // Local state for auto signup / login password in enrollment
+  const [gatewayPassword, setGatewayPassword] = useState<string>('');
 
   // Evidence file state
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
@@ -553,15 +560,71 @@ export const CheckoutGateway: React.FC<CheckoutGatewayProps> = ({
                     placeholder="student@example.com"
                   />
                 </div>
+
+                {!currentUser && (() => {
+                  const isExisting = registeredUsers.some(u => u.username.toLowerCase() === checkoutName.trim().toLowerCase());
+                  return (
+                    <div className="animate-fade-in">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        {isExisting ? (
+                          <span className="text-amber-600 font-extrabold flex items-center gap-1">
+                            ⚠️ Student Account Found! Enter Password to Login (အကောင့်ရှိပြီးသားဖြစ်၍ စကားဝှက်ထည့်ပါ)
+                          </span>
+                        ) : (
+                          <span>
+                            Choose Password for Auto-Signup (အကောင့်အသစ်အတွက် စကားဝှက်အသစ်ပေးပါ)
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={gatewayPassword}
+                        onChange={(e) => setGatewayPassword(e.target.value)}
+                        className={`w-full px-3 py-1.5 border focus:bg-white rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all placeholder:text-slate-300 ${
+                          isExisting 
+                            ? 'bg-amber-50/70 border-amber-300 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10' 
+                            : 'bg-slate-50 border-slate-205 focus:border-brand-purple/60'
+                        }`}
+                        placeholder={isExisting ? "Type password to link account..." : "Password (min 4 chars)..."}
+                      />
+                      <p className="text-[9px] text-slate-400 mt-0.5 font-sans leading-normal">
+                        {isExisting 
+                          ? "This student profile is already registered. Logging in will link this course purchase to your progress!" 
+                          : "This password will let you easily log back in anytime to access approved lessons."}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="pt-1">
                 <button
                   type="button"
                   onClick={() => {
-                    if (!checkoutName.trim() || !gatewayPhone.trim()) {
+                    const cleanName = checkoutName.trim();
+                    if (!cleanName || !gatewayPhone.trim()) {
                       alert("Please provide dry contact information (Name and Phone) first.");
                       return;
+                    }
+                    if (!currentUser) {
+                      const cleanPassword = gatewayPassword.trim();
+                      if (!cleanPassword) {
+                        alert("Please provide a password so that you can easily log in to access your course!");
+                        return;
+                      }
+                      const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === cleanName.toLowerCase());
+                      if (matchedUser) {
+                        if (matchedUser.password && matchedUser.password !== cleanPassword) {
+                          alert(`Error: This name "${cleanName}" is already taken by another registered student. Please enter the correct password, or choose a different Student Full Name.`);
+                          return;
+                        }
+                      } else {
+                        if (cleanPassword.length < 4) {
+                          alert("For security, your password must be at least 4 characters.");
+                          return;
+                        }
+                      }
                     }
                     setGatewayStep(2);
                   }}
@@ -844,15 +907,53 @@ export const CheckoutGateway: React.FC<CheckoutGatewayProps> = ({
                     
                     setTimeout(() => {
                       setGatewayProcessing(false);
-                      const buyerUsername = (checkoutName || currentUser || 'Student_' + Math.floor(100 + Math.random() * 900)).trim();
+                      const cleanName = (checkoutName || 'Student_' + Math.floor(100 + Math.random() * 900)).trim();
+                      let buyerUsername = cleanName;
                       
-                      // Handle login
+                      // Handle login / sign-up
                       if (!currentUser) {
-                        setIsLoggedIn(true);
-                        setCurrentUser(buyerUsername);
-                        localStorage.setItem('thai_user_logged_in', 'true');
-                        localStorage.setItem('thai_current_user', buyerUsername);
-                        addSystemLog('System', `Created new account for buyer "${buyerUsername}"`);
+                        const cleanPassword = gatewayPassword.trim();
+                        const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === cleanName.toLowerCase());
+
+                        if (matchedUser) {
+                          // Log in the existing user
+                          setIsLoggedIn(true);
+                          setCurrentUser(matchedUser.username);
+                          localStorage.setItem('thai_user_logged_in', 'true');
+                          localStorage.setItem('thai_current_user', matchedUser.username);
+                          localStorage.setItem('thai_user_is_admin', matchedUser.role === 'admin' ? 'true' : 'false');
+                          addSystemLog(matchedUser.username, `Student logged in during checkout`);
+                          buyerUsername = matchedUser.username;
+                        } else {
+                          // Sign up and log in the new user!
+                          setIsLoggedIn(true);
+                          setCurrentUser(cleanName);
+                          localStorage.setItem('thai_user_logged_in', 'true');
+                          localStorage.setItem('thai_current_user', cleanName);
+                          localStorage.setItem('thai_user_is_admin', 'false');
+
+                          const newUser: RegisteredUser = {
+                            username: cleanName,
+                            password: cleanPassword,
+                            role: 'student',
+                            xp: 0,
+                            dateJoined: new Date().toISOString().split('T')[0],
+                            fullName: cleanName,
+                            phone: gatewayPhone,
+                            email: gatewayEmail
+                          };
+                          
+                          setRegisteredUsers(prev => {
+                            const nextList = [...prev, newUser];
+                            localStorage.setItem('thai_registered_users_list', JSON.stringify(nextList));
+                            return nextList;
+                          });
+
+                          addSystemLog(cleanName, `Registered new student account and auto-logged in during enrollment.`);
+                          buyerUsername = cleanName;
+                        }
+                      } else {
+                        buyerUsername = currentUser;
                       }
 
                       const id = "ORD-" + Math.floor(10000 + Math.random() * 90000);

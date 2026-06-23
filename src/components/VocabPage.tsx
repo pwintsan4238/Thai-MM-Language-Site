@@ -153,31 +153,29 @@ export const VocabPage: React.FC<VocabPageProps> = ({ onClose }) => {
 
       {/* Grid view containing layout */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Dropdown for category on Mobile view only */}
-        <div className="block md:hidden px-4 py-3.5 border-b border-rose-100/30 bg-slate-50/50">
-          <label className="block text-xs font-sans font-black uppercase text-slate-600 mb-2 tracking-wide">
-            📁 Select Vocabulary Category:
-          </label>
-          <div className="relative">
-            <select
-              value={selectedCategoryName}
-              onChange={(e) => {
-                setSelectedCategoryName(e.target.value);
-                setSearchQuery('');
-              }}
-              className="w-full pl-3.5 pr-11 py-3 bg-white border-2 border-slate-200 hover:border-slate-350 rounded-xl font-sans text-sm sm:text-base font-black text-slate-800 focus:outline-none focus:ring-4 focus:ring-brand-purple/15 focus:border-brand-purple transition-all appearance-none cursor-pointer shadow-3xs"
-            >
-              {categories.map((cat) => (
-                <option key={cat.name} value={cat.name} className="font-sans font-bold text-slate-800 text-sm sm:text-base">
-                  {cat.icon} &nbsp;&nbsp; {cat.name}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-              <svg className="fill-current h-4.5 w-4.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-              </svg>
-            </div>
+        {/* Horizontal scroll category container for Mobile & Tablet view (hidden on desktop) */}
+        <div className="block md:hidden px-4 py-3 bg-white border-b border-slate-100 select-none">
+          <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin select-none snap-x check-scrollbar">
+            {categories.map((cat) => {
+              const isSelected = cat.name === selectedCategoryName;
+              return (
+                <button
+                  key={cat.name}
+                  onClick={() => {
+                    setSelectedCategoryName(cat.name);
+                    setSearchQuery('');
+                  }}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold leading-normal transition-all shrink-0 cursor-pointer snap-start flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-brand-purple text-white shadow-3xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span className="text-sm">{cat.icon}</span> 
+                  <span>{cat.name}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -211,77 +209,76 @@ export const VocabPage: React.FC<VocabPageProps> = ({ onClose }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {filteredItems.map((item, idx) => {
                 const isSpeaking = playingWord === item.thai;
+                const pastelColors = [
+                  'bg-[#EFEFFA] text-[#6366F1]',
+                  'bg-[#FFF5E6] text-[#F97316]',
+                  'bg-[#E6F7F0] text-[#10B981]',
+                  'bg-[#FFF0F2] text-[#F43F5E]',
+                  'bg-[#EEF2FF] text-[#4F46E5]',
+                  'bg-[#F0FDF4] text-[#16A34A]',
+                  'bg-[#ECFDFC] text-[#0D9488]',
+                  'bg-[#FAF5FF] text-[#9333EA]',
+                  'bg-[#FFFBEB] text-[#D97706]',
+                  'bg-[#F8FAFC] text-[#64748B]',
+                ];
+                const pastelClass = pastelColors[idx % pastelColors.length];
+
                 return (
                   <div
                     key={idx}
-                    className={`p-4 bg-white rounded-2xl border-2 transition-all flex items-start justify-between gap-3 relative overflow-hidden group ${
+                    className={`p-3.5 sm:p-4 bg-white rounded-3xl border transition-all flex items-center justify-between gap-4 relative overflow-hidden group ${
                       isSpeaking 
                         ? 'border-brand-purple shadow-xs bg-brand-purple/5' 
-                        : 'border-slate-100 hover:border-slate-250 hover:shadow-3xs'
+                        : 'border-slate-100 hover:border-slate-200 hover:shadow-xs'
                     }`}
                   >
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      {/* Audio Speaker Touch Target */}
-                      <button
-                        onClick={() => handleSpeak(item.thai)}
-                        className={`w-9.5 h-9.5 rounded-xl flex items-center justify-center shrink-0 border transition-all cursor-pointer ${
-                          isSpeaking
-                            ? 'bg-brand-purple text-white border-brand-purple border-b-2 border-brand-purple-shadow'
-                            : 'bg-slate-50 text-slate-550 hover:bg-brand-purple/10 hover:text-brand-purple border-slate-100 group-hover:scale-105'
-                        }`}
-                        title="Listen Pronunciation"
-                      >
-                        <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} />
-                      </button>
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      {/* Left side Visual Illustration beautiful pastel badge */}
+                      <div className={`w-14 h-14 sm:w-16 sm:h-16 ${pastelClass} rounded-2xl flex items-center justify-center text-3xl shrink-0 select-none transition-transform duration-300 group-hover:scale-105`}>
+                        {item.illustration}
+                      </div>
 
-                      <div className="flex-1 min-w-0 text-left">
-                        {/* Thai Writing Display */}
+                      <div className="flex-1 min-w-0 text-left space-y-1 sm:space-y-1.5">
+                        {/* Thai Writing & green pronunciation spelling */}
                         <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <span className="font-sans font-black text-xl sm:text-2xl text-slate-800 tracking-wide select-all">
+                          <span className="font-sans font-extrabold text-lg sm:text-[19px] text-[#222] select-all tracking-wide">
                             {item.thai}
+                          </span>
+                          <span className="text-xs sm:text-sm font-bold text-emerald-600 select-all">
+                            ({item.phonetic})
                           </span>
                         </div>
 
-                        {/* Roman Spelling / Phonetics */}
-                        <p className="text-sm sm:text-base text-brand-green font-bold italic font-sans flex items-center gap-1 mt-0.5 select-all">
-                          <span>[{item.phonetic}]</span>
-                        </p>
+                        {/* Myanmar Definition below the Thai word */}
+                        <div className="font-sans font-bold text-[13.5px] sm:text-[15px] text-slate-750 leading-tight select-all">
+                          {item.myanmar}
+                        </div>
 
-                        {/* Myanmar Transcript and Translation */}
-                        <div className="mt-2.5 space-y-1 pt-2 border-t border-slate-100">
-                          <div className="flex items-center gap-1 text-[10.5px]">
-                            <span className="text-[9px] font-sans font-extrabold text-indigo-500 uppercase tracking-widest shrink-0">အသံထွက်:</span>
-                            <span className="font-sans font-extrabold text-slate-700 bg-indigo-50 px-1.5 py-0.5 rounded select-all">
-                              {item.phoneticMm}
-                            </span>
-                          </div>
-
-                          <div className="flex items-start gap-1 py-0.5 text-xs">
-                            <span className="text-[9px] font-sans font-extrabold text-black uppercase tracking-widest mt-1 shrink-0">ENG:</span>
-                            <span className="font-sans font-black text-black select-all">
-                              {item.english}
-                            </span>
-                          </div>
-
-                          <div className="flex items-start gap-1 text-xs">
-                            <span className="text-[9px] font-sans font-extrabold text-black uppercase tracking-widest mt-0.5 shrink-0">MM:</span>
-                            <span className="font-sans font-bold text-black select-all leading-tight">
-                              {item.myanmar}
-                            </span>
-                          </div>
+                        {/* Secondary info breakdown */}
+                        <div className="flex items-center gap-2 flex-wrap pt-0.5 text-[10px] text-slate-400 select-all font-sans font-bold">
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-extrabold text-[9px]">
+                            {item.phoneticMm}
+                          </span>
+                          <span>•</span>
+                          <span className="text-slate-500">
+                            {item.english}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Right side Visual Illustration badge */}
-                    <div className="w-16 h-16 bg-slate-50/70 border border-slate-150/80 rounded-2xl flex items-center justify-center text-4xl shrink-0 select-none shadow-3xs group-hover:scale-110 transition-transform duration-300 self-center">
-                      {item.illustration}
-                    </div>
-
-                    {/* Top-right card index accent badge */}
-                    <div className="absolute top-1.5 right-1 px-1 text-[7px] font-mono font-bold tracking-widest opacity-20 text-slate-400 group-hover:opacity-40">
-                      #{idx + 1}
-                    </div>
+                    {/* Right side tidy speaker button */}
+                    <button
+                      onClick={() => handleSpeak(item.thai)}
+                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 border transition-all cursor-pointer ${
+                        isSpeaking
+                          ? 'bg-brand-purple text-white border-brand-purple shadow-xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-500 hover:text-brand-purple border-slate-200 hover:border-brand-purple/25 shadow-3xs group-hover:scale-105'
+                      }`}
+                      title="Listen Pronunciation"
+                    >
+                      <Volume2 className={`w-4 h-4 sm:w-4.5 sm:h-4.5 ${isSpeaking ? 'animate-pulse text-white' : ''}`} />
+                    </button>
                   </div>
                 );
               })}
